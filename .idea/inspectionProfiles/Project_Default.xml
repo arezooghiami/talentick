@@ -1,0 +1,32 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="bcrypt" />
+          <option value="dotenv" />
+          <option value="fastapi" />
+          <option value="itsdangerous" />
+          <option value="jdatetime" />
+          <option value="jinja2" />
+          <option value="jose" />
+          <option value="khayyam" />
+          <option value="openpyxl" />
+          <option value="pandas" />
+          <option value="passlib" />
+          <option value="persiantools" />
+          <option value="psycopg" />
+          <option value="psycopg2" />
+          <option value="python-dotenv" />
+          <option value="python-multipart" />
+          <option value="pytz" />
+          <option value="sqlalchemy" />
+          <option value="starlette" />
+          <option value="uvicorn" />
+          <option value="v" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
