@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>پنل مدیریت — Talentick</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/variables.css">
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <style>
+    /* ─── Page-specific overrides ─────────────────────────── */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .page-header h1 {
+      font-size: var(--font-2xl);
+      font-weight: 700;
+      color: var(--gray-800);
+    }
+    .page-header p {
+      font-size: var(--font-sm);
+      color: var(--gray-500);
+      margin-top: 4px;
+    }
+
+    .org-select-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .org-select-wrap label {
+      font-size: var(--font-sm);
+      font-weight: 500;
+      color: var(--gray-600);
+      white-space: nowrap;
+    }
+    .org-select-wrap select {
+      min-width: 200px;
+    }
+
+    /* ─── Table actions cell ──────────────────────────────── */
+    .actions-cell {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    /* ─── User card in table ──────────────────────────────── */
+    .user-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .org-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .org-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: var(--primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── Toast container ─────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<div class="app-shell">
+
+  <!-- ─── Sidebar ───────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo-text">🎓 Talentick</div>
+      <div class="logo-sub">پنل مدیریت</div>
+    </div>
+
+    <div class="sidebar-section-title">مدیریت</div>
+    <nav class="sidebar-nav">
+      <a href="#" data-section="orgs" onclick="switchSection('orgs',this)" class="active">
+        <span class="nav-icon">🏢</span>
+        <span>سازمان‌ها</span>
+      </a>
+      <a href="#" data-section="users" onclick="switchSection('users',this)">
+        <span class="nav-icon">👥</span>
+        <span>کاربران</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="avatar avatar-md" id="sidebar-user-init">—</div>
+        <div class="user-info">
+          <div class="name" id="sidebar-user-name">—</div>
+          <div class="role" id="sidebar-user-role">—</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost w-full mt-4" style="color:var(--sidebar-text);font-size:var(--font-sm);" onclick="Auth.logout()">
+        خروج از سیستم
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── Main Content ───────────────────────────────────── -->
+  <div class="main-content">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">سازمان‌ها</span>
+    </div>
+
+    <div class="page-body">
+
+      <!-- ═══ SECTION: Organizations ═══════════════════════ -->
+      <section id="section-orgs">
+        <div class="page-header">
+          <div>
+            <h1>سازمان‌ها</h1>
+            <p>مدیریت تمام سازمان‌های ثبت‌شده در سیستم</p>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('modal-create-org')">
+            ➕ سازمان جدید
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="stat-grid" id="org-stats">
+          <div class="stat-card">
+            <div class="stat-icon purple">🏢</div>
+            <div>
+              <div class="stat-value" id="stat-org-total">—</div>
+              <div class="stat-label">کل سازمان‌ها</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green">✅</div>
+            <div>
+              <div class="stat-value" id="stat-org-active">—</div>
+              <div class="stat-label">سازمان فعال</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue">👥</div>
+            <div>
+              <div class="stat-value" id="stat-user-total">—</div>
+              <div class="stat-label">کل کاربران</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card">
+          <div class="card-header">
+            <h2>لیست سازمان‌ها</h2>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>سازمان</th>
+                  <th>Slug</th>
+                  <th>وب‌سایت</th>
+                  <th>پلن</th>
+                  <th>وضعیت</th>
+                  <th>تاریخ ثبت</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody id="orgs-tbody">
+                <tr class="loading-row"><td colspan="7">در حال بارگذاری...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ SECTION: Users ════════════════════════════════ -->
+      <section id="section-users" class="hidden">
+        <div class="page-header">
+          <div>
+            <h1>کاربران</h1>
+            <p>مدیریت تمام کاربران سیستم</p>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('modal-create-user')">
+            ➕ کاربر جدید
+          </button>
+        </div>
+
+        <!-- Filter by org -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-body" style="padding:16px 24px;">
+            <div class="org-select-wrap">
+              <label>فیلتر سازمان:</label>
+              <select id="user-filter-org" class="form-control" onchange="loadUsers()">
+                <option value="">همه سازمان‌ها</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>لیست کاربران</h2>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>کاربر</th>
+                  <th>ایمیل</th>
+                  <th>نقش</th>
+                  <th>سازمان</th>
+                  <th>وضعیت</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr class="loading-row"><td colspan="6">در حال بارگذاری...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /page-body -->
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+
+
+<!-- ═══ MODAL: Create Organization ═══════════════════════════ -->
+<div id="modal-create-org" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>ایجاد سازمان جدید</h3>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-create-org')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">نام سازمان <span class="required">*</span></label>
+          <input id="org-name" class="form-control" placeholder="شرکت نمونه">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Slug (شناسه URL) <span class="required">*</span></label>
+          <input id="org-slug" class="form-control" placeholder="namune-company" dir="ltr">
+          <span class="form-hint">فقط حروف لاتین، اعداد و خط تیره</span>
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">نام انگلیسی</label>
+          <input id="org-name-en" class="form-control" placeholder="Example Corp" dir="ltr">
+        </div>
+        <div class="form-group">
+          <label class="form-label">وب‌سایت</label>
+          <input id="org-website" class="form-control" placeholder="https://example.com" dir="ltr">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">توضیحات</label>
+        <textarea id="org-desc" class="form-control" rows="3" placeholder="معرفی کوتاه سازمان..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btn-create-org" onclick="createOrg()">
+        ذخیره سازمان
+      </button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-create-org')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: Create User ═══════════════════════════════════ -->
+<div id="modal-create-user" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>افزودن کاربر جدید</h3>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-create-user')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">نام و نام خانوادگی <span class="required">*</span></label>
+          <input id="u-name" class="form-control" placeholder="علی محمدی">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ایمیل <span class="required">*</span></label>
+          <input id="u-email" class="form-control" placeholder="user@company.com" type="email" dir="ltr">
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">پسورد <span class="required">*</span></label>
+          <input id="u-password" class="form-control" placeholder="حداقل ۸ کاراکتر" type="password" dir="ltr">
+        </div>
+        <div class="form-group">
+          <label class="form-label">شماره تماس</label>
+          <input id="u-phone" class="form-control" placeholder="09..." dir="ltr">
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">سازمان <span class="required">*</span></label>
+          <select id="u-org" class="form-control">
+            <option value="">انتخاب سازمان...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">نقش <span class="required">*</span></label>
+          <select id="u-role" class="form-control">
+            <option value="employee">کارمند</option>
+            <option value="manager">مدیر</option>
+            <option value="org_admin">ادمین سازمان</option>
+            <option value="super_admin">سوپر ادمین</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btn-create-user" onclick="createUser()">
+        ذخیره کاربر
+      </button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-create-user')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ MODAL: Confirm Delete ════════════════════════════════ -->
+<div id="modal-confirm-delete" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <h3>تأیید حذف</h3>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-confirm-delete')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-msg" style="color:var(--gray-700);line-height:1.7;">آیا مطمئن هستید؟</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="btn-confirm-yes">حذف</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-confirm-delete')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ─── Scripts ────────────────────────────────────────────── -->
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/utils.js"></script>
+<script>
+  // ─── Auth Guard ──────────────────────────────────────────
+  Auth.requireAuth(['super_admin', 'org_admin', 'manager']);
+  fillSidebarUser();
+
+  const currentUser = Auth.getUser();
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
+  // Hide super_admin option if not super_admin
+  if (!isSuperAdmin) {
+    const saOption = document.querySelector('#u-role option[value="super_admin"]');
+    if (saOption) saOption.remove();
+  }
+
+  // ─── State ───────────────────────────────────────────────
+  let orgs = [];
+  let users = [];
+
+  // ─── Section switching ───────────────────────────────────
+  function switchSection(name, linkEl) {
+    document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+    if (linkEl) linkEl.classList.add('active');
+
+    document.getElementById('section-orgs').classList.toggle('hidden', name !== 'orgs');
+    document.getElementById('section-users').classList.toggle('hidden', name !== 'users');
+
+    const titles = { orgs: 'سازمان‌ها', users: 'کاربران' };
+    document.getElementById('topbar-title').textContent = titles[name] || '';
+
+    if (name === 'users') loadUsers();
+  }
+
+  // ─── Load organizations ──────────────────────────────────
+  async function loadOrgs() {
+    try {
+      orgs = await api.get('/orgs/');
+      renderOrgs();
+      populateOrgSelects();
+
+      // stats
+      document.getElementById('stat-org-total').textContent = orgs.length;
+      document.getElementById('stat-org-active').textContent = orgs.filter(o => o.is_active).length;
+    } catch(e) {
+      toastError(e.message);
+    }
+  }
+
+  function renderOrgs() {
+    const tbody = document.getElementById('orgs-tbody');
+    if (!orgs.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
+        <div class="empty-icon">🏢</div>
+        <h3>هنوز سازمانی ثبت نشده</h3>
+        <p>اولین سازمان خود را اضافه کنید</p>
+      </div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = orgs.map(org => `
+      <tr>
+        <td>
+          <div class="org-cell">
+            <div class="org-logo">${(org.name || org.name_en || '?')[0]}</div>
+            <div>
+              <div style="font-weight:600;">${org.name}</div>
+              ${org.name_en ? `<div class="text-sm text-muted">${org.name_en}</div>` : ''}
+            </div>
+          </div>
+        </td>
+        <td><code style="font-size:12px;background:var(--gray-100);padding:2px 6px;border-radius:4px;">${org.slug}</code></td>
+        <td>${org.website ? `<a href="${org.website}" target="_blank" style="color:var(--primary);">${org.website}</a>` : '—'}</td>
+        <td><span class="badge badge-blue">${org.plan}</span></td>
+        <td>${statusBadge(org.is_active)}</td>
+        <td class="text-sm text-muted">—</td>
+        <td>
+          <div class="actions-cell">
+            <button class="btn btn-sm btn-danger" onclick="confirmDelete('org','${org.id}','${org.name}')">حذف</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function populateOrgSelects() {
+    // modal create-user select
+    const uOrg = document.getElementById('u-org');
+    uOrg.innerHTML = '<option value="">انتخاب سازمان...</option>' +
+      orgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+
+    // user filter select
+    const filterOrg = document.getElementById('user-filter-org');
+    filterOrg.innerHTML = '<option value="">همه سازمان‌ها</option>' +
+      orgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+  }
+
+  // ─── Create Organization ─────────────────────────────────
+  async function createOrg() {
+    const name = document.getElementById('org-name').value.trim();
+    const slug = document.getElementById('org-slug').value.trim();
+
+    if (!name || !slug) { toastError('نام و Slug اجباری هستند'); return; }
+    if (!/^[a-z0-9-]+$/.test(slug)) { toastError('Slug فقط شامل حروف لاتین کوچک، اعداد و خط تیره'); return; }
+
+    const btn = document.getElementById('btn-create-org');
+    setLoading(btn, true);
+
+    try {
+      await api.post('/orgs/', {
+        name,
+        slug,
+        name_en: document.getElementById('org-name-en').value.trim() || null,
+        website:  document.getElementById('org-website').value.trim() || null,
+        description: document.getElementById('org-desc').value.trim() || null,
+      });
+
+      toastSuccess('سازمان با موفقیت ایجاد شد');
+      closeModal('modal-create-org');
+      resetOrgForm();
+      await loadOrgs();
+
+    } catch(e) {
+      toastError(e.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  function resetOrgForm() {
+    ['org-name','org-slug','org-name-en','org-website','org-desc']
+      .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  }
+
+  // ─── Load Users ──────────────────────────────────────────
+  async function loadUsers() {
+    const orgId = document.getElementById('user-filter-org').value;
+    try {
+      const qs = orgId ? `?org_id=${orgId}` : '';
+      users = await api.get('/users/' + qs);
+      renderUsers();
+      document.getElementById('stat-user-total').textContent = users.length;
+    } catch(e) {
+      toastError(e.message);
+    }
+  }
+
+  function renderUsers() {
+    const tbody = document.getElementById('users-tbody');
+    if (!users.length) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <h3>کاربری یافت نشد</h3>
+        <p>اولین کاربر را اضافه کنید</p>
+      </div></td></tr>`;
+      return;
+    }
+
+    const orgMap = {};
+    orgs.forEach(o => orgMap[o.id] = o.name);
+
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td>
+          <div class="user-cell">
+            <div class="avatar avatar-sm">${initials(u.full_name)}</div>
+            <span style="font-weight:500;">${u.full_name}</span>
+          </div>
+        </td>
+        <td dir="ltr" style="text-align:right;">${u.email}</td>
+        <td>${roleBadge(u.role)}</td>
+        <td>${orgMap[u.org_id] || '—'}</td>
+        <td>${statusBadge(u.is_active)}</td>
+        <td>
+          <div class="actions-cell">
+            ${u.is_active
+              ? `<button class="btn btn-sm btn-secondary" onclick="toggleUser('${u.id}',false)">غیرفعال</button>`
+              : `<button class="btn btn-sm btn-secondary" onclick="toggleUser('${u.id}',true)">فعال‌سازی</button>`}
+            <button class="btn btn-sm btn-danger" onclick="confirmDelete('user','${u.id}','${u.full_name}')">حذف</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // ─── Create User ─────────────────────────────────────────
+  async function createUser() {
+    const name     = document.getElementById('u-name').value.trim();
+    const email    = document.getElementById('u-email').value.trim();
+    const password = document.getElementById('u-password').value;
+    const orgId    = document.getElementById('u-org').value;
+    const role     = document.getElementById('u-role').value;
+    const phone    = document.getElementById('u-phone').value.trim();
+
+    if (!name || !email || !password || !orgId) {
+      toastError('فیلدهای ستاره‌دار اجباری هستند');
+      return;
+    }
+    if (password.length < 6) {
+      toastError('پسورد باید حداقل ۶ کاراکتر باشد');
+      return;
+    }
+
+    const btn = document.getElementById('btn-create-user');
+    setLoading(btn, true);
+
+    try {
+      await api.post('/users/', {
+        full_name: name,
+        email,
+        password,
+        org_id: orgId,
+        role,
+        phone: phone || null,
+      });
+
+      toastSuccess('کاربر با موفقیت ایجاد شد');
+      closeModal('modal-create-user');
+      resetUserForm();
+      await loadUsers();
+
+    } catch(e) {
+      toastError(e.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  function resetUserForm() {
+    ['u-name','u-email','u-password','u-phone']
+      .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    document.getElementById('u-org').value = '';
+    document.getElementById('u-role').value = 'employee';
+  }
+
+  // ─── Toggle user active ───────────────────────────────────
+  async function toggleUser(userId, isActive) {
+    try {
+      await api.patch(`/users/${userId}`, { is_active: isActive });
+      toastSuccess(isActive ? 'کاربر فعال شد' : 'کاربر غیرفعال شد');
+      await loadUsers();
+    } catch(e) {
+      toastError(e.message);
+    }
+  }
+
+  // ─── Confirm delete ───────────────────────────────────────
+  function confirmDelete(type, id, label) {
+    document.getElementById('confirm-msg').textContent =
+      `آیا مطمئن هستید که می‌خواهید "${label}" را حذف کنید؟ این عمل قابل بازگشت نیست.`;
+    openModal('modal-confirm-delete');
+
+    const yesBtn = document.getElementById('btn-confirm-yes');
+    yesBtn.onclick = async () => {
+      closeModal('modal-confirm-delete');
+      try {
+        if (type === 'org')  await api.delete(`/orgs/${id}`);
+        if (type === 'user') await api.delete(`/users/${id}`);
+        toastSuccess('با موفقیت حذف شد');
+        if (type === 'org') await loadOrgs();
+        else await loadUsers();
+      } catch(e) {
+        toastError(e.message);
+      }
+    };
+  }
+
+  // ─── Auto-generate slug from org name ────────────────────
+  document.getElementById('org-name').addEventListener('input', (e) => {
+    const slugEl = document.getElementById('org-slug');
+    // Only auto-fill if user hasn't typed in slug manually
+    if (!slugEl.dataset.manual) {
+      const slug = e.target.value
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-');
+      slugEl.value = slug;
+    }
+  });
+
+  document.getElementById('org-slug').addEventListener('input', (e) => {
+    e.target.dataset.manual = '1';
+  });
+
+  // ─── Init ─────────────────────────────────────────────────
+  loadOrgs();
+  loadUsers();  // pre-load for stats
+</script>
+
+</body>
+</html>

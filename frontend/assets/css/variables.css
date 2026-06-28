@@ -1,0 +1,63 @@
+/* =============================================================================
+   Talentick — Design Tokens (CSS Variables)
+   ============================================================================= */
+:root {
+  /* ─── Brand Colors ─────────────────────────────────────────── */
+  --primary:        #5B6AF5;
+  --primary-dark:   #4150E8;
+  --primary-light:  #EEF0FF;
+  --secondary:      #00C9A7;
+  --danger:         #F45B5B;
+  --warning:        #FFB800;
+  --success:        #22C55E;
+  --info:           #38BDF8;
+
+  /* ─── Neutrals ─────────────────────────────────────────────── */
+  --gray-50:   #F9FAFB;
+  --gray-100:  #F3F4F6;
+  --gray-200:  #E5E7EB;
+  --gray-300:  #D1D5DB;
+  --gray-400:  #9CA3AF;
+  --gray-500:  #6B7280;
+  --gray-600:  #4B5563;
+  --gray-700:  #374151;
+  --gray-800:  #1F2937;
+  --gray-900:  #111827;
+
+  /* ─── Sidebar ───────────────────────────────────────────────── */
+  --sidebar-bg:      #1A1F3C;
+  --sidebar-hover:   #252B52;
+  --sidebar-active:  #5B6AF5;
+  --sidebar-text:    #A8B0D8;
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-width:   256px;
+
+  /* ─── Layout ────────────────────────────────────────────────── */
+  --topbar-height: 64px;
+  --content-bg:    #F4F6FC;
+  --card-bg:       #FFFFFF;
+  --border:        #E5E7EB;
+
+  /* ─── Shadows ───────────────────────────────────────────────── */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.08);
+  --shadow-md:  0 4px 16px rgba(0,0,0,.10);
+  --shadow-lg:  0 8px 32px rgba(0,0,0,.12);
+
+  /* ─── Typography ────────────────────────────────────────────── */
+  --font-family: 'Vazirmatn', system-ui, sans-serif;
+  --font-sm:   0.8125rem;   /* 13px */
+  --font-base: 0.9375rem;   /* 15px */
+  --font-lg:   1.0625rem;   /* 17px */
+  --font-xl:   1.25rem;
+  --font-2xl:  1.5rem;
+  --font-3xl:  1.875rem;
+
+  /* ─── Radius ────────────────────────────────────────────────── */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
+
+  /* ─── Transitions ───────────────────────────────────────────── */
+  --transition: 150ms ease;
+}

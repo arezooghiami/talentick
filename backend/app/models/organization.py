@@ -91,6 +91,10 @@ class Organization(UUIDMixin, TimestampMixin, Base):
     users: Mapped[list["User"]] = relationship(
         back_populates="organization"
     )
+    positions: Mapped[list["Position"]] = relationship(
+        back_populates="organization",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Organization slug={self.slug!r} name={self.name!r}>"

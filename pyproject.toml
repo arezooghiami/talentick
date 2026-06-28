@@ -5,6 +5,7 @@ description = ""
 authors = [
     {name = "arezooghiami",email = "ghiamiarezoo@yahoo.com"}
 ]
+package-mode = false
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -22,7 +23,8 @@ dependencies = [
     "greenlet (>=3.5.3,<4.0.0)",
     "jinja2 (>=3.1.6,<4.0.0)",
     "psycopg (>=3.3.4,<4.0.0)",
-    "psycopg2-binary (>=2.9.12,<3.0.0)"
+    "psycopg2-binary (>=2.9.12,<3.0.0)",
+    "bcrypt (==4.0.1)"
 ]
 
 

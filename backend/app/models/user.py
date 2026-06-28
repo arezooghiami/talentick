@@ -113,6 +113,8 @@ class User(UUIDMixin, TimestampMixin, Base):
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    department: Mapped["Department | None"] = relationship()
+    position: Mapped["Position | None"] = relationship()
 
     def __repr__(self) -> str:
         return f"<User email={self.email!r} role={self.role!r}>"

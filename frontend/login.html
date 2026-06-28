@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ورود به Talentick</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:       #5B6AF5;
+      --primary-dark:  #4150E8;
+      --primary-light: #EEF0FF;
+      --sidebar-bg:    #1A1F3C;
+      --gray-50:  #F9FAFB;
+      --gray-100: #F3F4F6;
+      --gray-200: #E5E7EB;
+      --gray-300: #D1D5DB;
+      --gray-400: #9CA3AF;
+      --gray-500: #6B7280;
+      --gray-700: #374151;
+      --gray-800: #1F2937;
+      --danger:   #F45B5B;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --shadow-md: 0 4px 24px rgba(0,0,0,.12);
+      --font: 'Vazirmatn', system-ui, sans-serif;
+    }
+
+    html { direction: rtl; }
+
+    body {
+      font-family: var(--font);
+      background: #F0F2FF;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-wrapper {
+      display: flex;
+      width: 100%;
+      max-width: 900px;
+      min-height: 520px;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+
+    /* ─── Left side: branding panel ───────────────────── */
+    .brand-panel {
+      background: var(--sidebar-bg);
+      width: 380px;
+      flex-shrink: 0;
+      padding: 48px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brand-panel::before {
+      content: '';
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: rgba(91,106,245,.15);
+      bottom: -80px;
+      left: -80px;
+    }
+
+    .brand-panel::after {
+      content: '';
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: rgba(91,106,245,.1);
+      top: 40px;
+      left: 40px;
+    }
+
+    .brand-logo {
+      position: relative;
+      z-index: 1;
+    }
+
+    .brand-logo .logo-icon {
+      width: 52px;
+      height: 52px;
+      background: var(--primary);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 16px;
+    }
+
+    .brand-logo h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -.5px;
+    }
+
+    .brand-logo p {
+      font-size: .9rem;
+      color: rgba(168,176,216,.8);
+      margin-top: 8px;
+      line-height: 1.6;
+    }
+
+    .brand-features {
+      position: relative;
+      z-index: 1;
+    }
+
+    .brand-features .feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .brand-features .feature .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .brand-features .feature span {
+      font-size: .85rem;
+      color: rgba(168,176,216,.9);
+    }
+
+    /* ─── Right side: login form ──────────────────────── */
+    .form-panel {
+      flex: 1;
+      background: #fff;
+      padding: 56px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .form-panel h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--gray-800);
+      margin-bottom: 6px;
+    }
+
+    .form-panel .subtitle {
+      font-size: .9rem;
+      color: var(--gray-500);
+      margin-bottom: 36px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 18px;
+    }
+
+    .form-label {
+      font-size: .875rem;
+      font-weight: 500;
+      color: var(--gray-700);
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--gray-400);
+      pointer-events: none;
+      font-size: 16px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 11px 38px 11px 13px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      font-family: var(--font);
+      font-size: .9375rem;
+      color: var(--gray-800);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(91,106,245,.12);
+    }
+
+    .form-control.error { border-color: var(--danger); }
+
+    .form-error {
+      font-size: .75rem;
+      color: var(--danger);
+    }
+
+    /* password toggle */
+    .toggle-pass {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--gray-400);
+      cursor: pointer;
+      font-size: 15px;
+      padding: 2px;
+    }
+
+    .toggle-pass:hover { color: var(--gray-600); }
+
+    /* alert box */
+    .alert-error {
+      display: none;
+      background: #FEF2F2;
+      border: 1px solid #FCA5A5;
+      color: #B91C1C;
+      border-radius: var(--radius-md);
+      padding: 11px 14px;
+      font-size: .875rem;
+      margin-bottom: 18px;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert-error.show { display: flex; }
+
+    /* submit button */
+    .btn-login {
+      width: 100%;
+      padding: 13px;
+      background: var(--primary);
+      color: #fff;
+      font-family: var(--font);
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .btn-login:hover:not(:disabled) {
+      background: var(--primary-dark);
+    }
+
+    .btn-login:active:not(:disabled) { transform: scale(.98); }
+    .btn-login:disabled { opacity: .6; cursor: not-allowed; }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* footer */
+    .form-footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: .8125rem;
+      color: var(--gray-400);
+    }
+
+    @media (max-width: 700px) {
+      .brand-panel { display: none; }
+      .form-panel { padding: 40px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-wrapper">
+
+  <!-- Brand Panel -->
+  <div class="brand-panel">
+    <div class="brand-logo">
+      <div class="logo-icon">🎓</div>
+      <h1>Talentick</h1>
+      <p>پلتفرم یادگیری و آموزش<br>سازمانی بومی ایران</p>
+    </div>
+    <div class="brand-features">
+      <div class="feature">
+        <div class="dot"></div>
+        <span>آموزش و آشنایی ساختاریافته</span>
+      </div>
+      <div class="feature">
+        <div class="dot"></div>
+        <span>مدیریت محتوای سازمانی</span>
+      </div>
+      <div class="feature">
+        <div class="dot"></div>
+        <span>ارزیابی و آزمون تعاملی</span>
+      </div>
+      <div class="feature">
+        <div class="dot"></div>
+        <span>داشبورد مدیریتی پیشرفته</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Panel -->
+  <div class="form-panel">
+    <h2>خوش آمدید 👋</h2>
+    <p class="subtitle">برای ادامه وارد حساب کاربری خود شوید</p>
+
+    <div id="alert-error" class="alert-error">
+      <span>⚠️</span>
+      <span id="alert-msg">خطا</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="email">ایمیل</label>
+      <div class="input-wrap">
+        <span class="input-icon">✉️</span>
+        <input
+          id="email"
+          type="email"
+          class="form-control"
+          placeholder="example@company.com"
+          autocomplete="email"
+          dir="ltr"
+        >
+      </div>
+      <span class="form-error" id="email-err"></span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="password">پسورد</label>
+      <div class="input-wrap">
+        <span class="input-icon">🔒</span>
+        <input
+          id="password"
+          type="password"
+          class="form-control"
+          placeholder="••••••••"
+          autocomplete="current-password"
+          dir="ltr"
+        >
+        <button type="button" class="toggle-pass" id="toggle-pass" title="نمایش/پنهان">👁</button>
+      </div>
+      <span class="form-error" id="pass-err"></span>
+    </div>
+
+    <button class="btn-login" id="login-btn" onclick="doLogin()">
+      ورود به سیستم
+    </button>
+
+    <div class="form-footer">
+      Talentick v0 — نسخه دمو
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ─── Config ──────────────────────────────────────────────────────
+  const API_BASE  = 'http://localhost:8000/api';
+  const TOKEN_KEY = 'talentick_token';
+  const USER_KEY  = 'talentick_user';
+
+  // Redirect if already logged in
+  if (localStorage.getItem(TOKEN_KEY)) {
+    const user = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
+    redirectByRole(user.role);
+  }
+
+  function redirectByRole(role) {
+    if (role === 'super_admin' || role === 'org_admin' || role === 'manager') {
+      window.location.href = '/admin/index.html';
+    } else {
+      window.location.href = '/onboarding/index.html';
+    }
+  }
+
+  // ─── Password toggle ─────────────────────────────────────────────
+  document.getElementById('toggle-pass').addEventListener('click', () => {
+    const inp = document.getElementById('password');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  });
+
+  // ─── Enter key ───────────────────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  // ─── Login ───────────────────────────────────────────────────────
+  async function doLogin() {
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn      = document.getElementById('login-btn');
+
+    // clear errors
+    showAlert('');
+    setErr('email-err', '');
+    setErr('pass-err', '');
+
+    // simple validation
+    if (!email) { setErr('email-err', 'ایمیل را وارد کنید'); return; }
+    if (!password) { setErr('pass-err', 'پسورد را وارد کنید'); return; }
+
+    // loading state
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> در حال ورود...';
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const msg = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail;
+        showAlert(msg || 'ایمیل یا پسورد اشتباه است');
+        return;
+      }
+
+      // Save session
+      localStorage.setItem(TOKEN_KEY, data.access_token);
+      localStorage.setItem(USER_KEY, JSON.stringify({
+        id:        data.user_id,
+        org_id:    data.org_id,
+        role:      data.role,
+        full_name: data.full_name,
+      }));
+
+      redirectByRole(data.role);
+
+    } catch (err) {
+      showAlert('خطا در اتصال به سرور. لطفاً دوباره تلاش کنید.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'ورود به سیستم';
+    }
+  }
+
+  function showAlert(msg) {
+    const el = document.getElementById('alert-error');
+    const msgEl = document.getElementById('alert-msg');
+    if (msg) {
+      msgEl.textContent = msg;
+      el.classList.add('show');
+    } else {
+      el.classList.remove('show');
+    }
+  }
+
+  function setErr(id, msg) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = msg;
+  }
+</script>
+</body>
+</html>
