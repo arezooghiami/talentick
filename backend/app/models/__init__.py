@@ -10,12 +10,12 @@ Talentick — Models Package
 
 from app.models.base import Base  # noqa: F401
 from app.models.content import Content, ContentItem, UserContentProgress  # noqa: F401
-# from app.models.onboarding import (  # noqa: F401
-#     OnboardingProgram,
-#     ProgramStep,
-#     UserProgramEnrollment,
-#     UserStepProgress,
-# )
+from app.models.onboarding import (  # noqa: F401
+    OnboardingProgram,
+    ProgramStep,
+    UserProgramEnrollment,
+    UserStepProgress,
+)
 from app.models.organization import Department, Organization, Position  # noqa: F401
 from app.models.quiz import Quiz, Question, QuestionOption, QuizAttempt  # noqa: F401
 from app.models.user import Invitation, RefreshToken, User  # noqa: F401
@@ -35,10 +35,10 @@ __all__ = [
     "ContentItem",
     "UserContentProgress",
     # Onboarding
-    # "OnboardingProgram",
-    # "ProgramStep",
-    # "UserProgramEnrollment",
-    # "UserStepProgress",
+    "OnboardingProgram",
+    "ProgramStep",
+    "UserProgramEnrollment",
+    "UserStepProgress",
     # Quiz
     "Quiz",
     "Question",
