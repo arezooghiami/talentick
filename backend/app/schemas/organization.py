@@ -2,6 +2,7 @@
 Talentick — Organization Schemas
 """
 import uuid
+from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
 
@@ -42,5 +43,6 @@ class OrganizationResponse(BaseModel):
     phone: Optional[str]
     plan: str
     is_active: bool
+    created_at: Optional[datetime] = None   # ← اضافه شد
 
     model_config = {"from_attributes": True}

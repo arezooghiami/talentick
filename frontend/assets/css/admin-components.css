@@ -1,0 +1,146 @@
+/* =============================================================================
+   Talentick — Admin Panel: Shared Components
+   =============================================================================
+   مکمل admin.css (که فقط layout/sidebar/dashboard-widgets را دارد).
+   این فایل را هر صفحه‌ای که از admin.css استفاده می‌کند باید لود کند.
+   تمام کلاس‌ها از روی طراحی اصلی super-admin.html استخراج شده‌اند تا
+   ظاهر برای هر سه نقش (super_admin / org_admin / manager) یکسان بماند.
+   ============================================================================= */
+
+/* ─── View switching (هر صفحه‌ی داخل dashboard یک .view است) ────────── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ─── Role-based visibility ───────────────────────────────────────── */
+.hidden { display: none !important; }
+
+/* ─── Page / View header ──────────────────────────────────────────── */
+.view-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
+.view-title { font-size: 18px; font-weight: 700; color: var(--gray-800); }
+.view-subtitle { font-size: 13px; color: var(--gray-400); margin-top: 2px; }
+.struct-section-title { font-weight: 700; color: var(--gray-800); font-size: 14px; }
+
+/* ─── Buttons ──────────────────────────────────────────────────────── */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius-md); font-size: 13px; font-weight: 600; cursor: pointer; border: none; font-family: 'Vazirmatn', sans-serif; transition: opacity .15s, background .15s; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { opacity: .9; }
+.btn-secondary { background: var(--gray-100); color: var(--gray-700); }
+.btn-secondary:hover:not(:disabled) { background: var(--gray-200); }
+.btn-danger { background: #FEF2F2; color: #DC2626; }
+.btn-danger:hover:not(:disabled) { background: #FEE2E2; }
+.btn-icon { padding: 6px; width: 30px; height: 30px; justify-content: center; background: transparent; color: var(--gray-400); border-radius: var(--radius-sm); }
+.btn-icon:hover { background: var(--gray-100); }
+
+.btn-action { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500; cursor: pointer; border: none; font-family: 'Vazirmatn', sans-serif; transition: opacity .15s; }
+.btn-action:hover { opacity: .8; }
+.btn-toggle-on  { background: #FEF2F2; color: #DC2626; }
+.btn-toggle-off { background: #ECFDF5; color: #059669; }
+
+/* ─── Badges ───────────────────────────────────────────────────────── */
+.badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.badge-active   { background: #ECFDF5; color: #059669; }
+.badge-inactive { background: #FEF2F2; color: #DC2626; }
+.badge-super    { background: #EDE9FE; color: #7C3AED; }
+.badge-admin    { background: #EFF6FF; color: #2563EB; }
+.badge-manager  { background: #FFF7ED; color: #D97706; }
+.badge-employee { background: var(--gray-100); color: var(--gray-600); }
+
+/* ─── Data table card (جدول + هدر جستجو/فیلتر + صفحه‌بندی) ─────────── */
+.data-table-wrap { background: var(--card-bg); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm); }
+.data-table-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); gap: 12px; flex-wrap: wrap; }
+
+.search-box { display: flex; align-items: center; gap: 8px; background: var(--gray-50); border: 1.5px solid var(--gray-200); border-radius: var(--radius-md); padding: 7px 12px; flex: 1; max-width: 300px; }
+.search-box input { border: none; background: none; outline: none; font-family: 'Vazirmatn', sans-serif; font-size: 13px; color: var(--gray-800); width: 100%; }
+.search-box svg { color: var(--gray-400); flex-shrink: 0; }
+
+.filter-select { padding: 7px 12px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-md); font-family: 'Vazirmatn', sans-serif; font-size: 13px; color: var(--gray-700); background: var(--gray-50); outline: none; cursor: pointer; }
+
+.data-table-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table-wrap thead th { background: var(--gray-50); padding: 11px 16px; text-align: right; font-weight: 600; color: var(--gray-500); font-size: 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.data-table-wrap tbody td { padding: 13px 16px; color: var(--gray-700); border-bottom: 1px solid var(--border); vertical-align: middle; }
+.data-table-wrap tbody tr:last-child td { border-bottom: none; }
+.data-table-wrap tbody tr:hover { background: var(--gray-50); }
+
+/* ─── Pagination ───────────────────────────────────────────────────── */
+.pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--gray-500); }
+.pagination-btns { display: flex; gap: 6px; }
+.page-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 13px; color: var(--gray-700); font-family: 'Vazirmatn', sans-serif; transition: all .15s; }
+.page-btn:hover { border-color: var(--primary); color: var(--primary); }
+.page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.page-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ─── Placeholder section (برای منوهای هنوز توسعه‌نیافته) ───────────── */
+.placeholder-section { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; text-align: center; gap: 12px; }
+.placeholder-badge { display: inline-block; padding: 4px 14px; background: var(--primary-light); color: var(--primary); border-radius: 20px; font-size: 12px; font-weight: 600; }
+.placeholder-title { font-size: 20px; font-weight: 700; color: var(--gray-700); }
+.placeholder-desc { font-size: 14px; color: var(--gray-400); max-width: 340px; }
+
+/* ─── Modal ────────────────────────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(17,24,39,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+.modal-overlay.hidden { display: none; }
+.modal-box { background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.modal-header h3 { font-size: 16px; font-weight: 700; color: var(--gray-800); }
+.modal-body { padding: 20px 22px; }
+.modal-footer { display: flex; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--border); }
+
+/* ─── Form ─────────────────────────────────────────────────────────── */
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 6px; }
+.required { color: var(--danger); }
+.form-control { width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-md); font-family: 'Vazirmatn', sans-serif; font-size: 13px; color: var(--gray-800); outline: none; transition: border-color .15s; background: var(--card-bg); }
+.form-control:focus { border-color: var(--primary); }
+textarea.form-control { resize: vertical; }
+.form-hint { font-size: 11px; color: var(--gray-400); margin-top: 4px; display: block; }
+
+/* ─── Toast ────────────────────────────────────────────────────────── */
+#toast-container { position: fixed; bottom: 24px; left: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+.toast { padding: 12px 18px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.15); animation: toastIn .25s ease; max-width: 320px; }
+.toast.success { background: #059669; }
+.toast.error   { background: #DC2626; }
+.toast.info    { background: var(--primary); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ─── Spinner (برای دکمه‌های در حال ارسال) ───────────────────────────── */
+.spinner { width: 16px; height: 16px; border: 2.5px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Content type / status badges ───────────────────────────────────── */
+.badge-draft     { background: var(--gray-100); color: var(--gray-600); }
+.badge-published { background: #ECFDF5; color: #059669; }
+.badge-archived  { background: #FEF2F2; color: #9CA3AF; }
+.badge-type-course  { background: #EFF6FF; color: #2563EB; }
+.badge-type-article  { background: #FFF7ED; color: #D97706; }
+.badge-type-podcast  { background: #F5F3FF; color: #7C3AED; }
+.badge-type-book     { background: #ECFEFF; color: #0891B2; }
+
+/* ─── Tabs (فیلتر نوع محتوا) ───────────────────────────────────────── */
+.tab-bar { display: flex; gap: 6px; padding: 4px; background: var(--gray-50); border: 1px solid var(--border); border-radius: var(--radius-md); width: fit-content; flex-wrap: wrap; }
+.tab-btn { padding: 7px 16px; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--gray-500); font-family: 'Vazirmatn', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.tab-btn.active { background: var(--primary); color: #fff; }
+.tab-btn:hover:not(.active) { background: var(--gray-100); color: var(--gray-700); }
+
+/* ─── Modal — اندازه بزرگ‌تر برای فرم محتوا ─────────────────────────── */
+.modal-box.modal-lg { max-width: 720px; }
+
+/* ─── Upload widget ────────────────────────────────────────────────── */
+.upload-box { display: flex; align-items: center; gap: 10px; }
+.upload-box input[type=file] { display: none; }
+.upload-box-name { flex: 1; font-size: 12px; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--gray-50); border: 1.5px dashed var(--gray-200); border-radius: var(--radius-md); padding: 9px 12px; }
+.upload-box-name.has-file { color: var(--gray-800); border-style: solid; }
+
+/* ─── Content items manager (داخل مودال آیتم‌ها) ───────────────────── */
+.content-items-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.item-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--gray-50); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.item-row-order { font-size: 11px; color: var(--gray-400); width: 18px; text-align: center; flex-shrink: 0; }
+.item-row-icon { width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; }
+.item-row-info { flex: 1; min-width: 0; }
+.item-row-title { font-size: 13px; font-weight: 600; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-row-meta { font-size: 11px; color: var(--gray-400); }
+.item-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* ─── Empty state ─────────────────────────────────────────────────── */
+.empty-state { text-align: center; padding: 50px 20px; color: var(--gray-400); }
+.empty-state-icon { font-size: 38px; margin-bottom: 10px; }

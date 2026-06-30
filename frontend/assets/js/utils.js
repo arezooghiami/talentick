@@ -50,19 +50,19 @@ function roleLabel(role) {
 
 function roleBadge(role) {
   const cls = {
-    super_admin: 'badge-purple',
-    org_admin:   'badge-blue',
-    manager:     'badge-orange',
-    employee:    'badge-green',
-  }[role] || 'badge-gray';
+    super_admin: 'badge-super',
+    org_admin:   'badge-admin',
+    manager:     'badge-manager',
+    employee:    'badge-employee',
+  }[role] || 'badge-employee';
   return `<span class="badge ${cls}">${roleLabel(role)}</span>`;
 }
 
 // ─── Status badge ─────────────────────────────────────────────────
 function statusBadge(isActive) {
   return isActive
-    ? '<span class="badge badge-green">فعال</span>'
-    : '<span class="badge badge-red">غیرفعال</span>';
+    ? '<span class="badge badge-active">فعال</span>'
+    : '<span class="badge badge-inactive">غیرفعال</span>';
 }
 
 // ─── Initials avatar ─────────────────────────────────────────────
@@ -86,6 +86,68 @@ function setLoading(btn, loading, text = 'در حال پردازش...') {
     btn.innerHTML = btn._originalText || 'تأیید';
     btn.disabled = false;
   }
+}
+
+// ─── HTML escaping ─────────────────────────────────────────────────
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s ?? '';
+  return d.innerHTML;
+}
+
+// ─── Persian number formatting ─────────────────────────────────────
+function numFa(n) {
+  return Number(n ?? 0).toLocaleString('fa-IR');
+}
+
+// ─── Generic delete confirmation (آشنا با مودال #modal-confirm-delete) ──
+// onConfirm باید یک تابع async باشد که خودِ عملیات حذف را انجام می‌دهد.
+function confirmAction(message, onConfirm) {
+  document.getElementById('confirm-msg').textContent = message;
+  openModal('modal-confirm-delete');
+  document.getElementById('btn-confirm-yes').onclick = async () => {
+    closeModal('modal-confirm-delete');
+    try {
+      await onConfirm();
+    } catch (e) {
+      toastError(e.message);
+    }
+  };
+}
+
+// ─── Generic pagination renderer ───────────────────────────────────
+// containerId: المان والد دکمه‌های صفحه‌بندی
+// cur/total: صفحه فعلی و تعداد کل صفحات
+// onPage(page): callback برای رفتن به صفحه‌ی مشخص
+function renderPagination(containerId, cur, total, onPage) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (total <= 1) { el.innerHTML = ''; return; }
+
+  const s = Math.max(1, cur - 2), e = Math.min(total, cur + 2);
+  let btns = '';
+  const pageBtn = (p, active) =>
+    `<button class="page-btn${active ? ' active' : ''}" data-page="${p}">${numFa(p)}</button>`;
+
+  if (s > 1) btns += pageBtn(1, false);
+  if (s > 2) btns += `<span style="padding:0 4px;color:var(--gray-400)">…</span>`;
+  for (let p = s; p <= e; p++) btns += pageBtn(p, p === cur);
+  if (e < total - 1) btns += `<span style="padding:0 4px;color:var(--gray-400)">…</span>`;
+  if (e < total) btns += pageBtn(total, false);
+
+  el.innerHTML = `<span>صفحه ${numFa(cur)} از ${numFa(total)}</span>
+    <div class="pagination-btns">
+      <button class="page-btn" data-page="${cur - 1}" ${cur <= 1 ? 'disabled' : ''}>›</button>
+      ${btns}
+      <button class="page-btn" data-page="${cur + 1}" ${cur >= total ? 'disabled' : ''}>‹</button>
+    </div>`;
+
+  el.querySelectorAll('[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = parseInt(btn.dataset.page, 10);
+      if (p >= 1 && p <= total) onPage(p);
+    });
+  });
 }
 
 // ─── Tabs ────────────────────────────────────────────────────────

@@ -11,17 +11,32 @@ from app.dependencies import CurrentUser
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.services import auth_service
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/auth",
+    tags=["Authentication"]
+)
+
+
+from fastapi.security import OAuth2PasswordRequestForm
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    user = await auth_service.authenticate_user(db, body.email, body.password)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await auth_service.authenticate_user(
+        db,
+        form_data.username,
+        form_data.password,
+    )
+
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="ایمیل یا پسورد اشتباه است",
+            status_code=401,
+            detail="Invalid credentials",
         )
+
     return auth_service.build_token(user)
 
 
@@ -35,3 +50,4 @@ async def me(current_user: CurrentUser):
         "role": current_user.role,
         "is_active": current_user.is_active,
     }
+
