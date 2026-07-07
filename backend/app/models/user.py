@@ -58,8 +58,9 @@ class User(UUIDMixin, TimestampMixin, Base):
     email: Mapped[str] = mapped_column(
         String(320),
         nullable=False,
+        unique=True,
         index=True,
-        comment="ایمیل یکتا در سطح سیستم (نه فقط سازمان)"
+        comment="ایمیل یکتا در سطح سیستم (نه فقط سازمان) — یکتایی در DB اجرا می‌شود"
     )
     full_name: Mapped[str] = mapped_column(
         String(255), nullable=False,

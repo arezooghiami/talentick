@@ -65,7 +65,14 @@ async def list_users(
     اگر org_id پاس داده شود فقط کاربران همان سازمان برمی‌گردند —
     این مقدار را router بر اساس نقش کاربر فعلی تعیین می‌کند
     (super_admin می‌تواند None بدهد یعنی همه سازمان‌ها).
+
+    قانون Soft Delete: کاربران غیرفعال (is_active=False) به‌طور پیش‌فرض
+    از لیست/جستجو مخفی می‌شوند. برای دیدن آن‌ها باید صریحاً
+    is_active=false در query param فرستاده شود.
     """
+    if is_active is None:
+        is_active = True
+
     base_q = (
         select(User, Organization.name.label("org_name"))
         .join(Organization, User.org_id == Organization.id)
@@ -241,11 +248,20 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest) -> 
     return result.scalar_one()
 
 
-# ─── Delete ────────────────────────────────────────────────────────────────────
+# ─── Delete (Soft Delete) ────────────────────────────────────────────────────
 
 async def delete_user(db: AsyncSession, user: User) -> None:
-    """حذف کامل کاربر. توجه: حذف واقعی (hard delete) است."""
-    await db.delete(user)
+    """
+    غیرفعال‌سازی کاربر (Soft Delete) — هیچ رکوردی از دیتابیس پاک نمی‌شود.
+
+    دلیل: کاربر ممکن است سابقه‌ی مرتبط (quiz_attempts، content progress،
+    onboarding enrollments و ...) داشته باشد که با حذف فیزیکی از بین
+    می‌رفت. به‌جای آن is_active=False می‌شود و کاربر می‌تواند بعداً از
+    طریق toggle-active دوباره فعال شود.
+
+    توجه: اگر کاربر از قبل غیرفعال بوده، این عملیات idempotent است.
+    """
+    user.is_active = False
     await db.commit()
 
 

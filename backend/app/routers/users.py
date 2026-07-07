@@ -11,8 +11,11 @@ CRUD کامل کاربران با رعایت سلسله‌مراتب نقش و O
 - GET  /api/users/{id}                → جزئیات یک کاربر — manager به بالا + org isolation
 - POST /api/users/                    → ساخت کاربر جدید — فقط org_admin به بالا
 - PATCH /api/users/{id}               → ویرایش کاربر — manager به بالا + org isolation
-- DELETE /api/users/{id}              → حذف کاربر — manager به بالا + org isolation
+- DELETE /api/users/{id}              → غیرفعال‌سازی کاربر (Soft Delete —
+                                         is_active=False، هیچ رکوردی پاک نمی‌شود)
+                                         — manager به بالا + org isolation
 - PATCH /api/users/{id}/toggle-active → فعال/غیرفعال — manager به بالا + org isolation
+                                         (برای بازگرداندن کاربر soft-delete‌شده هم استفاده می‌شود)
 
 قانون طلایی Org Isolation:
 هر کاربری که super_admin نیست، فقط می‌تواند کاربران سازمان خودش را
@@ -129,7 +132,9 @@ async def list_all_users(
     search: str | None = Query(None),
     role: str | None = Query(None),
     org_id: str | None = Query(None),
-    is_active: bool | None = Query(None),
+    is_active: bool | None = Query(
+        None, description="پیش‌فرض فقط کاربران فعال. برای دیدن غیرفعال‌ها صراحتاً false بدهید."
+    ),
 ) -> PaginatedUsers:
     if current_user.role != "super_admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "دسترسی محدود است — نقش مورد نیاز: super_admin")
@@ -158,7 +163,9 @@ async def list_org_users(
     search: str | None = Query(None),
     role: str | None = Query(None),
     org_id: str | None = Query(None, description="فقط برای super_admin معتبر است"),
-    is_active: bool | None = Query(None),
+    is_active: bool | None = Query(
+        None, description="پیش‌فرض فقط کاربران فعال. برای دیدن غیرفعال‌ها (soft-deleted) صراحتاً false بدهید."
+    ),
 ) -> PaginatedUsers:
     scoped_org_id = org_id if current_user.role == "super_admin" else str(current_user.org_id)
     return await user_service.list_users(
@@ -252,7 +259,17 @@ async def update_user(
 
 # ─── DELETE /{id} — حذف کاربر ─────────────────────────────────────────────────
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="حذف کاربر")
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="غیرفعال‌سازی کاربر (Soft Delete)",
+    description="""
+    کاربر را غیرفعال می‌کند (is_active=False) — هیچ رکوردی از دیتابیس پاک
+    نمی‌شود. کاربر غیرفعال‌شده به‌طور پیش‌فرض از لیست‌ها و جستجوها مخفی
+    می‌شود، اما سابقه‌ی او (محتوا، آزمون، onboarding) دست‌نخورده باقی می‌ماند
+    و از طریق `PATCH /{id}/toggle-active` قابل بازگردانی است.
+    """,
+)
 async def delete_user(
     user_id: str,
     current_user: Manager,
