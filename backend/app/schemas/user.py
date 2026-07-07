@@ -110,3 +110,21 @@ class PaginatedUsers(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+# ─── Import/Export (Excel) ────────────────────────────────────────────────────
+
+class UserImportRowError(BaseModel):
+    """خطای مربوط به یک سطر خاص در فایل Import."""
+    row: int = Field(..., description="شماره سطر در فایل اکسل (شامل هدر)")
+    email: str | None = None
+    message: str
+
+
+class UserImportResult(BaseModel):
+    """گزارش کامل نتیجه Import گروهی کاربران از Excel."""
+    total_rows: int
+    created: int
+    updated: int
+    skipped: int
+    errors: list[UserImportRowError] = Field(default_factory=list)

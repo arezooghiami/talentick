@@ -9,7 +9,12 @@ Talentick — Models Package
 """
 
 from app.models.base import Base  # noqa: F401
-from app.models.content import Content, ContentItem, UserContentProgress  # noqa: F401
+from app.models.content import (  # noqa: F401
+    Content,
+    ContentItem,
+    ContentTarget,
+    UserContentProgress,
+)
 from app.models.onboarding import (  # noqa: F401
     OnboardingProgram,
     ProgramStep,
@@ -33,6 +38,7 @@ __all__ = [
     # Content
     "Content",
     "ContentItem",
+    "ContentTarget",
     "UserContentProgress",
     # Onboarding
     "OnboardingProgram",

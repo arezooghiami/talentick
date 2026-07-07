@@ -43,6 +43,11 @@ CONTENT_STATUSES = ("draft", "published", "archived")
 # سطح دشواری
 CONTENT_LEVELS = ("beginner", "intermediate", "advanced")
 
+# نوع هدف انتشار محتوا (Targeting) — قابل توسعه
+# department/position/user → UUID در target_value ذخیره می‌شود
+# role                     → یکی از VALID_ROLES (رشته) در target_value ذخیره می‌شود
+TARGET_TYPES = ("department", "position", "role", "user")
+
 
 class Content(UUIDMixin, TimestampMixin, Base):
     """
@@ -141,6 +146,9 @@ class Content(UUIDMixin, TimestampMixin, Base):
     user_progresses: Mapped[list["UserContentProgress"]] = relationship(
         back_populates="content", cascade="all, delete-orphan"
     )
+    targets: Mapped[list["ContentTarget"]] = relationship(
+        back_populates="content", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Content type={self.type!r} title={self.title!r}>"
@@ -213,6 +221,56 @@ class ContentItem(UUIDMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<ContentItem type={self.type!r} title={self.title!r}>"
+
+
+class ContentTarget(UUIDMixin, TimestampMixin, Base):
+    """
+    هدف انتشار محتوا (Targeting).
+
+    هر سطر یک قانون نمایش است: محتوا برای یک دپارتمان/پست/نقش/کاربر
+    مشخص منتشر می‌شود. یک محتوا می‌تواند چند سطر (چند هدف مختلف)
+    داشته باشد — منطق OR: کافی است کاربر با یکی از سطرها match کند.
+
+    اگر هیچ سطری برای یک محتوا وجود نداشته باشد، یعنی محتوا برای کل
+    سازمان (همه کاربران org) قابل مشاهده است (پیش‌فرض قبلی — سازگاری
+    با محتواهای قدیمی).
+    """
+
+    __tablename__ = "content_targets"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "content_id", "target_type", "target_value",
+            name="uq_content_target",
+        ),
+    )
+
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    content_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    target_type: Mapped[str] = mapped_column(
+        String(20), nullable=False,
+        comment="department | position | role | user"
+    )
+    target_value: Mapped[str] = mapped_column(
+        String(255), nullable=False,
+        comment="UUID برای department/position/user — نام role برای role"
+    )
+
+    # ─── Relationships ────────────────────────────────────────────────────
+    content: Mapped["Content"] = relationship(back_populates="targets")
+
+    def __repr__(self) -> str:
+        return f"<ContentTarget {self.target_type}={self.target_value!r}>"
 
 
 class UserContentProgress(UUIDMixin, TimestampMixin, Base):

@@ -59,13 +59,19 @@ def _enforce_org_scope(current_user: User, target_org_id: uuid.UUID) -> None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "دسترسی به این سازمان مجاز نیست")
 
 
-def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID:
-    """super_admin می‌تواند org_id دلخواه بدهد، سایر نقش‌ها محدود به سازمان خودشان هستند."""
-    if current_user.role == "super_admin" and org_id:
-        try:
-            return uuid.UUID(org_id)
-        except ValueError:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id نامعتبر است")
+def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID | None:
+    """
+    super_admin: با org_id فیلتر می‌کند، یا اگر ندهد None برمی‌گردد (یعنی
+    مشاهده محتوای همه سازمان‌ها — برای مدیریت کلی پلتفرم).
+    سایر نقش‌ها همیشه محدود به سازمان خودشان هستند.
+    """
+    if current_user.role == "super_admin":
+        if org_id:
+            try:
+                return uuid.UUID(org_id)
+            except ValueError:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id نامعتبر است")
+        return None
     if current_user.org_id is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
     return current_user.org_id
@@ -113,13 +119,17 @@ async def list_contents(
     search: str | None = Query(None),
     type: str | None = Query(None, description="course | article | podcast | book"),
     status_filter: str | None = Query(None, alias="status"),
-    org_id: str | None = Query(None, description="فقط super_admin"),
+    org_id: str | None = Query(None, description="فقط super_admin — خالی = همه سازمان‌ها"),
+    sort_by: str = Query("created_at", description="created_at | updated_at | title | status | type"),
+    sort_order: str = Query("desc", description="asc | desc"),
 ):
     target_org_id = _resolve_org_id(current_user, org_id)
     if type:
         _validate_type(type)
     if status_filter:
         _validate_status(status_filter)
+    if sort_order not in ("asc", "desc"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "sort_order باید asc یا desc باشد")
 
     # کارمندان عادی فقط محتوای منتشرشده را می‌بینند
     if current_user.role == "employee" and not status_filter:
@@ -128,6 +138,8 @@ async def list_contents(
     items, total = await content_service.list_contents(
         db, target_org_id, page=page, page_size=page_size,
         search=search, type_filter=type, status_filter=status_filter,
+        sort_by=sort_by, sort_order=sort_order,
+        viewer=current_user if current_user.role == "employee" else None,
     )
     responses = [await content_service.content_to_response(db, c) for c in items]
     return ContentListResponse(
@@ -169,8 +181,11 @@ async def get_content(
 ):
     content = await _get_content_or_404(db, content_id)
     _enforce_org_scope(current_user, content.org_id)
-    if current_user.role == "employee" and content.status != "published":
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
+    if current_user.role == "employee":
+        if content.status != "published":
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
+        if not await content_service.is_visible_to_user(db, content, current_user):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     return await content_service.content_to_detail(db, content)
 
 
@@ -212,6 +227,45 @@ async def upload_content_file(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
     result = await upload_file(file, org_id, subfolder="contents")
     return UploadResponse(**result)
+
+
+# ─── Cover (کاور محتوا) ──────────────────────────────────────────────────────
+
+@router.post(
+    "/{content_id}/cover", response_model=ContentResponse,
+    summary="آپلود/ویرایش کاور محتوا",
+    description="فایل تصویر کاور را آپلود و مستقیماً روی محتوا تنظیم می‌کند (جایگزین کاور قبلی).",
+)
+async def upload_content_cover(
+    content_id: str,
+    current_user: OrgAdmin,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    content = await _get_content_or_404(db, content_id)
+    _enforce_org_scope(current_user, content.org_id)
+
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "فایل کاور باید تصویر باشد")
+
+    result = await upload_file(file, content.org_id, subfolder="covers")
+    updated = await content_service.set_cover(db, content, result["url"])
+    return await content_service.content_to_response(db, updated)
+
+
+@router.delete(
+    "/{content_id}/cover", response_model=ContentResponse,
+    summary="حذف کاور محتوا",
+)
+async def delete_content_cover(
+    content_id: str,
+    current_user: OrgAdmin,
+    db: AsyncSession = Depends(get_db),
+):
+    content = await _get_content_or_404(db, content_id)
+    _enforce_org_scope(current_user, content.org_id)
+    updated = await content_service.set_cover(db, content, None)
+    return await content_service.content_to_response(db, updated)
 
 
 # ─── ContentItem Routes ─────────────────────────────────────────────────────

@@ -16,6 +16,33 @@ ITEM_TYPES = ("text", "video", "pdf", "image", "link", "file", "quiz_ref")
 CONTENT_STATUSES = ("draft", "published", "archived")
 CONTENT_LEVELS = ("beginner", "intermediate", "advanced")
 
+# انواع هدف انتشار محتوا — می‌توان چند مورد را همزمان انتخاب کرد
+TARGET_TYPES = ("department", "position", "role", "user")
+
+
+# ─── ContentTarget (هدف انتشار: سازمان/دپارتمان/پست/نقش/کاربر) ───────────
+
+class ContentTargetCreate(BaseModel):
+    """
+    یک قانون هدف‌گذاری انتشار محتوا.
+
+    target_type=department → target_id باید dept_id باشد
+    target_type=position   → target_id باید position_id باشد
+    target_type=user       → target_id باید user_id باشد
+    target_type=role       → target_id یکی از super_admin|org_admin|manager|employee
+    """
+    target_type: str = Field(..., description="department | position | role | user")
+    target_id: str = Field(..., min_length=1, description="شناسه (UUID) یا نام role")
+
+
+class ContentTargetResponse(BaseModel):
+    id: str
+    target_type: str
+    target_id: str
+    target_label: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
 
 # ─── ContentItem ───────────────────────────────────────────────────────────
 
@@ -74,6 +101,10 @@ class ContentCreate(BaseModel):
     is_featured: bool = False
     meta: dict = Field(default_factory=dict)
     org_id: Optional[str] = None  # فقط super_admin — در router enforce می‌شود
+    targets: list[ContentTargetCreate] = Field(
+        default_factory=list,
+        description="هدف‌های انتشار — خالی یعنی برای کل سازمان",
+    )
 
 
 class ContentUpdate(BaseModel):
@@ -89,6 +120,10 @@ class ContentUpdate(BaseModel):
     total_duration_min: Optional[int] = Field(None, ge=0)
     is_featured: Optional[bool] = None
     meta: Optional[dict] = None
+    targets: Optional[list[ContentTargetCreate]] = Field(
+        None,
+        description="اگر ارسال شود، تمام هدف‌های قبلی جایگزین می‌شوند. ارسال‌نشدن = بدون تغییر. آرایه خالی [] = پاک کردن همه هدف‌ها (انتشار برای کل سازمان).",
+    )
 
 
 class ContentResponse(BaseModel):
@@ -117,6 +152,7 @@ class ContentResponse(BaseModel):
 
 class ContentDetailResponse(ContentResponse):
     items: list[ContentItemResponse] = Field(default_factory=list)
+    targets: list[ContentTargetResponse] = Field(default_factory=list)
 
 
 class ContentListResponse(BaseModel):

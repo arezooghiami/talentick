@@ -24,21 +24,29 @@ CRUD کامل کاربران با رعایت سلسله‌مراتب نقش و O
 
 from __future__ import annotations
 
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.database import get_db
 from app.dependencies import CurrentUser, Manager, OrgAdmin, require_active
+from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.user import (
     PaginatedUsers,
     UserCreateRequest,
     UserDetail,
+    UserImportResult,
     UserUpdateRequest,
 )
-from app.services import user_service
+from app.services import user_excel_service, user_service
+
+_XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 router = APIRouter(
     prefix="/api/users",
@@ -171,6 +179,117 @@ async def list_org_users(
     return await user_service.list_users(
         db, page=page, per_page=per_page, search=search,
         role=role, org_id=scoped_org_id, is_active=is_active,
+    )
+
+
+# ─── GET /template — دانلود قالب نمونه Import ─────────────────────────────────
+
+@router.get(
+    "/template",
+    summary="دانلود قالب نمونه Import کاربران (Excel)",
+    description="فایل Excel نمونه شامل ستون‌های موردنیاز، یک ردیف داده نمونه و شیت راهنما.",
+)
+async def download_user_import_template(
+    current_user: OrgAdmin,
+) -> StreamingResponse:
+    content = user_excel_service.build_template_workbook()
+    return StreamingResponse(
+        iter([content]),
+        media_type=_XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": "attachment; filename=talentick-users-template.xlsx"},
+    )
+
+
+# ─── GET /export — خروجی Excel از کاربران ─────────────────────────────────────
+
+@router.get(
+    "/export",
+    summary="خروجی Excel از کاربران (بر اساس فیلترهای اعمال‌شده)",
+    description="""
+    خروجی بر اساس همان فیلترهای لیست کاربران (search/role/org_id/is_active).
+    org_admin/manager همیشه فقط سازمان خودشان را export می‌کنند؛
+    super_admin می‌تواند با org_id فیلتر کند یا خالی بگذارد (خروجی همه سازمان‌ها).
+    """,
+)
+async def export_users_excel(
+    current_user: Manager,
+    db: AsyncSession = Depends(get_db),
+    search: str | None = Query(None),
+    role: str | None = Query(None),
+    org_id: str | None = Query(None, description="فقط برای super_admin معتبر است"),
+    is_active: bool | None = Query(None),
+) -> StreamingResponse:
+    scoped_org_id = org_id if current_user.role == "super_admin" else str(current_user.org_id)
+
+    q = (
+        select(User)
+        .join(Organization, User.org_id == Organization.id)
+        .options(joinedload(User.department), joinedload(User.position))
+    )
+    if search:
+        like = f"%{search}%"
+        q = q.where((User.full_name.ilike(like)) | (User.email.ilike(like)))
+    if role:
+        q = q.where(User.role == role)
+    if scoped_org_id:
+        q = q.where(User.org_id == uuid.UUID(scoped_org_id))
+    q = q.where(User.is_active.is_(is_active if is_active is not None else True))
+
+    result = await db.execute(q.order_by(User.created_at.desc()))
+    users = list(result.scalars().all())
+
+    org_ids = {u.org_id for u in users}
+    org_names: dict[str, str] = {}
+    if org_ids:
+        orgs_result = await db.execute(select(Organization).where(Organization.id.in_(org_ids)))
+        org_names = {str(o.id): o.name for o in orgs_result.scalars().all()}
+
+    content = user_excel_service.build_export_workbook(users, org_names)
+    return StreamingResponse(
+        iter([content]),
+        media_type=_XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": "attachment; filename=talentick-users-export.xlsx"},
+    )
+
+
+# ─── POST /import — Import گروهی کاربران از Excel ─────────────────────────────
+
+@router.post(
+    "/import",
+    response_model=UserImportResult,
+    summary="Import گروهی کاربران از فایل Excel",
+    description="""
+    **دسترسی:** org_admin به بالا.
+
+    - org_admin: همیشه در سازمان خودش import می‌کند.
+    - super_admin: باید org_id را در query مشخص کند.
+    - update_existing=false (پیش‌فرض): کاربران با ایمیل تکراری رد (skip) می‌شوند.
+    - update_existing=true: کاربران با ایمیل تکراری (در همان سازمان) به‌روزرسانی می‌شوند.
+    """,
+)
+async def import_users_excel(
+    current_user: OrgAdmin,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(...),
+    org_id: str | None = Query(None, description="الزامی فقط برای super_admin"),
+    update_existing: bool = Query(False),
+) -> UserImportResult:
+    if current_user.role == "super_admin":
+        if not org_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id برای super_admin الزامی است")
+        try:
+            target_org_id = uuid.UUID(org_id)
+        except ValueError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id نامعتبر است")
+    else:
+        target_org_id = current_user.org_id
+
+    if not (file.filename or "").lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "فقط فایل Excel (.xlsx) پذیرفته می‌شود")
+
+    data = await file.read()
+    return await user_excel_service.import_users_from_excel(
+        db, target_org_id, data, update_existing=update_existing,
     )
 
 
