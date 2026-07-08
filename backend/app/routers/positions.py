@@ -50,7 +50,10 @@ def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID:
     return current_user.org_id
 
 
-@router.get("/", response_model=list[PositionResponse], summary="لیست پست‌های سازمان")
+@router.get(
+    "/", response_model=list[PositionResponse], summary="لیست پست‌های سازمان",
+    description="لیست پست‌های سازمانی — با `dept_id` می‌توان فقط پست‌های یک دپارتمان را گرفت. **دسترسی:** manager به بالا.",
+)
 async def list_positions(
     current_user: Manager,
     db: AsyncSession = Depends(get_db),
@@ -61,7 +64,11 @@ async def list_positions(
     return await position_service.list_positions(db, target_org_id, dept_id=dept_id)
 
 
-@router.post("/", response_model=PositionResponse, status_code=status.HTTP_201_CREATED, summary="ساخت پست جدید")
+@router.post(
+    "/", response_model=PositionResponse, status_code=status.HTTP_201_CREATED, summary="ساخت پست جدید",
+    description="ساخت پست سازمانی جدید — `level` بین ۱ (کارمند) تا ۵ (مدیرعامل). **دسترسی:** manager به بالا (سازمان خودشان).",
+    responses={400: {"description": "واحد سازمانی (dept_id) معتبر نیست"}},
+)
 async def create_position(
     body: PositionCreate,
     current_user: Manager,
@@ -80,7 +87,11 @@ async def create_position(
     return await position_service.to_response(db, pos)
 
 
-@router.get("/{position_id}", response_model=PositionResponse, summary="جزئیات پست")
+@router.get(
+    "/{position_id}", response_model=PositionResponse, summary="جزئیات پست",
+    description="جزئیات یک پست سازمانی. **دسترسی:** manager به بالا (سازمان خودشان).",
+    responses={403: {"description": "دسترسی به این سازمان مجاز نیست"}, 404: {"description": "پست یافت نشد"}},
+)
 async def get_position(
     position_id: str,
     current_user: Manager,
@@ -93,7 +104,15 @@ async def get_position(
     return await position_service.to_response(db, pos)
 
 
-@router.patch("/{position_id}", response_model=PositionResponse, summary="ویرایش پست")
+@router.patch(
+    "/{position_id}", response_model=PositionResponse, summary="ویرایش پست",
+    description="ویرایش partial یک پست سازمانی. **دسترسی:** manager به بالا (سازمان خودشان).",
+    responses={
+        400: {"description": "واحد سازمانی معتبر نیست"},
+        403: {"description": "دسترسی به این سازمان مجاز نیست"},
+        404: {"description": "پست یافت نشد"},
+    },
+)
 async def update_position(
     position_id: str,
     body: PositionUpdate,
@@ -114,7 +133,11 @@ async def update_position(
     return await position_service.to_response(db, updated)
 
 
-@router.delete("/{position_id}", status_code=status.HTTP_204_NO_CONTENT, summary="حذف پست")
+@router.delete(
+    "/{position_id}", status_code=status.HTTP_204_NO_CONTENT, summary="حذف پست",
+    description="حذف پست سازمانی. **دسترسی:** manager به بالا (سازمان خودشان).",
+    responses={403: {"description": "دسترسی به این سازمان مجاز نیست"}, 404: {"description": "پست یافت نشد"}},
+)
 async def delete_position(
     position_id: str,
     current_user: Manager,

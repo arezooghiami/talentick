@@ -11,6 +11,7 @@ JWT token ساخت/اعتبارسنجی و hash کردن پسورد.
 """
 
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from typing import Any
 
 from jose import JWTError, jwt
@@ -31,6 +32,16 @@ def hash_password(plain_password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """پسورد ورودی را با hash مقایسه می‌کند."""
     return _pwd_context.verify(plain_password, hashed_password)
+
+
+def hash_token(token: str) -> str:
+    """
+    SHA256 hash از یک توکن (برای ذخیره refresh token در DB).
+
+    هرگز خودِ توکن را در DB ذخیره نکنید — فقط hash آن را، تا در صورت
+    نشت دیتابیس، توکن‌های معتبر لو نروند (مشابه ذخیره پسورد).
+    """
+    return sha256(token.encode("utf-8")).hexdigest()
 
 
 # ─── JWT Token ───────────────────────────────────────────────────────────────

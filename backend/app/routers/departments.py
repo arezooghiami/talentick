@@ -60,7 +60,10 @@ def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID:
     return current_user.org_id
 
 
-@router.get("/", response_model=list[DepartmentResponse], summary="لیست واحدهای سازمان")
+@router.get(
+    "/", response_model=list[DepartmentResponse], summary="لیست واحدهای سازمان",
+    description="لیست مسطح (flat) تمام دپارتمان‌های سازمان — برای چارت درختی از `GET /api/departments/tree` استفاده کنید. **دسترسی:** manager به بالا.",
+)
 async def list_departments(
     current_user: Manager,
     db: AsyncSession = Depends(get_db),
@@ -70,7 +73,10 @@ async def list_departments(
     return await department_service.list_departments(db, target_org_id)
 
 
-@router.get("/tree", response_model=list[DepartmentTreeNode], summary="چارت سازمانی درختی")
+@router.get(
+    "/tree", response_model=list[DepartmentTreeNode], summary="چارت سازمانی درختی",
+    description="ساختار درختی کامل دپارتمان‌ها (parent → children) برای رندر چارت سازمانی در فرانت — هر گره شامل تعداد کاربران و نام مدیر واحد. **دسترسی:** manager به بالا.",
+)
 async def get_department_tree(
     current_user: Manager,
     db: AsyncSession = Depends(get_db),
@@ -80,7 +86,11 @@ async def get_department_tree(
     return await department_service.build_tree(db, target_org_id)
 
 
-@router.post("/", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED, summary="ساخت واحد جدید")
+@router.post(
+    "/", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED, summary="ساخت واحد جدید",
+    description="ساخت دپارتمان جدید — با `parent_id` اختیاری برای ساخت زیرمجموعه. **دسترسی:** manager به بالا (سازمان خودشان).",
+    responses={400: {"description": "واحد مادر (parent_id) معتبر نیست"}},
+)
 async def create_department(
     body: DepartmentCreate,
     current_user: Manager,
@@ -99,7 +109,11 @@ async def create_department(
     return await department_service._to_response(db, dept)
 
 
-@router.get("/{dept_id}", response_model=DepartmentResponse, summary="جزئیات واحد")
+@router.get(
+    "/{dept_id}", response_model=DepartmentResponse, summary="جزئیات واحد",
+    description="جزئیات یک دپارتمان با شناسه‌ی آن. **دسترسی:** manager به بالا (فقط سازمان خودشان — super_admin استثناست).",
+    responses={403: {"description": "دسترسی به این سازمان مجاز نیست"}, 404: {"description": "واحد یافت نشد"}},
+)
 async def get_department(
     dept_id: str,
     current_user: Manager,
@@ -112,7 +126,15 @@ async def get_department(
     return await department_service._to_response(db, dept)
 
 
-@router.patch("/{dept_id}", response_model=DepartmentResponse, summary="ویرایش واحد")
+@router.patch(
+    "/{dept_id}", response_model=DepartmentResponse, summary="ویرایش واحد",
+    description="ویرایش partial یک دپارتمان — نام، توضیحات، parent_id، manager_id، ترتیب نمایش، وضعیت. **دسترسی:** manager به بالا (سازمان خودشان).",
+    responses={
+        400: {"description": "واحد مادر معتبر نیست یا واحد نمی‌تواند مادر خودش باشد"},
+        403: {"description": "دسترسی به این سازمان مجاز نیست"},
+        404: {"description": "واحد یافت نشد"},
+    },
+)
 async def update_department(
     dept_id: str,
     body: DepartmentUpdate,
@@ -135,7 +157,11 @@ async def update_department(
     return await department_service._to_response(db, updated)
 
 
-@router.delete("/{dept_id}", status_code=status.HTTP_204_NO_CONTENT, summary="حذف واحد")
+@router.delete(
+    "/{dept_id}", status_code=status.HTTP_204_NO_CONTENT, summary="حذف واحد",
+    description="حذف دپارتمان. زیرواحدها و کاربران وابسته حذف نمی‌شوند — فقط `dept_id`/`parent_id` آن‌ها روی NULL تنظیم می‌شود (ondelete=SET NULL). **دسترسی:** manager به بالا (سازمان خودشان).",
+    responses={403: {"description": "دسترسی به این سازمان مجاز نیست"}, 404: {"description": "واحد یافت نشد"}},
+)
 async def delete_department(
     dept_id: str,
     current_user: Manager,

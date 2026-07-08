@@ -15,9 +15,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.staticfiles import StaticFiles  # ← اضافه
-from fastapi.responses import RedirectResponse  # ← اضافه
+
 from app.config import settings
 from app.routers import auth, content, dashboard, departments, organizations, positions, users
 
@@ -48,12 +48,16 @@ app = FastAPI(
 )
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
-# در Development همه origin ها مجاز هستن
-# در Production باید محدود بشه به domain سازمان
+# ⚠️ نکته امنیتی مهم: origin=["*"] به‌همراه allow_credentials=True طبق
+# مشخصات CORS نامعتبر است (مرورگرها آن را رد می‌کنند) و در صورت کارکرد
+# هم یعنی هر وب‌سایتی می‌تواند با اعتبار (کوکی/Authorization) کاربر
+# درخواست بزند — ریسک امنیتی جدی. به‌همین دلیل از allowed_origins در
+# .env استفاده می‌شود؛ در Production باید فقط دامنه(های) واقعی فرانت
+# در ALLOWED_ORIGINS باشد.
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
