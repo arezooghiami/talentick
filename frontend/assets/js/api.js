@@ -1,7 +1,10 @@
 // Talentick — API Client
+// اگر access_token منقضی شود (401)، یک‌بار به‌صورت خودکار با refresh_token
+// تمدید و درخواست اصلی دوباره تلاش می‌شود — کاربر معمولاً چیزی متوجه نمی‌شود.
+// اگر تمدید هم شکست بخورد (refresh_token هم منقضی/باطل است)، به لاگین می‌رود.
 
 const api = {
-  async _fetch(method, path, body = null) {
+  async _fetch(method, path, body = null, _isRetry = false) {
     const token = Auth.getToken();
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -11,6 +14,15 @@ const api = {
 
     const res = await fetch(CONFIG.API_BASE + path, opts);
 
+    if (res.status === 401 && !_isRetry) {
+      const refreshed = await Auth.refreshSession();
+      if (refreshed) {
+        return this._fetch(method, path, body, true);
+      }
+      Auth.clear();
+      window.location.href = '/login.html';
+      throw new Error('Unauthorized');
+    }
     if (res.status === 401) {
       Auth.clear();
       window.location.href = '/login.html';
@@ -33,7 +45,7 @@ const api = {
   delete: (path)       => api._fetch('DELETE', path),
 
   /** آپلود فایل (multipart/form-data) — برای تصویر/ویدیو/فایل محتوا. */
-  async upload(path, file) {
+  async upload(path, file, _isRetry = false) {
     const token = Auth.getToken();
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -42,6 +54,15 @@ const api = {
 
     const res = await fetch(CONFIG.API_BASE + path, { method: 'POST', headers, body: formData });
 
+    if (res.status === 401 && !_isRetry) {
+      const refreshed = await Auth.refreshSession();
+      if (refreshed) {
+        return this.upload(path, file, true);
+      }
+      Auth.clear();
+      window.location.href = '/login.html';
+      throw new Error('Unauthorized');
+    }
     if (res.status === 401) {
       Auth.clear();
       window.location.href = '/login.html';

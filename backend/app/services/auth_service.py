@@ -19,7 +19,7 @@ Talentick — Auth Service
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,11 +75,11 @@ async def create_session(db: AsyncSession, user: User) -> dict:
             user_id=user.id,
             org_id=user.org_id,
             token_hash=hash_token(refresh_token),
-            expires_at=datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days),
-            created_at=datetime.now(UTC),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
+            created_at=datetime.now(timezone.utc),
         )
     )
-    user.last_login_at = datetime.now(UTC)
+    user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
 
     return _build_token_response(user, access_token, refresh_token)
@@ -118,7 +118,7 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> dict:
         raise UnauthorizedError("کاربر یافت نشد یا غیرفعال است")
 
     # ─── Rotation: توکن قدیمی فوراً باطل می‌شود ────────────────────────
-    stored.revoked_at = datetime.now(UTC)
+    stored.revoked_at = datetime.now(timezone.utc)
 
     new_access = create_access_token(_token_payload(user))
     new_refresh = create_refresh_token(_token_payload(user))
@@ -128,8 +128,8 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> dict:
             user_id=user.id,
             org_id=user.org_id,
             token_hash=hash_token(new_refresh),
-            expires_at=datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days),
-            created_at=datetime.now(UTC),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
+            created_at=datetime.now(timezone.utc),
         )
     )
     await db.commit()
@@ -152,7 +152,7 @@ async def revoke_session(db: AsyncSession, user: User, refresh_token: str | None
         )
         stored = result.scalar_one_or_none()
         if stored and stored.revoked_at is None:
-            stored.revoked_at = datetime.now(UTC)
+            stored.revoked_at = datetime.now(timezone.utc)
     else:
         result = await db.execute(
             select(RefreshToken).where(
@@ -161,7 +161,7 @@ async def revoke_session(db: AsyncSession, user: User, refresh_token: str | None
             )
         )
         for stored in result.scalars().all():
-            stored.revoked_at = datetime.now(UTC)
+            stored.revoked_at = datetime.now(timezone.utc)
 
     await db.commit()
 

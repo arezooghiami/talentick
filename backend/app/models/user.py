@@ -174,12 +174,12 @@ class RefreshToken(UUIDMixin, Base):
 
     @property
     def is_valid(self) -> bool:
-        from datetime import UTC
-
         from datetime import datetime as dt
+        from datetime import timezone
+
         return (
             self.revoked_at is None
-            and self.expires_at > dt.now(UTC)
+            and self.expires_at > dt.now(timezone.utc)
         )
 
 

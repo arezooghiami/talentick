@@ -10,7 +10,7 @@ JWT token ساخت/اعتبارسنجی و hash کردن پسورد.
 - org_id همیشه در JWT payload است
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any
 
@@ -55,7 +55,7 @@ def create_access_token(data: dict[str, Any]) -> str:
     - role: نقش کاربر
     """
     payload = data.copy()
-    expire = datetime.now(UTC) + timedelta(
+    expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.access_token_expire_minutes
     )
     payload.update({"exp": expire, "type": "access"})
@@ -68,7 +68,7 @@ def create_refresh_token(data: dict[str, Any]) -> str:
     در DB در جدول refresh_tokens ذخیره می‌شود.
     """
     payload = data.copy()
-    expire = datetime.now(UTC) + timedelta(
+    expire = datetime.now(timezone.utc) + timedelta(
         days=settings.refresh_token_expire_days
     )
     payload.update({"exp": expire, "type": "refresh"})
