@@ -11,15 +11,20 @@ Talentick — FastAPI Application Entry Point
     uvicorn app.main:app --reload --port 8000
 """
 
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.config import settings
+from app.database import engine
 from app.routers import auth, content, dashboard, departments, me, organizations, positions, reports, users
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Lifespan ─────────────────────────────────────────────────────────────────
@@ -54,7 +59,7 @@ app = FastAPI(
 # درخواست بزند — ریسک امنیتی جدی. به‌همین دلیل از allowed_origins در
 # .env استفاده می‌شود؛ در Production باید فقط دامنه(های) واقعی فرانت
 # در ALLOWED_ORIGINS باشد.
-print(settings.allowed_origins)
+logger.info("CORS allowed_origins=%s", settings.allowed_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -62,6 +67,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ─── Security Headers ─────────────────────────────────────────────────────────
+# هدرهای پایه‌ای امنیتی که در پاسخ API هم (نه فقط استاتیک فرانت پشت Nginx)
+# باید حاضر باشند — چون در dev/بدون Nginx هم uvicorn مستقیم پاسخ می‌دهد.
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if settings.is_production:
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+
+
+# ─── Health Check ─────────────────────────────────────────────────────────────
+# مسیر خارج از پیشوند /api عمداً انتخاب شده تا با HEALTHCHECK در Dockerfile
+# (curl http://localhost:8000/health) و nginx.conf هم‌راستا باشد.
+@app.get("/health", include_in_schema=False)
+async def health_check() -> JSONResponse:
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("Health check failed — database unreachable")
+        return JSONResponse(status_code=503, content={"status": "unhealthy"})
+    return JSONResponse(status_code=200, content={"status": "ok"})
 
 # ─── API Routers ──────────────────────────────────────────────────────────────
 # ترتیب مهم نیست اما گروه‌بندی منطقی نگه می‌داریم

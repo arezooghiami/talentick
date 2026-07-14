@@ -98,9 +98,25 @@ class UserDetail(BaseModel):
     phone: str | None = None
     org_id: str
     is_active: bool
+    must_change_password: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ─── Password Reset (توسط ادمین) ───────────────────────────────────────────
+
+class PasswordResetResponse(BaseModel):
+    """
+    پاسخ POST /api/users/{id}/reset-password.
+
+    temp_password فقط همین یک‌بار در همین پاسخ نمایش داده می‌شود — در هیچ
+    جای دیگری (لاگ، دیتابیس) به‌صورت خوانا ذخیره نمی‌شود. ادمین باید آن
+    را دستی (تلفن/حضوری — نه ایمیل/پیامک ناامن) به کاربر بدهد.
+    """
+    user_id: str
+    temp_password: str = Field(..., description="رمز موقت — فقط همین یک‌بار قابل مشاهده است")
+    message: str = "رمز عبور کاربر Reset شد — این رمز را فقط از کانال امن به کاربر بدهید"
 
 
 class PaginatedUsers(BaseModel):
@@ -121,6 +137,18 @@ class UserImportRowError(BaseModel):
     message: str
 
 
+class CreatedUserCredential(BaseModel):
+    """
+    ایمیل + رمز موقت یک کاربر تازه‌ساخته‌شده از Import.
+
+    چون سرویس ایمیل وجود ندارد، این تنها جایی است که رمز موقت به‌صورت
+    خوانا در دسترس است — ادمین باید آن را دستی (کانال امن) به کاربر بدهد.
+    کاربر با اولین ورود موظف به تغییر رمز است (must_change_password=True).
+    """
+    email: str
+    temp_password: str
+
+
 class UserImportResult(BaseModel):
     """گزارش کامل نتیجه Import گروهی کاربران از Excel."""
     total_rows: int
@@ -128,3 +156,7 @@ class UserImportResult(BaseModel):
     updated: int
     skipped: int
     errors: list[UserImportRowError] = Field(default_factory=list)
+    created_users: list[CreatedUserCredential] = Field(
+        default_factory=list,
+        description="ایمیل + رمز موقت هر کاربر تازه‌ساخته‌شده — فقط همین یک‌بار در دسترس است",
+    )

@@ -63,9 +63,11 @@ async def dashboard_stats(
     all_contents = list((await db.execute(all_contents_q)).scalars().all())
     published = [c for c in all_contents if c.status == "published"]
 
+    # Batch شده — یک کوئری برای همه‌ی محتواها به‌جای N کوئری در حلقه (رفع N+1)
+    eligibility_map = await content_service.eligible_user_ids_map_for_contents(db, published)
     eligible_users: set[uuid.UUID] = set()
-    for c in published:
-        eligible_users.update(await content_service.eligible_user_ids_for_content(db, c))
+    for ids in eligibility_map.values():
+        eligible_users.update(ids)
 
     active_users_q = select(User).where(User.role == "employee", User.is_active.is_(True))
     if org_id is not None:
@@ -111,9 +113,12 @@ async def content_reports(
     if content_id:
         contents = [c for c in contents if str(c.id) == content_id]
 
+    # Batch شده — یک کوئری برای همه‌ی محتواها به‌جای N کوئری در حلقه (رفع N+1)
+    eligibility_map = await content_service.eligible_user_ids_map_for_contents(db, contents)
+
     rows = []
     for c in contents:
-        eligible_ids = set(await content_service.eligible_user_ids_for_content(db, c))
+        eligible_ids = set(eligibility_map.get(c.id, set()))
         if dept_id or position_id or user_id:
             filtered_users_q = select(User.id).where(User.id.in_(eligible_ids)) if eligible_ids else None
             if filtered_users_q is not None:
@@ -258,9 +263,11 @@ async def user_reports(
         return []
 
     contents = await _published_contents(db, org_id)
+    # Batch شده — یک کوئری برای همه‌ی محتواها به‌جای N کوئری در حلقه (رفع N+1)
+    content_eligibility_map = await content_service.eligible_user_ids_map_for_contents(db, contents)
     eligible_map: dict[uuid.UUID, int] = {u.id: 0 for u in users}
-    for c in contents:
-        for uid in await content_service.eligible_user_ids_for_content(db, c):
+    for uids in content_eligibility_map.values():
+        for uid in uids:
             if uid in eligible_map:
                 eligible_map[uid] += 1
 

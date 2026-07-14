@@ -289,6 +289,65 @@ async def eligible_user_ids_for_content(db: AsyncSession, content: Content) -> l
     return list(result.scalars().all())
 
 
+async def eligible_user_ids_map_for_contents(
+    db: AsyncSession, contents: list[Content]
+) -> dict[uuid.UUID, set[uuid.UUID]]:
+    """
+    نسخه‌ی Batch‌شده‌ی eligible_user_ids_for_content — برای گزارش‌گیری روی
+    چند محتوا هم‌زمان (dashboard/reports).
+
+    به‌جای N کوئری جداگانه (یکی به ازای هر محتوا در یک حلقه — مشکل N+1
+    که در ممیزی عملکرد گزارش شد)، تمام ContentTarget های محتواهای ورودی و
+    تمام کارمندان سازمان(های) درگیر را در دو کوئری می‌خواند و eligibility
+    هر محتوا را در حافظه (طبق همان منطق visibility_condition) محاسبه
+    می‌کند. خروجی: نگاشت content_id → مجموعه‌ی user_id های مجاز.
+    """
+    if not contents:
+        return {}
+
+    content_ids = [c.id for c in contents]
+    targets_result = await db.execute(
+        select(ContentTarget).where(ContentTarget.content_id.in_(content_ids))
+    )
+    targets_by_content: dict[uuid.UUID, list[ContentTarget]] = {}
+    for t in targets_result.scalars().all():
+        targets_by_content.setdefault(t.content_id, []).append(t)
+
+    org_ids = {c.org_id for c in contents}
+    users_result = await db.execute(
+        select(User.id, User.org_id, User.dept_id, User.position_id).where(
+            User.org_id.in_(org_ids), User.role == "employee"
+        )
+    )
+    users_by_org: dict[uuid.UUID, list[tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None]]] = {}
+    for uid, org_id, dept_id, position_id in users_result.all():
+        users_by_org.setdefault(org_id, []).append((uid, dept_id, position_id))
+
+    result: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for content in contents:
+        targets = targets_by_content.get(content.id, [])
+        dept_ids = {t.target_value for t in targets if t.target_type == "department"}
+        pos_ids = {t.target_value for t in targets if t.target_type == "position"}
+        user_ids = {t.target_value for t in targets if t.target_type == "user"}
+
+        eligible: set[uuid.UUID] = set()
+        for uid, dept_id, position_id in users_by_org.get(content.org_id, []):
+            if dept_ids or pos_ids:
+                scope_match = True
+                if dept_ids:
+                    scope_match = scope_match and dept_id is not None and str(dept_id) in dept_ids
+                if pos_ids:
+                    scope_match = scope_match and position_id is not None and str(position_id) in pos_ids
+                if scope_match or str(uid) in user_ids:
+                    eligible.add(uid)
+            else:
+                # بدون محدودیت department/position → کل کارمندان سازمان مجازند
+                eligible.add(uid)
+        result[content.id] = eligible
+
+    return result
+
+
 # ─── Content CRUD ─────────────────────────────────────────────────────────
 
 _SORTABLE_FIELDS = {

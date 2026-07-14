@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.storage import upload_file
 from app.database import get_db
 from app.dependencies import Employee, OrgAdmin
+from app.dependencies import enforce_org_scope as _enforce_org_scope
 from app.models.content import Content
 from app.models.user import User
 from app.schemas.content import (
@@ -51,12 +52,8 @@ router = APIRouter(prefix="/api/contents", tags=["Content"])
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────
-
-def _enforce_org_scope(current_user: User, target_org_id: uuid.UUID) -> None:
-    if current_user.role == "super_admin":
-        return
-    if str(current_user.org_id) != str(target_org_id):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "دسترسی به این سازمان مجاز نیست")
+# _enforce_org_scope اکنون از dependencies.enforce_org_scope (نسخه‌ی واحد و
+# مشترک بین همه‌ی روترها) می‌آید — بدون تعریف محلی، فقط alias.
 
 
 def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID | None:

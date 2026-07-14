@@ -35,16 +35,18 @@ from sqlalchemy.orm import joinedload
 
 from app.database import get_db
 from app.dependencies import CurrentUser, Manager, OrgAdmin, require_active
+from app.dependencies import enforce_org_scope as _enforce_org_scope
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.user import (
     PaginatedUsers,
+    PasswordResetResponse,
     UserCreateRequest,
     UserDetail,
     UserImportResult,
     UserUpdateRequest,
 )
-from app.services import user_excel_service, user_service
+from app.services import auth_service, user_excel_service, user_service
 
 _XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -55,19 +57,10 @@ router = APIRouter(
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────────
-
-def _enforce_org_scope(current_user: User, target_org_id) -> None:
-    """
-    super_admin استثنا است. هر نقش دیگر فقط به سازمان خودش دسترسی دارد.
-    در صورت نقض → 403.
-    """
-    if current_user.role == "super_admin":
-        return
-    if str(current_user.org_id) != str(target_org_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="دسترسی به کاربران این سازمان مجاز نیست",
-        )
+# _enforce_org_scope اکنون از dependencies.enforce_org_scope (نسخه‌ی واحد
+# و مشترک بین همه‌ی روترها) گرفته می‌شود — به همین دلیل دیگر اینجا
+# تعریف محلی ندارد؛ فقط با alias قدیمی import شده تا فراخوانی‌های موجود
+# در همین فایل بدون تغییر بمانند.
 
 
 async def _to_detail(db: AsyncSession, user: User) -> UserDetail:
@@ -89,6 +82,7 @@ async def _to_detail(db: AsyncSession, user: User) -> UserDetail:
         phone=user.phone,
         org_id=str(user.org_id),
         is_active=user.is_active,
+        must_change_password=user.must_change_password,
         created_at=user.created_at,
     )
 
@@ -429,3 +423,54 @@ async def toggle_user_active(
         "is_active": updated.is_active,
         "message": "کاربر فعال شد" if updated.is_active else "کاربر غیرفعال شد",
     }
+
+
+# ─── POST /{id}/reset-password — Reset اجباری رمز توسط ادمین ─────────────────
+
+@router.post(
+    "/{user_id}/reset-password",
+    response_model=PasswordResetResponse,
+    summary="Reset رمز عبور کاربر (توسط ادمین — بدون ایمیل)",
+    description="""
+    یک رمز موقت تصادفی می‌سازد، آن را برای کاربر تنظیم می‌کند، همه‌ی
+    session های فعال او را باطل می‌کند (خروج اجباری از همه دستگاه‌ها) و
+    `must_change_password=True` می‌شود — کاربر با رمز موقت وارد می‌شود
+    اما تا `POST /api/auth/change-password` را صدا نزند، به جای دیگری
+    دسترسی ندارد.
+
+    **دسترسی:** manager به بالا + org isolation. یک کاربر نمی‌تواند رمز
+    خودش را از این مسیر Reset کند (باید از `change-password` با دانستن
+    رمز فعلی استفاده کند)، و فقط `super_admin` می‌تواند رمز یک
+    `super_admin` دیگر را Reset کند.
+
+    ⚠️ چون سرویس ایمیل وجود ندارد، `temp_password` فقط همین یک‌بار در
+    پاسخ این API نمایش داده می‌شود — ادمین باید آن را از یک کانال امن
+    (نه ایمیل/پیامک) به‌صورت دستی به کاربر برساند.
+    """,
+    responses={
+        400: {"description": "نمی‌توانید رمز خودتان را از این مسیر Reset کنید"},
+        403: {"description": "دسترسی به این سازمان مجاز نیست، یا اجازه Reset رمز super_admin دیگر را ندارید"},
+        404: {"description": "کاربر یافت نشد"},
+    },
+)
+async def reset_user_password(
+    user_id: str,
+    current_user: Manager,
+    db: AsyncSession = Depends(get_db),
+) -> PasswordResetResponse:
+    user = await user_service.get_user(db, user_id)
+    if not user:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "کاربر یافت نشد")
+
+    _enforce_org_scope(current_user, user.org_id)
+
+    if str(user.id) == str(current_user.id):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "نمی‌توانید رمز خودتان را از این مسیر Reset کنید — از «تغییر رمز عبور» استفاده کنید",
+        )
+    if user.role == "super_admin" and current_user.role != "super_admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "اجازه Reset رمز super_admin را ندارید")
+
+    temp_password = await auth_service.admin_reset_password(db, user)
+    return PasswordResetResponse(user_id=str(user.id), temp_password=temp_password)

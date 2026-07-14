@@ -20,7 +20,6 @@ Import/Export گروهی کاربران از/به فایل Excel + دانلود 
 from __future__ import annotations
 
 import io
-import secrets
 import uuid
 from datetime import datetime
 
@@ -30,10 +29,10 @@ from openpyxl.utils import get_column_letter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import hash_password
+from app.core.security import generate_temp_password, hash_password
 from app.models.organization import Department, Position
 from app.models.user import VALID_ROLES, User
-from app.schemas.user import UserImportResult, UserImportRowError
+from app.schemas.user import CreatedUserCredential, UserImportResult, UserImportRowError
 
 # ─── ستون‌های ثابت ──────────────────────────────────────────────────────────
 
@@ -191,6 +190,7 @@ async def import_users_from_excel(
 
     # سطرهایی که باید ساخته/به‌روزرسانی شوند را جمع می‌کنیم تا در آخر یک‌جا commit شود
     to_create: list[User] = []
+    created_credentials: list[CreatedUserCredential] = []
 
     for idx, row in enumerate(rows, start=2):
         if row is None or all(_norm(c) == "" for c in row):
@@ -266,12 +266,13 @@ async def import_users_from_excel(
                 existing.phone = phone
             updated += 1
         else:
+            temp_password = generate_temp_password()
             new_user = User(
                 id=uuid.uuid4(),
                 org_id=org_id,
                 email=email,
                 full_name=full_name,
-                hashed_password=hash_password(secrets.token_urlsafe(16)),
+                hashed_password=hash_password(temp_password),
                 role=role,
                 dept_id=dept.id if dept else None,
                 position_id=position.id if position else None,
@@ -279,9 +280,14 @@ async def import_users_from_excel(
                 phone=phone or None,
                 is_active=True,
                 is_email_verified=False,
+                # رمز موقت را ادمین از طریق created_users در همین پاسخ
+                # می‌بیند و باید دستی به کاربر بدهد — کاربر موظف به تغییر
+                # آن در اولین ورود است (بدون سرویس ایمیل).
+                must_change_password=True,
             )
             db.add(new_user)
             to_create.append(new_user)
+            created_credentials.append(CreatedUserCredential(email=email, temp_password=temp_password))
             # جلوگیری از ایمیل تکراری و امکان ارجاع «مدیر مستقیم» به کاربر تازه‌ساخته‌شده در همین فایل
             all_users_by_email[email] = new_user
             users_by_email_in_org[email] = new_user
@@ -296,4 +302,5 @@ async def import_users_from_excel(
         updated=updated,
         skipped=skipped,
         errors=errors,
+        created_users=created_credentials,
     )

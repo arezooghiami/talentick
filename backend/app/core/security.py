@@ -10,6 +10,9 @@ JWT token ساخت/اعتبارسنجی و hash کردن پسورد.
 - org_id همیشه در JWT payload است
 """
 
+import secrets
+import string
+import uuid
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any
@@ -34,6 +37,22 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return _pwd_context.verify(plain_password, hashed_password)
 
 
+_TEMP_PASSWORD_ALPHABET = string.ascii_letters + string.digits
+
+
+def generate_temp_password(length: int = 14) -> str:
+    """
+    رمز موقت تصادفی و امن می‌سازد — برای زمانی که ادمین رمز کاربری را
+    می‌سازد/Reset می‌کند و باید آن را دستی (بدون ایمیل) به کاربر بدهد.
+
+    از secrets.choice (CSPRNG) استفاده می‌شود — نه random ماژول معمولی.
+    فقط حروف/عدد (بدون کاراکتر خاص) تا کپی/تایپ دستی توسط ادمین برای
+    کاربر خطای انسانی کمتری داشته باشد؛ طول ۱۴ کاراکتر آنتروپی کافی
+    (~83 بیت) برای یک رمز یک‌بارمصرف که بلافاصله باید عوض شود، تأمین می‌کند.
+    """
+    return "".join(secrets.choice(_TEMP_PASSWORD_ALPHABET) for _ in range(length))
+
+
 def hash_token(token: str) -> str:
     """
     SHA256 hash از یک توکن (برای ذخیره refresh token در DB).
@@ -53,12 +72,18 @@ def create_access_token(data: dict[str, Any]) -> str:
     - sub: user_id (str)
     - org_id: organization UUID (str)
     - role: نقش کاربر
+
+    نکته: jti (شناسه یکتای توکن) عمداً اضافه می‌شود — بدون آن، دو توکن
+    صادرشده برای یک کاربر با claim های یکسان در یک ثانیه (exp با دقت
+    ثانیه truncate می‌شود) می‌توانند دقیقاً یکسان دربیایند (مثلاً لاگین و
+    بلافاصله تغییر رمز، یا دو تب هم‌زمان) — که برای refresh_token چون
+    token_hash در DB باید UNIQUE باشد، منجر به خطای IntegrityError می‌شود.
     """
     payload = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    payload.update({"exp": expire, "type": "access"})
+    payload.update({"exp": expire, "type": "access", "jti": str(uuid.uuid4())})
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 
@@ -66,12 +91,15 @@ def create_refresh_token(data: dict[str, Any]) -> str:
     """
     Refresh Token می‌سازد — بلندمدت‌تر از access token.
     در DB در جدول refresh_tokens ذخیره می‌شود.
+
+    jti یکتا دارد — دلیل در docstring بالا (create_access_token) توضیح
+    داده شده؛ برای این توکن حیاتی‌تر است چون token_hash آن UNIQUE در DB است.
     """
     payload = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(
         days=settings.refresh_token_expire_days
     )
-    payload.update({"exp": expire, "type": "refresh"})
+    payload.update({"exp": expire, "type": "refresh", "jti": str(uuid.uuid4())})
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 

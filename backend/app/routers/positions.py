@@ -20,18 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import Manager
+from app.dependencies import enforce_org_scope as _enforce_org_scope
 from app.models.user import User
 from app.schemas.position import PositionCreate, PositionResponse, PositionUpdate
 from app.services import department_service, position_service
 
 router = APIRouter(prefix="/api/positions", tags=["Positions"])
-
-
-def _enforce_org_scope(current_user: User, target_org_id) -> None:
-    if current_user.role == "super_admin":
-        return
-    if str(current_user.org_id) != str(target_org_id):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "دسترسی به این سازمان مجاز نیست")
 
 
 def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID:

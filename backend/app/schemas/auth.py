@@ -32,7 +32,7 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    """پاسخ موفق login/refresh — شامل هر دو توکن."""
+    """پاسخ موفق login/refresh/change-password — شامل هر دو توکن."""
     access_token: str = Field(..., description="برای Authorization: Bearer <token> در تمام درخواست‌های محافظت‌شده — اعتبار ۶۰ دقیقه")
     refresh_token: str = Field(..., description="فقط برای POST /api/auth/refresh استفاده شود — اعتبار ۳۰ روز — به‌صورت امن (نه localStorage در صورت امکان) نگه‌داری شود")
     token_type: str = "bearer"
@@ -41,6 +41,16 @@ class TokenResponse(BaseModel):
     org_id: str
     role: str
     full_name: str
+    must_change_password: bool = Field(
+        False,
+        description="اگر True باشد، کاربر تا فراخوانی موفق POST /api/auth/change-password به هیچ endpoint دیگری دسترسی ندارد",
+    )
+
+
+class ChangePasswordRequest(BaseModel):
+    """بدنه‌ی POST /api/auth/change-password — نیازمند دانستن رمز فعلی."""
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
 
 
 class RefreshRequest(BaseModel):
@@ -73,5 +83,6 @@ class MeResponse(BaseModel):
     department: str | None = None
     position: str | None = None
     last_login_at: datetime | None = None
+    must_change_password: bool = False
 
     model_config = {"from_attributes": True}

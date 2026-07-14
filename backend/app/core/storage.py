@@ -22,9 +22,12 @@ from minio.error import S3Error
 from app.config import settings
 
 # پسوندهای مجاز برای آپلود محتوا — جلوگیری از آپلود فایل اجرایی/خطرناک
+# نکته امنیتی: svg عمداً در این لیست نیست — فایل SVG می‌تواند حاوی
+# <script>/onload> باشد و در صورت نمایش inline در مرورگر منجر به
+# Stored XSS شود؛ برای آیکون/وکتور از فرمت‌های امن (png/webp) استفاده شود.
 ALLOWED_EXTENSIONS = {
     # تصویر
-    "jpg", "jpeg", "png", "webp", "gif", "svg",
+    "jpg", "jpeg", "png", "webp", "gif",
     # ویدیو
     "mp4", "webm", "mov",
     # صوت (پادکست)

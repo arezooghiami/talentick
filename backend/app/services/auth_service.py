@@ -29,10 +29,12 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
+    generate_temp_password,
+    hash_password,
     hash_token,
     verify_password,
 )
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import BadRequestError, UnauthorizedError
 from app.models.organization import Organization
 from app.models.user import RefreshToken, User
 
@@ -176,7 +178,84 @@ def _build_token_response(user: User, access_token: str, refresh_token: str) -> 
         "org_id": str(user.org_id),
         "role": user.role,
         "full_name": user.full_name,
+        "must_change_password": user.must_change_password,
     }
+
+
+# ─── Password Management (بدون سرویس ایمیل — طبق تصمیم محصول) ──────────────
+# رمز اولیه/Reset همیشه توسط یک ادمین (نه خودِ کاربر) ساخته و دستی (تلفن/
+# حضوری) به کاربر داده می‌شود. برای جلوگیری از باقی‌ماندن دائمی دانشِ رمز
+# نزد ادمین، must_change_password=True ست می‌شود و طبق
+# dependencies.get_current_user، کاربر تا تغییر رمز به هیچ endpoint دیگری
+# دسترسی ندارد.
+
+async def _revoke_all_sessions(db: AsyncSession, user: User) -> None:
+    """همه‌ی refresh token های فعال کاربر را باطل می‌کند (خروج از همه دستگاه‌ها)."""
+    result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    )
+    now = datetime.now(timezone.utc)
+    for stored in result.scalars().all():
+        stored.revoked_at = now
+
+
+async def change_password(
+    db: AsyncSession, user: User, current_password: str, new_password: str
+) -> dict:
+    """
+    تغییر رمز توسط خودِ کاربر (نیازمند دانستن رمز فعلی).
+
+    - همه session های قبلی (روی همه دستگاه‌ها) باطل می‌شوند — چون رمز قبلی
+      ممکن است نزد شخص دیگری (ادمین/مهاجم) هم شناخته‌شده بوده باشد.
+    - یک access/refresh token جدید بلافاصله صادر می‌شود تا کاربر مجبور به
+      لاگین دوباره نباشد.
+    - خطاها: BadRequestError اگر رمز فعلی اشتباه باشد.
+    """
+    if not verify_password(current_password, user.hashed_password):
+        raise BadRequestError("رمز عبور فعلی اشتباه است")
+
+    user.hashed_password = hash_password(new_password)
+    user.must_change_password = False
+    await _revoke_all_sessions(db, user)
+    await db.flush()
+
+    access_token = create_access_token(_token_payload(user))
+    refresh_token = create_refresh_token(_token_payload(user))
+    db.add(
+        RefreshToken(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            org_id=user.org_id,
+            token_hash=hash_token(refresh_token),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    await db.commit()
+    return _build_token_response(user, access_token, refresh_token)
+
+
+async def admin_reset_password(db: AsyncSession, user: User) -> str:
+    """
+    Reset اجباری رمز توسط ادمین (Manager+) — بدون دانستن رمز قبلی.
+
+    یک رمز موقت تصادفی می‌سازد، آن را روی کاربر ست می‌کند، همه‌ی
+    session های فعال کاربر را باطل می‌کند (خروج اجباری از همه دستگاه‌ها)
+    و must_change_password=True می‌شود.
+
+    خروجی: رمز موقت به‌صورت plain-text — تنها لحظه‌ای که این رمز در کل
+    سیستم به‌صورت خوانا وجود دارد؛ در جایی ذخیره نمی‌شود و فقط در همین
+    یک پاسخ API به ادمین بازگردانده می‌شود تا دستی به کاربر بدهد.
+    """
+    temp_password = generate_temp_password()
+    user.hashed_password = hash_password(temp_password)
+    user.must_change_password = True
+    await _revoke_all_sessions(db, user)
+    await db.commit()
+    return temp_password
 
 
 # ─── Profile (GET /me) ──────────────────────────────────────────────────────
@@ -205,4 +284,5 @@ async def get_me(db: AsyncSession, user: User) -> dict:
         "department": user.department.name if user.department else None,
         "position": user.position.name if user.position else None,
         "last_login_at": user.last_login_at,
+        "must_change_password": user.must_change_password,
     }

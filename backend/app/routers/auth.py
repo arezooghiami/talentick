@@ -29,7 +29,13 @@ from app.core.exceptions import UnauthorizedError
 from app.core.rate_limit import login_rate_limiter
 from app.database import get_db
 from app.dependencies import CurrentUser
-from app.schemas.auth import LogoutRequest, MeResponse, RefreshRequest, TokenResponse
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    LogoutRequest,
+    MeResponse,
+    RefreshRequest,
+    TokenResponse,
+)
 from app.services import auth_service
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -110,6 +116,36 @@ async def refresh(
         return await auth_service.refresh_session(db, body.refresh_token)
     except UnauthorizedError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, exc.detail)
+
+
+@router.post(
+    "/change-password",
+    response_model=TokenResponse,
+    summary="تغییر رمز عبور (توسط خود کاربر)",
+    description="""
+    نیازمند `access_token` معتبر و دانستن رمز عبور **فعلی**.
+
+    مخصوصاً برای کاربرانی که رمزشان توسط ادمین ساخته/Reset شده
+    (`must_change_password=True`) — تا زمانی که این endpoint را با موفقیت
+    صدا نزنند، به هیچ endpoint دیگری (به‌جز `GET /api/auth/me` و
+    `POST /api/auth/logout`) دسترسی ندارند و پاسخ `428` می‌گیرند.
+
+    با موفقیت: همه‌ی session های قبلی (همه دستگاه‌ها) باطل می‌شوند و یک
+    جفت توکن کاملاً جدید بازگردانده می‌شود — نیازی به لاگین دوباره نیست.
+
+    **خطاها:**
+    - `400` — رمز عبور فعلی اشتباه است.
+    """,
+    responses={400: {"description": "رمز عبور فعلی اشتباه است"}},
+)
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    return await auth_service.change_password(
+        db, current_user, body.current_password, body.new_password
+    )
 
 
 @router.post(

@@ -19,7 +19,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +31,15 @@ from app.models.user import User
 # ─── OAuth2 Scheme ────────────────────────────────────────────────────────────
 # tokenUrl باید با endpoint لاگین match کنه
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+# مسیرهایی که حتی اگر must_change_password=True باشد، همچنان مجازند —
+# باید حداقل «تغییر رمز» و «مشاهده پروفایل خود» و «خروج» در دسترس بمانند
+# تا کاربر بتواند خودش را از این وضعیت خارج کند.
+_PASSWORD_CHANGE_EXEMPT_PATHS = {
+    "/api/auth/change-password",
+    "/api/auth/me",
+    "/api/auth/logout",
+}
 
 # ─── Role Hierarchy ───────────────────────────────────────────────────────────
 # هر نقش شامل تمام نقش‌های پایین‌تر از خودشه
@@ -50,15 +59,22 @@ def _role_level(role: str) -> int:
 # ─── Base Dependency ──────────────────────────────────────────────────────────
 
 async def get_current_user(
+    request: Request,
     token: Annotated[str, Depends(oauth2_scheme)],
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
     JWT را decode می‌کند و User را از دیتابیس برمی‌گرداند.
 
+    همچنین قفل must_change_password اینجا (پایین‌ترین/مشترک‌ترین
+    dependency که همه‌ی guard ها و CurrentUser از آن مشتق می‌شوند) اعمال
+    می‌شود تا هیچ endpointی (فعلی یا آینده) نتواند این بررسی را فراموش
+    کند — مگر مسیرهای صراحتاً معاف‌شده در _PASSWORD_CHANGE_EXEMPT_PATHS.
+
     خطاها:
     - 401: token نامعتبر یا منقضی
     - 401: کاربر در دیتابیس وجود ندارد
+    - 428: رمز عبور توسط ادمین تنظیم شده و کاربر هنوز آن را عوض نکرده
     """
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -84,6 +100,12 @@ async def get_current_user(
 
     if user is None:
         raise credentials_exc
+
+    if user.must_change_password and request.url.path not in _PASSWORD_CHANGE_EXEMPT_PATHS:
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail="رمز عبور شما توسط مدیر سیستم تنظیم شده — قبل از ادامه باید آن را تغییر دهید",
+        )
 
     return user
 
@@ -214,3 +236,28 @@ class OrgIsolation:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="دسترسی به این سازمان مجاز نیست",
             )
+
+
+# ─── Shared Org-Scope Helper ───────────────────────────────────────────────────
+# پیش‌تر این منطق در users.py / content.py / departments.py / positions.py
+# عیناً چهار بار کپی‌پیست شده بود — نسخه‌ی واحد اینجا تا هیچ router جدیدی
+# این بررسی حیاتی Tenant Isolation را فراموش نکند یا نسخه‌ی ناهماهنگ از آن
+# ننویسد.
+
+def enforce_org_scope(current_user: User, target_org_id: uuid.UUID) -> None:
+    """
+    بررسی می‌کند کاربر به سازمانِ target_org_id دسترسی دارد.
+
+    super_admin از این قانون مستثناست (به همه‌ی سازمان‌ها دسترسی دارد).
+    سایر نقش‌ها فقط به سازمان خودشان — در غیر این صورت 403.
+
+    استفاده در Router (بعد از fetch رکورد و پیش از بازگرداندن آن):
+        enforce_org_scope(current_user, resource.org_id)
+    """
+    if current_user.role == "super_admin":
+        return
+    if str(current_user.org_id) != str(target_org_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="دسترسی به این سازمان مجاز نیست",
+        )

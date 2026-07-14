@@ -185,6 +185,9 @@ async def create_user(db: AsyncSession, data: UserCreateRequest) -> User:
         position_id=uuid.UUID(data.position_id) if data.position_id else None,
         manager_id=uuid.UUID(data.manager_id) if data.manager_id else None,
         is_active=True,
+        # رمز را خودِ ادمین انتخاب کرده (نه کاربر) — پس باید هنگام اولین
+        # ورود عوض شود تا رمز نزد ادمین «دائمی معتبر» باقی نماند.
+        must_change_password=True,
     )
     db.add(user)
     try:

@@ -105,6 +105,14 @@ class User(UUIDMixin, TimestampMixin, Base):
     is_email_verified: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False,
+        comment=(
+            "True یعنی رمز فعلی توسط شخص دیگری (ادمین هنگام ساخت/Import/Reset) "
+            "تنظیم شده و کاربر باید قبل از هر کار دیگری آن را عوض کند — "
+            "enforcement در dependencies.get_current_user انجام می‌شود"
+        ),
+    )
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
