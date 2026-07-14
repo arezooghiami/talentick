@@ -201,7 +201,9 @@ class ContentItem(UUIDMixin, TimestampMixin, Base):
 
     # برای quiz_ref: شناسه quiz مرتبط
     quiz_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True,
+        UUID(as_uuid=True),
+        ForeignKey("quizzes.id", ondelete="SET NULL"),
+        nullable=True,
         comment="شناسه Quiz اگر type=quiz_ref باشد"
     )
 

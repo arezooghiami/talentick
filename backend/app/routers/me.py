@@ -1,13 +1,20 @@
 """
-Talentick — «محتواهای من» (My Contents) Router
-==================================================
-پرتال کاربر عادی — کاملاً مستقل از API پنل ادمین (routers/content.py).
+Talentick — «محتواهای من» (My Contents) + «آزمون‌های من» (My Quizzes) Router
+=================================================================================
+پرتال کاربر عادی — کاملاً مستقل از API پنل ادمین (routers/content.py،
+routers/quizzes.py).
 
-Routes:
+Routes (محتوا):
   GET  /api/me/contents                                  → فهرست محتواهای مجاز من + پیشرفتم
   GET  /api/me/contents/{id}                              → جزئیات محتوا + آیتم‌ها + پیشرفت من
   POST /api/me/contents/{id}/start                        → شروع مشاهده (ثبت started_at)
   POST /api/me/contents/{id}/items/{item_id}/progress     → به‌روزرسانی پیشرفت یک آیتم
+
+Routes (آزمون):
+  GET  /api/me/quizzes/{id}                                → سوالات آزمون برای شرکت (بدون پاسخ صحیح)
+  POST /api/me/quizzes/{id}/attempts                        → ثبت پاسخ‌ها + نمره‌دهی خودکار
+  GET  /api/me/quizzes/{id}/attempts                        → تاریخچه‌ی تلاش‌های من روی این آزمون
+  GET  /api/me/quizzes/{id}/attempts/{attempt_id}           → جزئیات یک تلاش (شامل پاسخ صحیح/توضیح)
 
 دسترسی: هر کاربر فعال (Employee و بالاتر) — همیشه از Permission Engine مرکزی
 (content_service.visibility_condition) استفاده می‌شود، صرف‌نظر از نقش کاربر،
@@ -24,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import Employee
 from app.models.content import Content
+from app.models.quiz import Quiz
 from app.schemas.content import CONTENT_TYPES
 from app.schemas.me import (
     MyContentDetailResponse,
@@ -32,7 +40,13 @@ from app.schemas.me import (
     MyContentResponse,
 )
 from app.schemas.progress import ItemProgressUpdate
-from app.services import content_service, progress_service
+from app.schemas.quiz import (
+    QuizAttemptResult,
+    QuizAttemptSubmit,
+    QuizAttemptSummary,
+    QuizTakeResponse,
+)
+from app.services import content_service, progress_service, quiz_service
 
 router = APIRouter(prefix="/api/me", tags=["My Contents"])
 
@@ -42,6 +56,13 @@ async def _get_content_or_404(db: AsyncSession, content_id: str) -> Content:
     if not content:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     return content
+
+
+async def _get_active_quiz_or_404(db: AsyncSession, quiz_id: str, org_id) -> Quiz:
+    quiz = await quiz_service.get_quiz(db, quiz_id)
+    if not quiz or str(quiz.org_id) != str(org_id) or not quiz.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "آزمون یافت نشد")
+    return quiz
 
 
 @router.get("/contents", response_model=MyContentListResponse, summary="فهرست محتواهای مجاز من")
@@ -163,3 +184,77 @@ async def update_item_progress(
         "item": progress_service.item_progress_to_response(item_progress),
         "content": progress_service.content_progress_to_response(content_progress),
     }
+
+
+# ─── Quiz Routes ─────────────────────────────────────────────────────────────
+
+@router.get(
+    "/quizzes/{quiz_id}", response_model=QuizTakeResponse,
+    summary="سوالات آزمون برای شرکت (بدون پاسخ صحیح)",
+    description="پاسخ صحیح و توضیح سوالات عمداً در این پاسخ نیست — فقط بعد از ثبت attempt نمایش داده می‌شود.",
+)
+async def get_quiz_to_take(
+    quiz_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+) -> QuizTakeResponse:
+    quiz = await _get_active_quiz_or_404(db, quiz_id, current_user.org_id)
+    return await quiz_service.get_quiz_for_taking(db, quiz, current_user)
+
+
+@router.post(
+    "/quizzes/{quiz_id}/attempts", response_model=QuizAttemptResult, status_code=status.HTTP_201_CREATED,
+    summary="ثبت پاسخ‌های آزمون (نمره‌دهی خودکار)",
+    description="""
+    یک‌بار ثبت می‌شود — attempt هرگز ویرایش نمی‌شود. پاسخ صحیح/توضیح هر
+    سوال فقط در همین پاسخ (بعد از ثبت) نمایش داده می‌شود.
+
+    **خطاها:**
+    - `400` — تعداد دفعات مجاز (`max_attempts`) پر شده یا مهلت زمانی (`time_limit_min`) گذشته است.
+    """,
+    responses={400: {"description": "تعداد دفعات مجاز پر شده یا مهلت زمانی گذشته است"}},
+)
+async def submit_quiz_attempt(
+    quiz_id: str,
+    body: QuizAttemptSubmit,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+) -> QuizAttemptResult:
+    quiz = await _get_active_quiz_or_404(db, quiz_id, current_user.org_id)
+    attempt = await quiz_service.submit_attempt(db, current_user, quiz, body)
+    return await quiz_service.attempt_to_result(db, attempt)
+
+
+@router.get(
+    "/quizzes/{quiz_id}/attempts", response_model=list[QuizAttemptSummary],
+    summary="تاریخچه‌ی تلاش‌های من روی این آزمون",
+)
+async def list_my_quiz_attempts(
+    quiz_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+) -> list[QuizAttemptSummary]:
+    quiz = await _get_active_quiz_or_404(db, quiz_id, current_user.org_id)
+    attempts = await quiz_service.list_my_attempts(db, current_user.id, quiz.id)
+    return [quiz_service.attempt_to_summary(a) for a in attempts]
+
+
+@router.get(
+    "/quizzes/{quiz_id}/attempts/{attempt_id}", response_model=QuizAttemptResult,
+    summary="جزئیات یک تلاش (شامل پاسخ صحیح/توضیح)",
+)
+async def get_my_quiz_attempt(
+    quiz_id: str,
+    attempt_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+) -> QuizAttemptResult:
+    quiz = await _get_active_quiz_or_404(db, quiz_id, current_user.org_id)
+    attempt = await quiz_service.get_attempt(db, attempt_id)
+    if (
+        not attempt
+        or str(attempt.quiz_id) != str(quiz.id)
+        or str(attempt.user_id) != str(current_user.id)
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "تلاش یافت نشد")
+    return await quiz_service.attempt_to_result(db, attempt)

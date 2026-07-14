@@ -22,7 +22,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine
-from app.routers import auth, content, dashboard, departments, me, organizations, positions, reports, users
+from app.routers import auth, content, dashboard, departments, me, organizations, positions, quizzes, reports, users
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +105,9 @@ app.include_router(users.router)          # CRUD /api/users
 app.include_router(departments.router)    # CRUD /api/departments
 app.include_router(positions.router)      # CRUD /api/positions
 app.include_router(content.router)        # CRUD /api/contents
+app.include_router(quizzes.router)        # CRUD /api/quizzes + گزارش تلاش‌ها
 app.include_router(dashboard.router)      # GET /api/dashboard/super-admin
-app.include_router(me.router)             # GET /api/me/contents — پرتال کاربر (LMS)
+app.include_router(me.router)             # GET /api/me/contents, /api/me/quizzes — پرتال کاربر (LMS)
 app.include_router(reports.router)        # GET /api/reports/* — BI و گزارش‌گیری
 
 # ─── Static Frontend ──────────────────────────────────────────────────────────
