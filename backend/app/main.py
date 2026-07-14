@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import auth, content, dashboard, departments, organizations, positions, users
+from app.routers import auth, content, dashboard, departments, me, organizations, positions, reports, users
 
 
 # ─── Lifespan ─────────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ app = FastAPI(
 # درخواست بزند — ریسک امنیتی جدی. به‌همین دلیل از allowed_origins در
 # .env استفاده می‌شود؛ در Production باید فقط دامنه(های) واقعی فرانت
 # در ALLOWED_ORIGINS باشد.
-
+print(settings.allowed_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -73,6 +73,8 @@ app.include_router(departments.router)    # CRUD /api/departments
 app.include_router(positions.router)      # CRUD /api/positions
 app.include_router(content.router)        # CRUD /api/contents
 app.include_router(dashboard.router)      # GET /api/dashboard/super-admin
+app.include_router(me.router)             # GET /api/me/contents — پرتال کاربر (LMS)
+app.include_router(reports.router)        # GET /api/reports/* — BI و گزارش‌گیری
 
 # ─── Static Frontend ──────────────────────────────────────────────────────────
 # frontend/ دایرکتوری مجاور backend/ است

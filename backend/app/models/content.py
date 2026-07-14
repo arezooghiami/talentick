@@ -43,10 +43,11 @@ CONTENT_STATUSES = ("draft", "published", "archived")
 # سطح دشواری
 CONTENT_LEVELS = ("beginner", "intermediate", "advanced")
 
-# نوع هدف انتشار محتوا (Targeting) — قابل توسعه
-# department/position/user → UUID در target_value ذخیره می‌شود
-# role                     → یکی از VALID_ROLES (رشته) در target_value ذخیره می‌شود
-TARGET_TYPES = ("department", "position", "role", "user")
+# نوع هدف انتشار محتوا (Permission Engine) — قابل توسعه
+# منطق: (Department AND Position) OR کاربر مشخص (Explicit User)
+# هر کدام از department/position اگر خالی باشند یعنی «بدون محدودیت» روی آن بعد.
+# user همیشه مستقل از دو بعد بالا، دسترسی می‌دهد.
+TARGET_TYPES = ("department", "position", "user")
 
 
 class Content(UUIDMixin, TimestampMixin, Base):
@@ -225,15 +226,20 @@ class ContentItem(UUIDMixin, TimestampMixin, Base):
 
 class ContentTarget(UUIDMixin, TimestampMixin, Base):
     """
-    هدف انتشار محتوا (Targeting).
+    قانون دسترسی محتوا (Permission Engine).
 
-    هر سطر یک قانون نمایش است: محتوا برای یک دپارتمان/پست/نقش/کاربر
-    مشخص منتشر می‌شود. یک محتوا می‌تواند چند سطر (چند هدف مختلف)
-    داشته باشد — منطق OR: کافی است کاربر با یکی از سطرها match کند.
+    منطق نهایی (محاسبه در content_service.visibility_condition):
 
-    اگر هیچ سطری برای یک محتوا وجود نداشته باشد، یعنی محتوا برای کل
-    سازمان (همه کاربران org) قابل مشاهده است (پیش‌فرض قبلی — سازگاری
-    با محتواهای قدیمی).
+        (Department AND Position) OR Explicit Users
+
+    یعنی:
+    - اگر هیچ department و هیچ positionـی برای محتوا ثبت نشده باشد → کل سازمان می‌بیند.
+    - اگر department ثبت شده باشد ولی position نه → فقط اعضای همان department(ها)
+      (با هر پستی) می‌بینند.
+    - اگر هر دو ثبت شده باشند → کاربر باید هم در یکی از department‌ها و هم در
+      یکی از position‌های انتخاب‌شده باشد (AND).
+    - کاربرانی که مستقیم (target_type=user) انتخاب شده‌اند، همیشه مجازند —
+      حتی اگر شرط department/position را نداشته باشند (OR).
     """
 
     __tablename__ = "content_targets"
@@ -317,7 +323,18 @@ class UserContentProgress(UUIDMixin, TimestampMixin, Base):
     )
     progress_pct: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0,
-        comment="درصد پیشرفت 0-100"
+        comment="درصد پیشرفت 0-100 — میانگین progress_pct آیتم‌ها"
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="not_started",
+        comment="not_started | in_progress | completed"
+    )
+    total_view_time_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0,
+        comment="مجموع زمان مشاهده (ثانیه) — برای گزارش BI"
+    )
+    last_viewed_at: Mapped[datetime | None] = mapped_column(
+        __import__("sqlalchemy").DateTime(timezone=True), nullable=True
     )
 
     started_at: Mapped[datetime | None] = mapped_column(
@@ -329,3 +346,69 @@ class UserContentProgress(UUIDMixin, TimestampMixin, Base):
 
     # ─── Relationships ────────────────────────────────────────────────────
     content: Mapped["Content"] = relationship(back_populates="user_progresses")
+
+
+class UserItemProgress(UUIDMixin, TimestampMixin, Base):
+    """
+    پیشرفت کاربر در هر آیتم محتوا (سطح ریزدانه — Progress Tracking).
+
+    یک سطر به ازای هر (user, item) — یکتاست. مجموع/میانگین این سطرها
+    برای محاسبه‌ی UserContentProgress استفاده می‌شود
+    (به‌روزرسانی در services/progress_service.py).
+    """
+
+    __tablename__ = "user_item_progress"
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "item_id", name="uq_user_item"),
+    )
+
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    content_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("content_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="not_started",
+        comment="not_started | in_progress | completed"
+    )
+    progress_pct: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="درصد پیشرفت این آیتم 0-100"
+    )
+    last_position: Mapped[int | None] = mapped_column(
+        Integer, nullable=True,
+        comment="آخرین محل مشاهده — مثلاً ثانیه ویدیو یا شماره صفحه PDF"
+    )
+    view_time_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="مجموع زمان مشاهده این آیتم (ثانیه)"
+    )
+
+    started_at: Mapped[datetime | None] = mapped_column(
+        __import__("sqlalchemy").DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        __import__("sqlalchemy").DateTime(timezone=True), nullable=True
+    )
+    last_viewed_at: Mapped[datetime | None] = mapped_column(
+        __import__("sqlalchemy").DateTime(timezone=True), nullable=True
+    )
+
+    def __repr__(self) -> str:
+        return f"<UserItemProgress user={self.user_id} item={self.item_id} pct={self.progress_pct}>"

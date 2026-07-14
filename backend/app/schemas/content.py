@@ -16,23 +16,27 @@ ITEM_TYPES = ("text", "video", "pdf", "image", "link", "file", "quiz_ref")
 CONTENT_STATUSES = ("draft", "published", "archived")
 CONTENT_LEVELS = ("beginner", "intermediate", "advanced")
 
-# انواع هدف انتشار محتوا — می‌توان چند مورد را همزمان انتخاب کرد
-TARGET_TYPES = ("department", "position", "role", "user")
+# ابعاد Permission Engine — منطق: (Department AND Position) OR Explicit User
+TARGET_TYPES = ("department", "position", "user")
 
 
 # ─── ContentTarget (هدف انتشار: سازمان/دپارتمان/پست/نقش/کاربر) ───────────
 
 class ContentTargetCreate(BaseModel):
     """
-    یک قانون هدف‌گذاری انتشار محتوا.
+    یک بعد از Permission Engine محتوا.
 
-    target_type=department → target_id باید dept_id باشد
-    target_type=position   → target_id باید position_id باشد
-    target_type=user       → target_id باید user_id باشد
-    target_type=role       → target_id یکی از super_admin|org_admin|manager|employee
+    منطق نهایی (در content_service.visibility_condition محاسبه می‌شود):
+        (Department AND Position) OR Explicit Users
+
+    target_type=department → target_id باید dept_id باشد — خالی‌بودن همه‌ی
+        سطرهای department یعنی «بدون محدودیت واحد».
+    target_type=position   → target_id باید position_id باشد — مشابه بالا.
+    target_type=user       → target_id باید user_id باشد — این کاربران
+        همیشه مجازند، صرف‌نظر از department/position.
     """
-    target_type: str = Field(..., description="department | position | role | user")
-    target_id: str = Field(..., min_length=1, description="شناسه (UUID) یا نام role")
+    target_type: str = Field(..., description="department | position | user")
+    target_id: str = Field(..., min_length=1, description="شناسه (UUID)")
 
 
 class ContentTargetResponse(BaseModel):

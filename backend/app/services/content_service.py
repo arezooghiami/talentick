@@ -10,12 +10,13 @@ from __future__ import annotations
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy import String as sa_String
+from sqlalchemy import and_, cast as sa_cast, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content import TARGET_TYPES, Content, ContentItem, ContentTarget
 from app.models.organization import Department, Position
-from app.models.user import VALID_ROLES, User
+from app.models.user import User
 from app.schemas.content import (
     ContentCreate,
     ContentDetailResponse,
@@ -104,10 +105,6 @@ async def _validate_targets(
                 status.HTTP_400_BAD_REQUEST,
                 f"نوع هدف نامعتبر است — مقادیر مجاز: {', '.join(TARGET_TYPES)}",
             )
-        if t.target_type == "role":
-            if t.target_id not in VALID_ROLES:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, "نقش انتخاب‌شده معتبر نیست")
-            continue
         try:
             target_uuid = uuid.UUID(t.target_id)
         except ValueError:
@@ -127,33 +124,22 @@ async def _validate_targets(
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر انتخاب‌شده معتبر نیست")
 
 
-ROLE_LABELS = {
-    "super_admin": "سوپرادمین",
-    "org_admin": "مدیر سازمان",
-    "manager": "مدیر واحد",
-    "employee": "کارمند",
-}
-
-
 async def _target_to_response(db: AsyncSession, target: ContentTarget) -> ContentTargetResponse:
     label = None
-    if target.target_type == "role":
-        label = ROLE_LABELS.get(target.target_value, target.target_value)
-    else:
-        try:
-            target_uuid = uuid.UUID(target.target_value)
-        except ValueError:
-            target_uuid = None
-        if target_uuid:
-            if target.target_type == "department":
-                dept = await db.get(Department, target_uuid)
-                label = dept.name if dept else None
-            elif target.target_type == "position":
-                pos = await db.get(Position, target_uuid)
-                label = pos.name if pos else None
-            elif target.target_type == "user":
-                user = await db.get(User, target_uuid)
-                label = user.full_name if user else None
+    try:
+        target_uuid = uuid.UUID(target.target_value)
+    except ValueError:
+        target_uuid = None
+    if target_uuid:
+        if target.target_type == "department":
+            dept = await db.get(Department, target_uuid)
+            label = dept.name if dept else None
+        elif target.target_type == "position":
+            pos = await db.get(Position, target_uuid)
+            label = pos.name if pos else None
+        elif target.target_type == "user":
+            user = await db.get(User, target_uuid)
+            label = user.full_name if user else None
     return ContentTargetResponse(
         id=str(target.id),
         target_type=target.target_type,
@@ -203,35 +189,104 @@ async def is_visible_to_user(db: AsyncSession, content: Content, viewer: User) -
 
 def visibility_condition(viewer: User):
     """
-    شرط SQL برای فیلتر محتوایی که یک کارمند مجاز به دیدن آن است:
-    - محتوایی که هیچ هدفی برایش تعریف نشده (برای کل سازمان) یا
-    - محتوایی که حداقل یکی از هدف‌هایش با دپارتمان/پست/نقش/شناسه کاربر او match می‌شود.
+    شرط SQL — Permission Engine مرکزی — همه‌ی endpointها (لیست/جزئیات/گزارش)
+    باید از همین تابع استفاده کنند تا منطق دسترسی یک‌جا و یکپارچه بماند.
 
-    فقط برای نقش employee استفاده می‌شود — manager به بالا همه محتوای
-    سازمان را برای مدیریت می‌بینند.
+    منطق نهایی:
+        (Department AND Position) OR Explicit User
+
+    یعنی:
+    - user_match: اگر یک سطر target_type='user' با شناسه‌ی این viewer وجود
+      داشته باشد → همیشه مجاز (صرف‌نظر از بقیه شروط).
+    - در غیر این صورت باید scope_match برقرار باشد:
+        - dept_ok  = هیچ سطر department‌ای برای محتوا نیست، یا viewer در
+                     یکی از department‌های انتخاب‌شده است.
+        - pos_ok   = هیچ سطر position‌ای برای محتوا نیست، یا viewer در
+                     یکی از position‌های انتخاب‌شده است.
+        - scope_match = dept_ok AND pos_ok
+    - اگر هیچ department و هیچ positionـی ثبت نشده باشد → dept_ok=pos_ok=True
+      یعنی «بدون محدودیت» (قابل مشاهده برای کل سازمان).
     """
-    match_clauses = [
-        and_(ContentTarget.target_type == "role", ContentTarget.target_value == viewer.role),
-        and_(ContentTarget.target_type == "user", ContentTarget.target_value == str(viewer.id)),
-    ]
-    if viewer.dept_id:
-        match_clauses.append(
-            and_(ContentTarget.target_type == "department", ContentTarget.target_value == str(viewer.dept_id))
-        )
-    if viewer.position_id:
-        match_clauses.append(
-            and_(ContentTarget.target_type == "position", ContentTarget.target_value == str(viewer.position_id))
-        )
-
-    has_targets = exists(
-        select(ContentTarget.id).where(ContentTarget.content_id == Content.id)
-    )
-    matches_target = exists(
+    user_match = exists(
         select(ContentTarget.id).where(
-            ContentTarget.content_id == Content.id, or_(*match_clauses)
+            ContentTarget.content_id == Content.id,
+            ContentTarget.target_type == "user",
+            ContentTarget.target_value == str(viewer.id),
         )
     )
-    return or_(~has_targets, matches_target)
+
+    has_dept_targets = exists(
+        select(ContentTarget.id).where(
+            ContentTarget.content_id == Content.id, ContentTarget.target_type == "department"
+        )
+    )
+    if viewer.dept_id:
+        dept_match = exists(
+            select(ContentTarget.id).where(
+                ContentTarget.content_id == Content.id,
+                ContentTarget.target_type == "department",
+                ContentTarget.target_value == str(viewer.dept_id),
+            )
+        )
+        dept_ok = or_(~has_dept_targets, dept_match)
+    else:
+        # کاربر بدون department ثبت‌شده — فقط زمانی مجاز است که هیچ محدودیت department‌ای وجود نداشته باشد
+        dept_ok = ~has_dept_targets
+
+    has_position_targets = exists(
+        select(ContentTarget.id).where(
+            ContentTarget.content_id == Content.id, ContentTarget.target_type == "position"
+        )
+    )
+    if viewer.position_id:
+        position_match = exists(
+            select(ContentTarget.id).where(
+                ContentTarget.content_id == Content.id,
+                ContentTarget.target_type == "position",
+                ContentTarget.target_value == str(viewer.position_id),
+            )
+        )
+        position_ok = or_(~has_position_targets, position_match)
+    else:
+        position_ok = ~has_position_targets
+
+    scope_match = and_(dept_ok, position_ok)
+    return or_(scope_match, user_match)
+
+
+async def eligible_user_ids_for_content(db: AsyncSession, content: Content) -> list[uuid.UUID]:
+    """
+    لیست شناسه‌ی همه‌ی کارمندان سازمان که مطابق Permission Engine مجاز به
+    دیدن این محتوا هستند — برای گزارش‌گیری BI («تعداد کاربران مجاز»).
+
+    همان منطق visibility_condition (Department AND Position) OR Explicit
+    User را روی همه‌ی کارمندان سازمان اعمال می‌کند.
+    """
+    targets_result = await db.execute(
+        select(ContentTarget).where(ContentTarget.content_id == content.id)
+    )
+    targets = list(targets_result.scalars().all())
+    dept_ids = {t.target_value for t in targets if t.target_type == "department"}
+    pos_ids = {t.target_value for t in targets if t.target_type == "position"}
+    user_ids = {t.target_value for t in targets if t.target_type == "user"}
+
+    q = select(User.id).where(User.org_id == content.org_id, User.role == "employee")
+
+    if dept_ids or pos_ids:
+        scope_clauses = []
+        if dept_ids:
+            scope_clauses.append(sa_cast(User.dept_id, sa_String).in_(dept_ids))
+        if pos_ids:
+            scope_clauses.append(sa_cast(User.position_id, sa_String).in_(pos_ids))
+        scope_match = and_(*scope_clauses)
+        user_match = sa_cast(User.id, sa_String).in_(user_ids) if user_ids else False
+        q = q.where(or_(scope_match, user_match))
+    # اگر نه department/position و نه user ثبت نشده باشد → بدون محدودیت (همه‌ی کارمندان)
+    # اگر فقط user ثبت شده باشد (بدون scope) → طبق منطق AND/OR، scope خالی یعنی
+    # بدون محدودیت است، پس باز هم همه‌ی کارمندان واجد شرایط‌اند.
+
+    result = await db.execute(q)
+    return list(result.scalars().all())
 
 
 # ─── Content CRUD ─────────────────────────────────────────────────────────
@@ -257,14 +312,16 @@ async def list_contents(
     sort_by: str = "created_at",
     sort_order: str = "desc",
     viewer: User | None = None,
+    apply_visibility: bool = False,
 ) -> tuple[list[Content], int]:
     """
     لیست محتوا با فیلتر/جستجو/صفحه‌بندی/مرتب‌سازی.
 
     - org_id=None → همه سازمان‌ها (فقط برای super_admin در مدیریت کلی)
-    - viewer داده شود و role او employee باشد → علاوه بر status=published،
-      فقط محتوایی که مطابق دپارتمان/پست/نقش/شناسه‌ی خودش هدف‌گذاری شده
-      (یا اصلاً هدف‌گذاری نشده) نمایش داده می‌شود.
+    - viewer داده شود و role او employee باشد (یا apply_visibility=True — برای
+      endpointهای «محتواهای من») → علاوه بر status=published، فقط محتوایی که
+      مطابق Permission Engine (department/position/user) برای او مجاز است
+      نمایش داده می‌شود.
     """
     q = select(Content)
     if org_id is not None:
@@ -276,7 +333,7 @@ async def list_contents(
         q = q.where(Content.type == type_filter)
     if status_filter:
         q = q.where(Content.status == status_filter)
-    if viewer is not None and viewer.role == "employee":
+    if viewer is not None and (apply_visibility or viewer.role == "employee"):
         q = q.where(visibility_condition(viewer))
 
     count_q = select(func.count()).select_from(q.subquery())
