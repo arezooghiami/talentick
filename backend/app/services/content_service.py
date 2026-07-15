@@ -212,7 +212,11 @@ def visibility_condition(viewer: User):
                      یکی از position‌های انتخاب‌شده است.
         - scope_match = dept_ok AND pos_ok
     - اگر هیچ department و هیچ positionـی ثبت نشده باشد → dept_ok=pos_ok=True
-      یعنی «بدون محدودیت» (قابل مشاهده برای کل سازمان).
+      یعنی «بدون محدودیت» — اما این حالتِ «بدون محدودیت» فقط زمانی معتبر است
+      که محتوا اصلاً هیچ targetـی (نه department، نه position، نه user) نداشته
+      باشد. اگر فقط target از نوع user ثبت شده باشد (بدون department/position)،
+      نباید scope_match به‌صورت پیش‌فرض True شود — وگرنه محتوای «مخصوص یک
+      کاربر» برای همه‌ی سازمان باز می‌شود (باگ قبلی).
     """
     user_match = exists(
         select(ContentTarget.id).where(
@@ -227,6 +231,17 @@ def visibility_condition(viewer: User):
             ContentTarget.content_id == Content.id, ContentTarget.target_type == "department"
         )
     )
+    has_position_targets = exists(
+        select(ContentTarget.id).where(
+            ContentTarget.content_id == Content.id, ContentTarget.target_type == "position"
+        )
+    )
+    has_user_targets = exists(
+        select(ContentTarget.id).where(
+            ContentTarget.content_id == Content.id, ContentTarget.target_type == "user"
+        )
+    )
+
     if viewer.dept_id:
         dept_match = exists(
             select(ContentTarget.id).where(
@@ -240,11 +255,6 @@ def visibility_condition(viewer: User):
         # کاربر بدون department ثبت‌شده — فقط زمانی مجاز است که هیچ محدودیت department‌ای وجود نداشته باشد
         dept_ok = ~has_dept_targets
 
-    has_position_targets = exists(
-        select(ContentTarget.id).where(
-            ContentTarget.content_id == Content.id, ContentTarget.target_type == "position"
-        )
-    )
     if viewer.position_id:
         position_match = exists(
             select(ContentTarget.id).where(
@@ -257,9 +267,15 @@ def visibility_condition(viewer: User):
     else:
         position_ok = ~has_position_targets
 
-    scope_match = and_(dept_ok, position_ok)
-    return or_(scope_match, user_match)
+    # scope (dept/position) فقط زمانی می‌تواند «بدون محدودیت» در نظر گرفته شود
+    # که محتوا اصلاً target از نوع dept/position نداشته باشد و همزمان هیچ
+    # target از نوع user هم نداشته باشد (یعنی واقعاً هیچ محدودیتی روی محتوا
+    # تعریف نشده). اگر فقط user-target ثبت شده باشد، scope باید False بماند
+    # تا فقط user_match تعیین‌کننده‌ی دسترسی باشد.
+    scope_applicable = or_(has_dept_targets, has_position_targets, ~has_user_targets)
+    scope_match = and_(dept_ok, position_ok, scope_applicable)
 
+    return or_(scope_match, user_match)
 
 async def eligible_user_ids_for_content(db: AsyncSession, content: Content) -> list[uuid.UUID]:
     """
