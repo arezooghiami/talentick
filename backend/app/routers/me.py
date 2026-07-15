@@ -33,12 +33,15 @@ from app.dependencies import Employee
 from app.models.content import Content
 from app.models.quiz import Quiz
 from app.schemas.content import CONTENT_TYPES
+from app.schemas.department import DepartmentTreeNode
+from app.schemas.document import DocumentCategoryResponse, DocumentListResponse
 from app.schemas.me import (
     MyContentDetailResponse,
     MyContentItemResponse,
     MyContentListResponse,
     MyContentResponse,
 )
+from app.schemas.organization import OrganizationResponse
 from app.schemas.progress import ItemProgressUpdate
 from app.schemas.quiz import (
     QuizAttemptResult,
@@ -46,7 +49,7 @@ from app.schemas.quiz import (
     QuizAttemptSummary,
     QuizTakeResponse,
 )
-from app.services import content_service, progress_service, quiz_service
+from app.services import content_service, department_service, document_service, org_service, progress_service, quiz_service
 
 router = APIRouter(prefix="/api/me", tags=["My Contents"])
 
@@ -208,6 +211,65 @@ async def update_item_progress(
         "item": progress_service.item_progress_to_response(item_progress),
         "content": progress_service.content_progress_to_response(content_progress),
     }
+
+
+# ─── Org Intro + Org Chart + Document Library ────────────────────────────────
+# صفحه‌ی «سازمان» کارمند: معرفی سازمان، چارت سازمانی (فقط مشاهده)، کتابخانه اسناد.
+
+@router.get("/org", response_model=OrganizationResponse, summary="معرفی سازمان (تاریخچه/ماموریت/چشم‌انداز/ارزش‌ها)")
+async def get_my_org(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
+    org = await org_service.get_organization(db, current_user.org_id)
+    if not org:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "سازمان یافت نشد")
+    return org
+
+
+@router.get("/org-chart", response_model=list[DepartmentTreeNode], summary="چارت سازمانی (فقط مشاهده)")
+async def get_my_org_chart(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
+    return await department_service.build_tree(db, current_user.org_id)
+
+
+@router.get("/documents/categories", response_model=list[DocumentCategoryResponse], summary="دسته‌بندی‌های کتابخانه اسناد")
+async def list_my_document_categories(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
+    return await document_service.list_categories(db, current_user.org_id)
+
+
+@router.get("/documents", response_model=DocumentListResponse, summary="کتابخانه اسناد — قوانین/آیین‌نامه‌ها/مستندات مجاز من")
+async def list_my_documents(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: str | None = Query(None),
+    category_id: str | None = Query(None),
+):
+    if current_user.org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
+    items, total = await document_service.list_documents(
+        db, current_user.org_id, page=page, page_size=page_size,
+        search=search, category_id=category_id,
+        viewer=current_user, apply_visibility=True,
+    )
+    responses = [await document_service.document_to_response(db, d) for d in items]
+    return DocumentListResponse(
+        items=responses, total=total, page=page, page_size=page_size,
+        total_pages=max(1, math.ceil(total / page_size)),
+    )
 
 
 # ─── Quiz Routes ─────────────────────────────────────────────────────────────

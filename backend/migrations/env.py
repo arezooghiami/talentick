@@ -23,6 +23,7 @@ from app.models.base import Base
 from app.models.organization import *
 from app.models.user import *
 from app.models.content import *
+from app.models.document import *
 from app.models.onboarding import *
 from app.models.quiz import *
 
@@ -43,6 +44,7 @@ from app.models.base import Base
 from app.models.organization import *
 from app.models.user import *
 from app.models.content import *
+from app.models.document import *
 from app.models.onboarding import *
 from app.models.quiz import *
 

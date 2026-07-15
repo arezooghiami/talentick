@@ -15,6 +15,7 @@ from app.models.content import (  # noqa: F401
     ContentTarget,
     UserContentProgress,
 )
+from app.models.document import Document, DocumentCategory, DocumentTarget  # noqa: F401
 from app.models.onboarding import (  # noqa: F401
     OnboardingProgram,
     ProgramStep,
@@ -40,6 +41,10 @@ __all__ = [
     "ContentItem",
     "ContentTarget",
     "UserContentProgress",
+    # Document Library
+    "Document",
+    "DocumentCategory",
+    "DocumentTarget",
     # Onboarding
     "OnboardingProgram",
     "ProgramStep",

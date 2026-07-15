@@ -18,6 +18,8 @@ const OrgProfilePage = (() => {
       document.getElementById('op-desc').value = org.description || '';
       document.getElementById('op-mission').value = org.mission || '';
       document.getElementById('op-vision').value = org.vision || '';
+      document.getElementById('op-values').value = org.values || '';
+      document.getElementById('op-history').value = org.history || '';
     } catch (e) {
       toastError(e.message);
     }
@@ -36,6 +38,8 @@ const OrgProfilePage = (() => {
         description: document.getElementById('op-desc').value.trim() || null,
         mission: document.getElementById('op-mission').value.trim() || null,
         vision: document.getElementById('op-vision').value.trim() || null,
+        values: document.getElementById('op-values').value.trim() || null,
+        history: document.getElementById('op-history').value.trim() || null,
       });
       toastSuccess('پروفایل سازمان به‌روزرسانی شد');
     } catch (e) {

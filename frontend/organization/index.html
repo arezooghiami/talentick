@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>سازمان — Talentick</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260715" />
+</head>
+<body>
+
+  <nav class="emp-navbar">
+    <a href="/onboarding/index.html" class="emp-brand"><span class="logo-dot"></span>Talenti<span class="accent">ck</span></a>
+    <div class="emp-nav-links">
+      <a href="/onboarding/index.html" data-nav="home">🏠 خانه</a>
+      <a href="/content/list.html" data-nav="content">📚 محتوای من</a>
+      <a href="/organization/index.html" data-nav="organization">🏢 سازمان</a>
+    </div>
+    <div class="emp-nav-right">
+      <div class="emp-user-menu">
+        <button class="emp-user-btn" id="empUserBtn">
+          <span class="emp-user-avatar" id="empUserAvatar">—</span>
+          <span class="emp-user-name" id="empUserName">—</span>
+        </button>
+        <div class="emp-user-dropdown" id="empUserDropdown">
+          <a href="/change-password.html">🔒 تغییر رمز عبور</a>
+          <hr>
+          <button class="danger" onclick="EmployeeShell.logout()">🚪 خروج از حساب</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="emp-page">
+    <div class="emp-page-header">
+      <div class="emp-page-title">سازمان</div>
+      <div class="emp-page-subtitle">معرفی سازمان، چارت سازمانی و کتابخانه اسناد</div>
+    </div>
+
+    <div class="org-tabs">
+      <button class="org-tab-btn active" data-org-tab="intro" onclick="OrganizationPage.switchTab('intro')">🏛️ درباره سازمان</button>
+      <button class="org-tab-btn" data-org-tab="chart" onclick="OrganizationPage.switchTab('chart')">🌳 چارت سازمانی</button>
+      <button class="org-tab-btn" data-org-tab="docs" onclick="OrganizationPage.switchTab('docs')">📁 کتابخانه اسناد</button>
+    </div>
+
+    <!-- ─── تب: درباره سازمان ──────────────────────────────────────── -->
+    <div class="org-tab-panel active" id="orgTabIntro">
+      <div class="org-intro-hero" id="introHero">
+        <div class="org-intro-logo" id="introLogo">🏢</div>
+        <div>
+          <div class="org-intro-name" id="introName">—</div>
+          <div class="org-intro-desc" id="introDesc"></div>
+        </div>
+      </div>
+      <div class="org-intro-grid" id="introGrid"></div>
+      <div class="org-intro-contact" id="introContact"></div>
+    </div>
+
+    <!-- ─── تب: چارت سازمانی ──────────────────────────────────────── -->
+    <div class="org-tab-panel" id="orgTabChart">
+      <div id="orgChartWrap">
+        <div class="org-chart-loading">در حال بارگذاری...</div>
+      </div>
+    </div>
+
+    <!-- ─── تب: کتابخانه اسناد ────────────────────────────────────── -->
+    <div class="org-tab-panel" id="orgTabDocs">
+      <div class="emp-filters">
+        <div class="emp-search-box">
+          <input type="text" id="docLibSearch" placeholder="جستجو در عنوان یا توضیحات..." oninput="OrganizationPage.docSearchDebounced()" />
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+        </div>
+        <div class="emp-filter-pills" id="docLibCategoryPills">
+          <button class="emp-filter-pill active" onclick="OrganizationPage.setDocCategory('', this)">همه</button>
+        </div>
+      </div>
+      <div class="doc-lib-list" id="docLibList"></div>
+      <div class="emp-pagination" id="docLibPagination"></div>
+    </div>
+  </main>
+
+  <script src="../assets/js/config.js?v=20260715"></script>
+  <script src="../assets/js/auth.js?v=20260715"></script>
+  <script src="../assets/js/api.js?v=20260715"></script>
+  <script src="../assets/js/utils.js?v=20260715"></script>
+  <script src="../assets/js/employee_shell.js?v=20260715"></script>
+  <script src="../assets/js/organization_view.js?v=20260715"></script>
+  <script>
+    EmployeeShell.init('organization');
+    OrganizationPage.load();
+  </script>
+</body>
+</html>

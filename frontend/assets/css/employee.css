@@ -332,8 +332,83 @@ img { max-width: 100%; display: block; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 .hidden { display: none !important; }
 
+/* ─── Organization Page (معرفی سازمان / چارت / کتابخانه اسناد) ────── */
+.org-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+.org-tab-btn {
+  padding: 11px 18px; border: none; background: transparent; font-family: inherit; font-size: var(--font-sm);
+  font-weight: 600; color: var(--gray-500); cursor: pointer; border-bottom: 2.5px solid transparent;
+  transition: color var(--transition), border-color var(--transition); margin-bottom: -1px;
+}
+.org-tab-btn:hover { color: var(--gray-700); }
+.org-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+.org-tab-panel { display: none; }
+.org-tab-panel.active { display: block; }
+
+/* ─── درباره سازمان ──────────────────────────────────────────────── */
+.org-intro-hero {
+  display: flex; align-items: center; gap: 20px; background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); padding: 26px 28px; margin-bottom: 22px;
+}
+.org-intro-logo {
+  width: 72px; height: 72px; border-radius: var(--radius-lg); background: var(--primary-light); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 34px; overflow: hidden;
+}
+.org-intro-logo img { width: 100%; height: 100%; object-fit: cover; }
+.org-intro-name { font-size: 21px; font-weight: 800; color: var(--gray-800); }
+.org-intro-desc { font-size: 13.5px; color: var(--gray-500); margin-top: 6px; line-height: 1.8; }
+
+.org-intro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 22px; }
+.org-intro-card {
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); padding: 20px 22px;
+}
+.org-intro-card-icon { font-size: 26px; margin-bottom: 10px; }
+.org-intro-card-title { font-size: var(--font-md); font-weight: 700; color: var(--gray-800); margin-bottom: 8px; }
+.org-intro-card-text { font-size: 13px; color: var(--gray-600); line-height: 1.9; white-space: pre-wrap; }
+
+.org-intro-contact { display: flex; gap: 20px; flex-wrap: wrap; }
+.org-intro-contact-item {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gray-600);
+  background: var(--gray-50); border-radius: var(--radius-md); padding: 9px 14px;
+}
+
+.org-empty-hint { text-align: center; padding: 50px 20px; color: var(--gray-400); font-size: 13.5px; }
+
+/* ─── چارت سازمانی ───────────────────────────────────────────────── */
+.org-chart-loading { text-align: center; padding: 50px 20px; color: var(--gray-400); font-size: 13.5px; }
+.org-chart-tree, .org-chart-level { list-style: none; }
+.org-chart-tree { overflow-x: auto; padding: 10px 4px 24px; }
+.org-chart-level { display: flex; gap: 24px; padding-right: 28px; margin-top: 18px; position: relative; }
+.org-chart-tree > .org-chart-level { padding-right: 0; margin-top: 0; }
+.org-chart-node { position: relative; display: flex; flex-direction: column; align-items: center; }
+.org-chart-box {
+  background: var(--card-bg); border: 1.5px solid var(--border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm); padding: 12px 18px; min-width: 160px; text-align: center; white-space: nowrap;
+}
+.org-chart-box.inactive { opacity: .5; }
+.org-chart-box-name { font-size: 13.5px; font-weight: 700; color: var(--gray-800); }
+.org-chart-box-manager { font-size: 11.5px; color: var(--primary); margin-top: 4px; }
+.org-chart-box-count { font-size: 11px; color: var(--gray-400); margin-top: 3px; }
+
+/* ─── کتابخانه اسناد ─────────────────────────────────────────────── */
+.doc-lib-list { display: flex; flex-direction: column; gap: 10px; }
+.doc-lib-item {
+  display: flex; align-items: center; gap: 16px; background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 16px 20px; text-decoration: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.doc-lib-item:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
+.doc-lib-icon { font-size: 28px; flex-shrink: 0; }
+.doc-lib-body { flex: 1; min-width: 0; }
+.doc-lib-title { font-size: var(--font-md); font-weight: 700; color: var(--gray-800); }
+.doc-lib-desc { font-size: 12.5px; color: var(--gray-500); margin-top: 4px; }
+.doc-lib-meta { display: flex; gap: 12px; font-size: 11.5px; color: var(--gray-400); margin-top: 8px; flex-wrap: wrap; }
+.doc-lib-download { font-size: 18px; flex-shrink: 0; color: var(--primary); }
+
 @media (max-width: 720px) {
   .emp-nav-links { display: none; }
   .emp-page { padding: 20px 14px 40px; }
   .content-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .org-intro-hero { flex-direction: column; text-align: center; }
 }
