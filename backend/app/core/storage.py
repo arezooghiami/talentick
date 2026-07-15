@@ -11,6 +11,7 @@ Talentick — Storage Utilities (MinIO)
 from __future__ import annotations
 
 import io
+import json
 import uuid
 from datetime import timedelta
 from functools import lru_cache
@@ -50,11 +51,33 @@ def get_minio_client() -> Minio:
     )
 
 
+def _public_read_policy(bucket_name: str) -> str:
+    return json.dumps({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"AWS": ["*"]},
+            "Action": ["s3:GetObject"],
+            "Resource": [f"arn:aws:s3:::{bucket_name}/*"],
+        }],
+    })
+
+
+@lru_cache
 def ensure_bucket() -> None:
-    """در صورت نبودن bucket، آن را می‌سازد و دسترسی public-read به آبجکت‌ها می‌دهد."""
+    """
+    در صورت نبودن bucket، آن را می‌سازد؛ در هر دو حالت (جدید/موجود) سیاست
+    public-read روی آبجکت‌ها را اعمال می‌کند.
+
+    نکته: قبلاً این تابع فقط bucket را می‌ساخت و هیچ policy‌ای تنظیم
+    نمی‌کرد — در نتیجه آبجکت‌های آپلودشده با «Access Denied» مواجه
+    می‌شدند چون MinIO به‌صورت پیش‌فرض bucket را private می‌سازد.
+    با lru_cache این تابع فقط یک‌بار در طول عمر پروسه اجرا می‌شود.
+    """
     client = get_minio_client()
     if not client.bucket_exists(settings.minio_bucket_name):
         client.make_bucket(settings.minio_bucket_name)
+    client.set_bucket_policy(settings.minio_bucket_name, _public_read_policy(settings.minio_bucket_name))
 
 
 def _public_url(object_name: str) -> str:

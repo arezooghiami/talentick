@@ -20,13 +20,21 @@ const QuizTakePage = (() => {
     if (!state.quizId) { showFatal('شناسه آزمون مشخص نیست'); return; }
 
     try {
-      const quiz = await api.get(`/me/quizzes/${state.quizId}`);
+      const quiz = await api.get(`/me/quizzes/${state.quizId}${lockQueryParams()}`);
       state.quiz = quiz;
       state.questions = quiz.questions || [];
       renderIntro();
     } catch (e) {
       showFatal(e.message || 'آزمون یافت نشد یا دسترسی ندارید');
     }
+  }
+
+  // در صورت باز شدن از یک آیتم quiz_ref در محتوا، این پارامترها را همراه
+  // درخواست‌های آزمون می‌فرستیم تا بک‌اند بتواند قفل ترتیبی محتوا را
+  // enforce کند (حتی اگر کاربر مستقیم به URL آزمون برود).
+  function lockQueryParams() {
+    if (!state.contentId || !state.itemId) return '';
+    return `?content_id=${encodeURIComponent(state.contentId)}&item_id=${encodeURIComponent(state.itemId)}`;
   }
 
   function showFatal(msg) {
@@ -180,7 +188,7 @@ const QuizTakePage = (() => {
     const btn = document.getElementById('btnFinishQuiz');
     setLoading(btn, true);
     try {
-      const result = await api.post(`/me/quizzes/${state.quizId}/attempts`, {
+      const result = await api.post(`/me/quizzes/${state.quizId}/attempts${lockQueryParams()}`, {
         started_at: state.startedAt.toISOString(),
         answers: state.answers,
       });

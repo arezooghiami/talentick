@@ -76,6 +76,53 @@ async def get_item_progress_map(
     return {str(p.item_id): p for p in result.scalars().all()}
 
 
+def compute_locked_map(
+    content: Content, items: list, item_progress_map: dict[str, UserItemProgress]
+) -> dict[str, bool]:
+    """
+    نگاشت item_id → is_locked برای «قفل ترتیبی» (Content.sequential_progress).
+
+    آیتم i قفل است اگر حداقل یکی از آیتم‌های قبل از آن (بر اساس order_index)
+    برای این کاربر «completed» نباشد. اگر سوئیچ خاموش باشد، هیچ آیتمی قفل نیست.
+    """
+    if not content.sequential_progress or not items:
+        return {it.id: False for it in items}
+
+    ordered = sorted(items, key=lambda it: it.order_index)
+    locked_map: dict[str, bool] = {}
+    blocked = False
+    for it in ordered:
+        locked_map[it.id] = blocked
+        p = item_progress_map.get(it.id)
+        if not p or p.status != "completed":
+            blocked = True
+    return locked_map
+
+
+async def is_item_locked(
+    db: AsyncSession, user_id: uuid.UUID, content: Content, item: ContentItem
+) -> bool:
+    """نسخه‌ی تک‌آیتمی compute_locked_map — برای enforcement روی endpoint ها (بدون نیاز به کل لیست آیتم‌ها)."""
+    if not content.sequential_progress:
+        return False
+
+    preceding_result = await db.execute(
+        select(ContentItem.id).where(
+            ContentItem.content_id == content.id,
+            ContentItem.order_index < item.order_index,
+        )
+    )
+    preceding_ids = [str(pid) for (pid,) in preceding_result.all()]
+    if not preceding_ids:
+        return False
+
+    progress_map = await get_item_progress_map(db, user_id, content.id)
+    return any(
+        progress_map.get(pid) is None or progress_map[pid].status != "completed"
+        for pid in preceding_ids
+    )
+
+
 async def get_content_progress_map(
     db: AsyncSession, user_id: uuid.UUID, content_ids: list[uuid.UUID]
 ) -> dict[str, UserContentProgress]:

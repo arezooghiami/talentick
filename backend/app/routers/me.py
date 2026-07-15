@@ -65,6 +65,26 @@ async def _get_active_quiz_or_404(db: AsyncSession, quiz_id: str, org_id) -> Qui
     return quiz
 
 
+async def _enforce_quiz_item_lock(
+    db: AsyncSession, current_user, quiz_id: str, content_id: str | None, item_id: str | None
+) -> None:
+    """
+    اگر آزمون از طریق یک آیتم quiz_ref در یک محتوای «قفل ترتیبی» باز شده باشد
+    (content_id/item_id در query string)، وضعیت قفل را enforce می‌کند —
+    حتی اگر کاربر مستقیماً به URL آزمون برود و از UI محتوا رد نشود.
+    """
+    if not content_id or not item_id:
+        return
+    content = await content_service.get_content(db, content_id)
+    if not content or str(content.org_id) != str(current_user.org_id):
+        return
+    item = await content_service.get_item(db, item_id)
+    if not item or str(item.content_id) != str(content.id) or str(item.quiz_id) != str(quiz_id):
+        return
+    if await progress_service.is_item_locked(db, current_user.id, content, item):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "این آزمون قفل است — ابتدا آیتم‌های قبلی را تکمیل کنید")
+
+
 @router.get("/contents", response_model=MyContentListResponse, summary="فهرست محتواهای مجاز من")
 async def list_my_contents(
     current_user: Employee,
@@ -92,7 +112,7 @@ async def list_my_contents(
         base = await content_service.content_to_response(db, c)
         p = progress_map.get(str(c.id))
         responses.append(MyContentResponse(
-            **base.model_dump(exclude={"org_id", "status", "created_by", "created_by_name", "updated_at"}),
+            **base.model_dump(exclude={"org_id", "org_name", "status", "created_by", "created_by_name", "updated_at", "sequential_progress", "target_count"}),
             my_status=p.status if p else "not_started",
             my_progress_pct=p.progress_pct if p else 0,
             my_last_item_id=str(p.last_item_id) if p and p.last_item_id else None,
@@ -121,6 +141,7 @@ async def get_my_content(
     detail = await content_service.content_to_detail(db, content)
     content_progress = await progress_service.get_content_progress(db, current_user.id, content.id)
     item_progress_map = await progress_service.get_item_progress_map(db, current_user.id, content.id)
+    locked_map = progress_service.compute_locked_map(content, detail.items, item_progress_map)
 
     items = [
         MyContentItemResponse(
@@ -128,11 +149,12 @@ async def get_my_content(
             my_status=(item_progress_map.get(it.id).status if it.id in item_progress_map else "not_started"),
             my_progress_pct=(item_progress_map.get(it.id).progress_pct if it.id in item_progress_map else 0),
             my_last_position=(item_progress_map.get(it.id).last_position if it.id in item_progress_map else None),
+            is_locked=locked_map.get(it.id, False),
         )
         for it in detail.items
     ]
     return MyContentDetailResponse(
-        **detail.model_dump(exclude={"org_id", "status", "created_by", "created_by_name", "updated_at", "items", "targets"}),
+        **detail.model_dump(exclude={"org_id", "org_name", "status", "created_by", "created_by_name", "updated_at", "sequential_progress", "target_count", "items", "targets"}),
         items=items,
         my_status=content_progress.status if content_progress else "not_started",
         my_progress_pct=content_progress.progress_pct if content_progress else 0,
@@ -176,6 +198,8 @@ async def update_item_progress(
     item = await content_service.get_item(db, item_id)
     if not item or str(item.content_id) != str(content.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "آیتم یافت نشد")
+    if await progress_service.is_item_locked(db, current_user.id, content, item):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "این آیتم قفل است — ابتدا آیتم‌های قبلی را تکمیل کنید")
 
     item_progress, content_progress = await progress_service.update_item_progress(
         db, current_user, content, item, body
@@ -197,8 +221,11 @@ async def get_quiz_to_take(
     quiz_id: str,
     current_user: Employee,
     db: AsyncSession = Depends(get_db),
+    content_id: str | None = Query(None, description="در صورت باز شدن از یک آیتم quiz_ref — برای enforcement قفل ترتیبی"),
+    item_id: str | None = Query(None, description="در صورت باز شدن از یک آیتم quiz_ref — برای enforcement قفل ترتیبی"),
 ) -> QuizTakeResponse:
     quiz = await _get_active_quiz_or_404(db, quiz_id, current_user.org_id)
+    await _enforce_quiz_item_lock(db, current_user, quiz_id, content_id, item_id)
     return await quiz_service.get_quiz_for_taking(db, quiz, current_user)
 
 
@@ -219,8 +246,11 @@ async def submit_quiz_attempt(
     body: QuizAttemptSubmit,
     current_user: Employee,
     db: AsyncSession = Depends(get_db),
+    content_id: str | None = Query(None, description="در صورت باز شدن از یک آیتم quiz_ref — برای enforcement قفل ترتیبی"),
+    item_id: str | None = Query(None, description="در صورت باز شدن از یک آیتم quiz_ref — برای enforcement قفل ترتیبی"),
 ) -> QuizAttemptResult:
     quiz = await _get_active_quiz_or_404(db, quiz_id, current_user.org_id)
+    await _enforce_quiz_item_lock(db, current_user, quiz_id, content_id, item_id)
     attempt = await quiz_service.submit_attempt(db, current_user, quiz, body)
     return await quiz_service.attempt_to_result(db, attempt)
 

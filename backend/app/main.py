@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.config import settings
+from app.core.storage import ensure_bucket
 from app.database import engine
 from app.routers import auth, content, dashboard, departments, me, organizations, positions, quizzes, reports, users
 
@@ -34,9 +35,15 @@ async def lifespan(app: FastAPI):
     """
     Startup و Shutdown hooks.
 
-    Startup: بررسی اتصال دیتابیس
+    Startup: اطمینان از وجود bucket و اعمال سیاست public-read روی آن —
+    بدون این کار، فایل‌های آپلودشده (کاور/PDF/ویدیو و ...) با خطای
+    Access Denied مواجه می‌شوند چون MinIO به‌صورت پیش‌فرض bucket را
+    private می‌سازد.
     """
-    # در آینده: health check اتصال DB و MinIO
+    try:
+        ensure_bucket()
+    except Exception:
+        logger.warning("اتصال به MinIO در زمان راه‌اندازی برقرار نشد — bucket در اولین آپلود بررسی می‌شود.")
     yield
 
 

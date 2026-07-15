@@ -138,6 +138,11 @@ class Content(UUIDMixin, TimestampMixin, Base):
         comment="محتوای ویژه — نمایش در صفحه اول"
     )
 
+    sequential_progress: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False,
+        comment="قفل ترتیبی آیتم‌ها — کاربر باید آیتم‌ها را دقیقاً به ترتیب order_index تکمیل کند"
+    )
+
     # ─── Relationships ────────────────────────────────────────────────────
     items: Mapped[list["ContentItem"]] = relationship(
         back_populates="content",

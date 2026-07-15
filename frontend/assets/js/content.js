@@ -35,13 +35,26 @@ const ContentPage = (() => {
   }
 
   // ─── Entry point از سایدبار (submenu محتوا) ────────────────────
-  function goto(type) {
+  async function goto(type) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-content').classList.add('active');
     document.querySelectorAll('.sidebar-nav [data-page]').forEach(el =>
       el.classList.toggle('active', el.dataset.page === 'content'));
     document.getElementById('headerTitle').textContent = 'مدیریت محتوا';
+    if (App.isSuperAdmin) await loadOrgFilterOptions();
     setType(type);
+  }
+
+  async function loadOrgFilterOptions() {
+    const sel = document.getElementById('contentOrgFilter');
+    if (!sel || sel.dataset.loaded) return;
+    try {
+      const res = await api.get('/orgs/');
+      const orgs = Array.isArray(res) ? res : (res.items || []);
+      sel.innerHTML = '<option value="">همه سازمان‌ها</option>' +
+        orgs.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+      sel.dataset.loaded = '1';
+    } catch { /* غیرحیاتی — فقط فیلتر است */ }
   }
 
   // ─── Tabs / Load ────────────────────────────────────────────────
@@ -56,11 +69,13 @@ const ContentPage = (() => {
   async function load(page = state.page) {
     state.page = page;
     state.status = document.getElementById('contentStatusFilter')?.value || '';
+    const orgFilter = document.getElementById('contentOrgFilter')?.value || '';
     const tbody = document.getElementById('contentTableBody');
-    tbody.innerHTML = `<tr><td colspan="6" class="loading-row">در حال بارگذاری...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="loading-row">در حال بارگذاری...</td></tr>`;
     const p = new URLSearchParams({ page, page_size: 10, type: state.type });
     if (state.search) p.set('search', state.search);
     if (state.status) p.set('status', state.status);
+    if (App.isSuperAdmin && orgFilter) p.set('org_id', orgFilter);
     try {
       const res = await api.get(`/contents/?${p}`);
       state.items = res.items || [];
@@ -70,7 +85,7 @@ const ContentPage = (() => {
       renderTable();
       renderPagination('contentPagination', state.page, state.totalPages, load);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
     }
   }
 
@@ -80,18 +95,31 @@ const ContentPage = (() => {
     searchTimer = setTimeout(() => load(1), 400);
   }
 
+  function accessBadges(c) {
+    const badges = [];
+    badges.push(c.target_count > 0
+      ? `<span class="badge badge-targeted" title="این محتوا فقط برای واحد/پست/کاربران خاصی نمایش داده می‌شود">🎯 ${numFa(c.target_count)} محدودیت</span>`
+      : `<span class="badge badge-orgwide">🌐 کل سازمان</span>`);
+    if (c.sequential_progress) {
+      badges.push(`<span class="badge badge-sequential" title="کاربر باید آیتم‌ها را به ترتیب تکمیل کند">🔒 ترتیبی</span>`);
+    }
+    return `<div style="display:flex;gap:4px;flex-wrap:wrap;">${badges.join('')}</div>`;
+  }
+
   function renderTable() {
     const tbody = document.getElementById('contentTableBody');
     if (!state.items.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">🗂️</div>هنوز محتوایی از نوع «${TYPE_LABELS[state.type]}» ثبت نشده</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🗂️</div>هنوز محتوایی از نوع «${TYPE_LABELS[state.type]}» ثبت نشده</div></td></tr>`;
       return;
     }
     const canEdit = App.isSuperAdmin || App.isOrgAdmin;
     tbody.innerHTML = state.items.map(c => `
       <tr>
         <td style="font-weight:600;">${esc(c.title)}</td>
+        ${App.isSuperAdmin ? `<td class="th-org">${esc(c.org_name || '—')}</td>` : ''}
         <td>${typeBadge(c.type)}</td>
         <td>${statusBadge(c.status)}</td>
+        <td>${accessBadges(c)}</td>
         <td>${numFa(c.total_items_count)} آیتم</td>
         <td style="color:var(--gray-500);">${fmtDate(c.created_at)}</td>
         <td>
@@ -154,6 +182,7 @@ const ContentPage = (() => {
     document.getElementById('c-tags').value = '';
     document.getElementById('c-duration').value = '';
     document.getElementById('c-featured').checked = false;
+    document.getElementById('c-sequential').checked = false;
     document.getElementById('c-thumb-url').value = '';
     setUploadName('c-thumb-name', '');
     resetMainContentFields();
@@ -189,6 +218,7 @@ const ContentPage = (() => {
     document.getElementById('c-tags').value = (c.tags || []).join('، ');
     document.getElementById('c-duration').value = c.total_duration_min ?? '';
     document.getElementById('c-featured').checked = !!c.is_featured;
+    document.getElementById('c-sequential').checked = !!c.sequential_progress;
     document.getElementById('c-thumb-url').value = c.thumbnail_url || '';
     setUploadName('c-thumb-name', c.thumbnail_url ? 'تصویر فعلی ثبت شده' : '');
     resetMainContentFields();
@@ -257,6 +287,7 @@ const ContentPage = (() => {
       tags: tagsRaw ? tagsRaw.split(/[،,]/).map(t => t.trim()).filter(Boolean) : [],
       total_duration_min: document.getElementById('c-duration').value ? parseInt(document.getElementById('c-duration').value, 10) : null,
       is_featured: document.getElementById('c-featured').checked,
+      sequential_progress: document.getElementById('c-sequential').checked,
       thumbnail_url: document.getElementById('c-thumb-url').value || null,
       targets: collectTargets(),
     };

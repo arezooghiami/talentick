@@ -66,18 +66,19 @@ const ContentDetailPage = (() => {
       return;
     }
     wrap.innerHTML = items.map((it, idx) => {
-      const checkCls = it.my_status === 'completed' ? 'done' : (it.my_status === 'in_progress' ? 'progress' : '');
-      const checkContent = it.my_status === 'completed' ? '✓' : numFa(idx + 1);
+      const checkCls = it.is_locked ? 'locked' : (it.my_status === 'completed' ? 'done' : (it.my_status === 'in_progress' ? 'progress' : ''));
+      const checkContent = it.is_locked ? '🔒' : (it.my_status === 'completed' ? '✓' : numFa(idx + 1));
+      const actionLabel = it.is_locked ? 'قفل' : (it.my_status === 'completed' ? 'مرور' : (it.my_status === 'in_progress' ? 'ادامه' : 'شروع'));
       return `
-        <div class="item-card" onclick="ContentDetailPage.openItem('${it.id}')">
+        <div class="item-card ${it.is_locked ? 'locked' : ''}" onclick="ContentDetailPage.openItem('${it.id}')">
           <div class="item-card-check ${checkCls}">${checkContent}</div>
           <div class="item-card-icon">${ITEM_TYPE_ICON_FA[it.type] || '📄'}</div>
           <div class="item-card-info">
             <div class="item-card-title">${esc(it.title)}</div>
-            <div class="item-card-meta">${ITEM_TYPE_LABEL_FA[it.type] || it.type}${it.duration_min ? ' • ' + numFa(it.duration_min) + ' دقیقه' : ''}</div>
+            <div class="item-card-meta">${ITEM_TYPE_LABEL_FA[it.type] || it.type}${it.duration_min ? ' • ' + numFa(it.duration_min) + ' دقیقه' : ''}${it.is_locked ? ' • ابتدا آیتم‌های قبلی را تکمیل کنید' : ''}</div>
           </div>
           <div class="item-card-action">
-            <button class="btn btn-outline btn-sm" style="padding:7px 14px;font-size:12px;" onclick="event.stopPropagation();ContentDetailPage.openItem('${it.id}')">${it.my_status === 'completed' ? 'مرور' : (it.my_status === 'in_progress' ? 'ادامه' : 'شروع')}</button>
+            <button class="btn btn-outline btn-sm" style="padding:7px 14px;font-size:12px;" onclick="event.stopPropagation();ContentDetailPage.openItem('${it.id}')">${actionLabel}</button>
           </div>
         </div>`;
     }).join('');
@@ -87,6 +88,11 @@ const ContentDetailPage = (() => {
   function openItem(itemId) {
     const it = state.detail.items.find(x => x.id === itemId);
     if (!it) return;
+
+    if (it.is_locked) {
+      toastError('این آیتم قفل است — ابتدا آیتم‌های قبلی را به‌ترتیب تکمیل کنید');
+      return;
+    }
 
     // آیتم آزمون: مستقیم به صفحه‌ی آزمون هدایت می‌شویم (خارج از این ویوئر)
     if (it.type === 'quiz_ref') {

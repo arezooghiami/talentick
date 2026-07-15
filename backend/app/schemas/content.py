@@ -105,6 +105,10 @@ class ContentCreate(BaseModel):
     is_featured: bool = False
     meta: dict = Field(default_factory=dict)
     org_id: Optional[str] = None  # فقط super_admin — در router enforce می‌شود
+    sequential_progress: bool = Field(
+        False,
+        description="قفل ترتیبی آیتم‌ها — کاربر باید آیتم‌ها را دقیقاً به ترتیب تکمیل کند",
+    )
     targets: list[ContentTargetCreate] = Field(
         default_factory=list,
         description="هدف‌های انتشار — خالی یعنی برای کل سازمان",
@@ -124,6 +128,7 @@ class ContentUpdate(BaseModel):
     total_duration_min: Optional[int] = Field(None, ge=0)
     is_featured: Optional[bool] = None
     meta: Optional[dict] = None
+    sequential_progress: Optional[bool] = None
     targets: Optional[list[ContentTargetCreate]] = Field(
         None,
         description="اگر ارسال شود، تمام هدف‌های قبلی جایگزین می‌شوند. ارسال‌نشدن = بدون تغییر. آرایه خالی [] = پاک کردن همه هدف‌ها (انتشار برای کل سازمان).",
@@ -133,6 +138,7 @@ class ContentUpdate(BaseModel):
 class ContentResponse(BaseModel):
     id: str
     org_id: str
+    org_name: Optional[str] = None
     title: str
     type: str
     description: Optional[str] = None
@@ -146,6 +152,8 @@ class ContentResponse(BaseModel):
     total_duration_min: Optional[int] = None
     total_items_count: int
     is_featured: bool
+    sequential_progress: bool = False
+    target_count: int = 0
     created_by: Optional[str] = None
     created_by_name: Optional[str] = None
     created_at: datetime

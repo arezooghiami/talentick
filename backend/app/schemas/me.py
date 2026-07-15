@@ -56,6 +56,9 @@ class MyContentItemResponse(BaseModel):
     my_progress_pct: int = 0
     my_last_position: Optional[int] = None
 
+    # قفل ترتیبی — اگر True باشد، آیتم‌های قبلی هنوز کامل نشده‌اند
+    is_locked: bool = False
+
     model_config = {"from_attributes": True}
 
 

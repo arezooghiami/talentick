@@ -115,6 +115,9 @@ textarea.form-control { resize: vertical; }
 .badge-type-article  { background: #FFF7ED; color: #D97706; }
 .badge-type-podcast  { background: #F5F3FF; color: #7C3AED; }
 .badge-type-book     { background: #ECFEFF; color: #0891B2; }
+.badge-orgwide     { background: var(--gray-100); color: var(--gray-600); }
+.badge-targeted    { background: #FEF3C7; color: #B45309; }
+.badge-sequential  { background: #EEF2FF; color: #4338CA; }
 
 /* ─── Tabs (فیلتر نوع محتوا / زیربخش‌های گزارش) ─────────────────────── */
 .tab-bar { display: flex; gap: 6px; padding: 4px; background: var(--gray-50); border: 1px solid var(--border); border-radius: var(--radius-md); width: fit-content; flex-wrap: wrap; }

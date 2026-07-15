@@ -15,7 +15,7 @@ from sqlalchemy import and_, cast as sa_cast, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content import TARGET_TYPES, Content, ContentItem, ContentTarget
-from app.models.organization import Department, Position
+from app.models.organization import Department, Organization, Position
 from app.models.user import User
 from app.schemas.content import (
     ContentCreate,
@@ -53,9 +53,14 @@ async def content_to_response(db: AsyncSession, content: Content) -> ContentResp
     if content.created_by:
         creator = await db.get(User, content.created_by)
         created_by_name = creator.full_name if creator else None
+    org = await db.get(Organization, content.org_id)
+    target_count = (await db.execute(
+        select(func.count()).select_from(ContentTarget).where(ContentTarget.content_id == content.id)
+    )).scalar_one()
     return ContentResponse(
         id=str(content.id),
         org_id=str(content.org_id),
+        org_name=org.name if org else None,
         title=content.title,
         type=content.type,
         description=content.description,
@@ -69,6 +74,8 @@ async def content_to_response(db: AsyncSession, content: Content) -> ContentResp
         total_duration_min=content.total_duration_min,
         total_items_count=content.total_items_count,
         is_featured=content.is_featured,
+        sequential_progress=content.sequential_progress,
+        target_count=target_count,
         created_by=str(content.created_by) if content.created_by else None,
         created_by_name=created_by_name,
         created_at=content.created_at,
@@ -437,6 +444,7 @@ async def create_content(
         total_duration_min=data.total_duration_min,
         total_items_count=0,
         is_featured=data.is_featured,
+        sequential_progress=data.sequential_progress,
         meta=data.meta,
         created_by=created_by,
     )

@@ -349,6 +349,9 @@
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
               <input type="text" id="contentSearch" placeholder="جستجو در عنوان یا توضیحات..." oninput="ContentPage.searchDebounced()" />
             </div>
+            <select class="filter-select" id="contentOrgFilter" data-roles="super_admin" onchange="ContentPage.load(1)">
+              <option value="">همه سازمان‌ها</option>
+            </select>
             <select class="filter-select" id="contentStatusFilter" onchange="ContentPage.load(1)">
               <option value="">همه وضعیت‌ها</option>
               <option value="draft">پیش‌نویس</option>
@@ -358,8 +361,8 @@
           </div>
           <div style="overflow-x:auto;">
             <table>
-              <thead><tr><th>عنوان</th><th>نوع</th><th>وضعیت</th><th>تعداد آیتم</th><th>تاریخ ایجاد</th><th>عملیات</th></tr></thead>
-              <tbody id="contentTableBody"><tr><td colspan="6" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+              <thead><tr><th>عنوان</th><th class="th-org" data-roles="super_admin">سازمان</th><th>نوع</th><th>وضعیت</th><th>دسترسی</th><th>تعداد آیتم</th><th>تاریخ ایجاد</th><th>عملیات</th></tr></thead>
+              <tbody id="contentTableBody"><tr><td colspan="8" class="loading-row">در حال بارگذاری...</td></tr></tbody>
             </table>
           </div>
           <div class="pagination" id="contentPagination"></div>
@@ -633,6 +636,12 @@
         <input type="checkbox" id="c-featured" style="width:16px;height:16px;">
         <label class="form-label" for="c-featured" style="margin:0;">محتوای ویژه (نمایش در صفحه اول کاربران)</label>
       </div>
+
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="c-sequential" style="width:16px;height:16px;">
+        <label class="form-label" for="c-sequential" style="margin:0;">قفل ترتیبی آیتم‌ها 🔒</label>
+      </div>
+      <span class="form-hint" style="margin-top:-10px;margin-bottom:14px;display:block;">در صورت فعال بودن، کاربر باید آیتم‌ها (ویدیو/PDF/آزمون و ...) را دقیقاً به ترتیب تکمیل کند و نمی‌تواند آیتم بعدی را قبل از تکمیل آیتم قبلی ببیند یا شروع کند.</span>
 
       <hr class="form-divider">
       <div class="form-section-title">انتشار هدف‌مند (اختیاری)</div>
