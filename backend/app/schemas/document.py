@@ -18,6 +18,7 @@ DOCUMENT_TARGET_TYPES = ("department", "role")
 class DocumentCategoryCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
     order_index: int = 0
+    org_id: Optional[str] = Field(None, description="فقط super_admin — در router enforce می‌شود")
 
 
 class DocumentCategoryUpdate(BaseModel):
@@ -71,6 +72,7 @@ class DocumentCreate(BaseModel):
     file_name: Optional[str] = None
     file_size: Optional[int] = None
     file_type: Optional[str] = None
+    org_id: Optional[str] = Field(None, description="فقط super_admin — در router enforce می‌شود")
     targets: list[DocumentTargetCreate] = Field(
         default_factory=list,
         description="قوانین دسترسی — خالی یعنی برای کل سازمان",

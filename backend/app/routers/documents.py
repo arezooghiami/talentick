@@ -21,11 +21,16 @@ Routes:
 
 دسترسی: مدیریت (ساخت/ویرایش/حذف/آپلود) فقط manager به بالا — هم‌راستا با
 سیاست فعلی پروژه برای ساختار سازمانی (routers/departments.py).
+
+super_admin: مثل departments.py/content.py می‌تواند با query param یا
+body.org_id کتابخانه‌ی هر سازمانی را مدیریت کند (پنل ادمین از طریق دکمه‌ی
+«کتابخانه اسناد» روی هر سازمان در صفحه‌ی «شرکت‌ها» وارد می‌شود).
 """
 
 from __future__ import annotations
 
 import math
+import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +39,7 @@ from app.core.storage import upload_file
 from app.database import get_db
 from app.dependencies import Manager
 from app.dependencies import enforce_org_scope as _enforce_org_scope
+from app.models.user import User
 from app.schemas.content import UploadResponse
 from app.schemas.document import (
     DocumentCategoryCreate,
@@ -49,14 +55,32 @@ from app.services import document_service
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
 
+def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID:
+    """
+    تعیین org_id مرجع — super_admin می‌تواند org_id دلخواه بدهد (برای
+    مدیریت کتابخانه‌ی هر سازمانی)، سایر نقش‌ها همیشه محدود به سازمان
+    خودشان هستند. هم‌راستا با departments._resolve_org_id.
+    """
+    if current_user.role == "super_admin" and org_id:
+        try:
+            return uuid.UUID(org_id)
+        except ValueError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id نامعتبر است")
+    if current_user.org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    return current_user.org_id
+
+
 # ─── Categories ──────────────────────────────────────────────────────────────
 
 @router.get("/categories", response_model=list[DocumentCategoryResponse], summary="لیست دسته‌بندی‌های سند")
 async def list_categories(
     current_user: Manager,
     db: AsyncSession = Depends(get_db),
+    org_id: str | None = Query(None, description="فقط super_admin — مدیریت سازمان دلخواه"),
 ):
-    return await document_service.list_categories(db, current_user.org_id)
+    target_org_id = _resolve_org_id(current_user, org_id)
+    return await document_service.list_categories(db, target_org_id)
 
 
 @router.post(
@@ -68,7 +92,12 @@ async def create_category(
     current_user: Manager,
     db: AsyncSession = Depends(get_db),
 ):
-    category = await document_service.create_category(db, current_user.org_id, body)
+    org_id = current_user.org_id
+    if current_user.role == "super_admin" and body.org_id:
+        org_id = uuid.UUID(body.org_id)
+    if org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    category = await document_service.create_category(db, org_id, body)
     return await document_service.category_to_response(db, category)
 
 
@@ -110,10 +139,10 @@ async def delete_category(
 async def upload_document_file(
     current_user: Manager,
     file: UploadFile = File(...),
+    org_id: str | None = Query(None, description="فقط super_admin — آپلود برای سازمان دلخواه"),
 ):
-    if current_user.org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
-    result = await upload_file(file, current_user.org_id, subfolder="documents")
+    target_org_id = _resolve_org_id(current_user, org_id)
+    result = await upload_file(file, target_org_id, subfolder="documents")
     return UploadResponse(**result)
 
 
@@ -127,9 +156,11 @@ async def list_documents(
     page_size: int = Query(20, ge=1, le=100),
     search: str | None = Query(None),
     category_id: str | None = Query(None),
+    org_id: str | None = Query(None, description="فقط super_admin — مدیریت سازمان دلخواه"),
 ):
+    target_org_id = _resolve_org_id(current_user, org_id)
     items, total = await document_service.list_documents(
-        db, current_user.org_id, page=page, page_size=page_size,
+        db, target_org_id, page=page, page_size=page_size,
         search=search, category_id=category_id,
     )
     responses = [await document_service.document_to_response(db, d) for d in items]
@@ -148,7 +179,12 @@ async def create_document(
     current_user: Manager,
     db: AsyncSession = Depends(get_db),
 ):
-    document = await document_service.create_document(db, current_user.org_id, current_user.id, body)
+    org_id = current_user.org_id
+    if current_user.role == "super_admin" and body.org_id:
+        org_id = uuid.UUID(body.org_id)
+    if org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    document = await document_service.create_document(db, org_id, current_user.id, body)
     return await document_service.document_to_detail(db, document)
 
 

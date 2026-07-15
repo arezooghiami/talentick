@@ -1,9 +1,40 @@
 // ════════════════════════════════════════════════════════════════════
-// Talentick — صفحه‌ی «کتابخانه اسناد» (دسته‌بندی‌ها + اسناد) — org_admin/manager
+// Talentick — صفحه‌ی «کتابخانه اسناد» (دسته‌بندی‌ها + اسناد)
 // ════════════════════════════════════════════════════════════════════
+// super_admin: از طریق دکمه‌ی «کتابخانه اسناد» روی هر ردیف در صفحه‌ی
+//              «شرکت‌ها» باز می‌شود (DocumentsPage.openFor(orgId, orgName)).
+// org_admin/manager: مستقیماً از منوی سایدبار، همیشه روی سازمان خودشان.
 
 const DocumentsPage = (() => {
-  const state = { categories: [], depts: [], docs: [], page: 1, search: '', searchTimer: null };
+  const state = {
+    orgId: null, orgName: '',
+    categories: [], depts: [], docs: [], page: 1, search: '', searchTimer: null,
+  };
+
+  /** super_admin از این مسیر وارد می‌شود (نه از Router.navigate معمولی). */
+  function openFor(orgId, orgName) {
+    state.orgId = orgId;
+    state.orgName = orgName;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-documents').classList.add('active');
+    document.querySelectorAll('.sidebar-nav [data-page]').forEach(el =>
+      el.classList.toggle('active', el.dataset.page === 'orgs'));
+    document.getElementById('headerTitle').textContent = 'کتابخانه اسناد';
+    setText('docsTitle', `کتابخانه اسناد — ${orgName}`);
+    setText('docsSubtitle', `مدیریت قوانین، آیین‌نامه‌ها و مستندات «${orgName}»`);
+    document.getElementById('docsBackBtn').classList.remove('hidden');
+    load();
+  }
+
+  /** org_admin/manager — صدا زده می‌شود توسط Router.register('documents', ...) */
+  function loadOwn() {
+    state.orgId = App.currentUser.org_id;
+    state.orgName = '';
+    setText('docsTitle', 'کتابخانه اسناد');
+    setText('docsSubtitle', 'مدیریت قوانین، آیین‌نامه‌ها و مستندات سازمان شما');
+    document.getElementById('docsBackBtn').classList.add('hidden');
+    load();
+  }
 
   async function load() {
     await Promise.all([loadCategories(), loadDepts()]);
@@ -15,7 +46,7 @@ const DocumentsPage = (() => {
     const tbody = document.getElementById('docCategoriesTableBody');
     tbody.innerHTML = `<tr><td colspan="3" class="loading-row">در حال بارگذاری...</td></tr>`;
     try {
-      const items = await api.get('/documents/categories');
+      const items = await api.get(`/documents/categories?org_id=${state.orgId}`);
       state.categories = items || [];
       populateCategoryFilter();
       populateCategorySelect();
@@ -75,6 +106,7 @@ const DocumentsPage = (() => {
     const name = document.getElementById('dc-name').value.trim();
     if (!name) { toastError('نام دسته اجباری است'); return; }
     const payload = { name, order_index: parseInt(document.getElementById('dc-order').value, 10) || 0 };
+    if (!id) payload.org_id = state.orgId;
 
     const btn = document.getElementById('btn-save-doc-category');
     setLoading(btn, true);
@@ -99,7 +131,7 @@ const DocumentsPage = (() => {
   // ─── Departments (برای چک‌باکس دسترسی) ─────────────────────────
   async function loadDepts() {
     try {
-      state.depts = await api.get('/departments/') || [];
+      state.depts = await api.get(`/departments/?org_id=${state.orgId}`) || [];
     } catch (e) {
       state.depts = [];
     }
@@ -136,7 +168,7 @@ const DocumentsPage = (() => {
     const tbody = document.getElementById('docsTableBody');
     tbody.innerHTML = `<tr><td colspan="7" class="loading-row">در حال بارگذاری...</td></tr>`;
     const categoryId = document.getElementById('docCategoryFilter')?.value || '';
-    const p = new URLSearchParams({ page, page_size: 20 });
+    const p = new URLSearchParams({ page, page_size: 20, org_id: state.orgId });
     if (state.search) p.set('search', state.search);
     if (categoryId) p.set('category_id', categoryId);
     try {
@@ -222,7 +254,7 @@ const DocumentsPage = (() => {
     const hint = document.getElementById('doc-file-hint');
     hint.textContent = 'در حال آپلود...';
     try {
-      const res = await api.upload('/documents/upload', file);
+      const res = await api.upload(`/documents/upload?org_id=${state.orgId}`, file);
       document.getElementById('doc-file-url').value = res.url;
       document.getElementById('doc-file-name').value = res.filename || file.name;
       document.getElementById('doc-file-size').value = res.size || file.size;
@@ -263,6 +295,7 @@ const DocumentsPage = (() => {
       file_type: document.getElementById('doc-file-type').value || null,
       targets: collectTargets(),
     };
+    if (!id) payload.org_id = state.orgId;
 
     const btn = document.getElementById('btn-save-document');
     setLoading(btn, true);
@@ -285,8 +318,10 @@ const DocumentsPage = (() => {
     });
   }
 
+  function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
   return {
-    load, loadDocs, searchDebounced,
+    openFor, loadOwn, loadDocs, searchDebounced,
     openCreateCategory, openEditCategory, saveCategory, removeCategory,
     openCreateDoc, openEditDoc, saveDoc, removeDoc, onFileSelected,
   };

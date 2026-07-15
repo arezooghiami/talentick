@@ -28,6 +28,7 @@ const OrgsPage = (() => {
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
               <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" onclick="StructurePage.openFor('${o.id}','${esc(o.name)}')">ساختار سازمانی</button>
+              <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" onclick="DocumentsPage.openFor('${o.id}','${esc(o.name)}')">کتابخانه اسناد</button>
               <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="OrgsPage.openEdit('${o.id}')">ویرایش</button>
               <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="OrgsPage.remove('${o.id}','${esc(o.name)}')">حذف</button>
             </div>

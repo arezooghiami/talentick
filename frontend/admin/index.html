@@ -298,9 +298,16 @@
       </div>
 
       <!-- ═══ VIEW: کتابخانه اسناد (قوانین/آیین‌نامه‌ها/مستندات) ═══ -->
+      <!-- super_admin از طریق دکمه‌ی روی هر سازمان وارد می‌شود، org_admin/manager از منوی سایدبار -->
       <div id="view-documents" class="view">
         <div class="view-header">
-          <div><div class="view-title">کتابخانه اسناد</div><div class="view-subtitle">مدیریت قوانین، آیین‌نامه‌ها و مستندات سازمان</div></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button class="btn btn-icon hidden" id="docsBackBtn" onclick="Router.navigate('orgs')" title="بازگشت به سازمان‌ها">→</button>
+            <div>
+              <div class="view-title" id="docsTitle">کتابخانه اسناد</div>
+              <div class="view-subtitle" id="docsSubtitle">مدیریت قوانین، آیین‌نامه‌ها و مستندات سازمان</div>
+            </div>
+          </div>
           <button class="btn btn-primary" onclick="DocumentsPage.openCreateDoc()">➕ سند جدید</button>
         </div>
 
@@ -1117,7 +1124,7 @@
   Router.register('orgs',      { title: 'مدیریت سازمان‌ها', load: OrgsPage.load });
   Router.register('org-profile', { title: 'سازمان من',      load: OrgProfilePage.load });
   Router.register('structure', { title: 'ساختار سازمانی',   load: () => { if (!App.isSuperAdmin) StructurePage.loadOwn(); } });
-  Router.register('documents', { title: 'کتابخانه اسناد',   load: DocumentsPage.load });
+  Router.register('documents', { title: 'کتابخانه اسناد',   load: () => { if (!App.isSuperAdmin) DocumentsPage.loadOwn(); } });
   Router.register('quiz',      { title: 'مدیریت آزمون',     load: () => QuizAdminPage.load(1) });
   Router.register('reports',   { title: 'گزارش‌ها',         load: ReportsPage.load });
   Router.register('support',   { title: 'پشتیبانی',         load: null });
