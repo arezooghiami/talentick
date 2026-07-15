@@ -172,7 +172,12 @@
       <div id="view-users" class="view">
         <div class="view-header">
           <div><div class="view-title">مدیریت کاربران</div><div class="view-subtitle" id="usersTotalLabel">در حال بارگذاری...</div></div>
-          <button class="btn btn-primary" data-roles="super_admin,org_admin" onclick="UsersPage.openCreate()">➕ کاربر جدید</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" data-roles="super_admin,org_admin" onclick="UsersPage.downloadTemplate()">📄 قالب Excel</button>
+            <button class="btn btn-secondary" onclick="UsersPage.exportExcel()">⬇️ خروجی Excel</button>
+            <button class="btn btn-secondary" data-roles="super_admin,org_admin" onclick="UsersPage.openImport()">⬆️ Import از Excel</button>
+            <button class="btn btn-primary" data-roles="super_admin,org_admin" onclick="UsersPage.openCreate()">➕ کاربر جدید</button>
+          </div>
         </div>
         <div class="data-table-wrap">
           <div class="data-table-header">
@@ -180,6 +185,15 @@
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
               <input type="text" id="usersSearch" placeholder="جستجو در نام یا ایمیل..." oninput="UsersPage.searchDebounced()" />
             </div>
+            <select class="filter-select" id="usersOrgFilter" data-roles="super_admin" onchange="UsersPage.onOrgFilterChange()">
+              <option value="">همه سازمان‌ها</option>
+            </select>
+            <select class="filter-select" id="usersDeptFilter" onchange="UsersPage.onDeptFilterChange()">
+              <option value="">همه واحدها</option>
+            </select>
+            <select class="filter-select" id="usersPositionFilter" onchange="UsersPage.load(1)">
+              <option value="">همه پست‌ها</option>
+            </select>
             <select class="filter-select" id="usersRoleFilter" onchange="UsersPage.load(1)">
               <option value="">همه نقش‌ها</option>
               <option value="super_admin" class="role-opt-super" data-roles="super_admin">مدیر ارشد</option>
@@ -557,139 +571,137 @@
 
 <!-- ═══ MODAL: Create / Edit Content ═══ -->
 <div id="modal-content" class="modal-overlay hidden">
-  <div class="modal-box modal-lg">
-    <div class="modal-header"><h3 id="contentModalTitle">محتوای جدید</h3><button class="btn btn-icon" onclick="closeModal('modal-content')">✕</button></div>
+  <div class="modal-box modal-xl">
+    <div class="modal-header"><h3 id="contentModalTitle">محتوای جدید</h3><button class="btn btn-icon" onclick="ContentPage.closeContentModal()">✕</button></div>
+
+    <div class="tab-bar" id="contentModalTabs" style="margin:16px 22px 0;">
+      <button class="tab-btn active" data-ctab="basic" onclick="ContentPage.switchTab('basic')">۱. مشخصات</button>
+      <button class="tab-btn" data-ctab="access" onclick="ContentPage.switchTab('access')">۲. دسترسی و کاور</button>
+      <button class="tab-btn" data-ctab="items" onclick="ContentPage.switchTab('items')">۳. آیتم‌ها</button>
+    </div>
+
     <div class="modal-body">
       <input type="hidden" id="c-id">
       <input type="hidden" id="c-thumb-url">
-      <div class="form-group" id="c-org-wrap" data-roles="super_admin">
-        <label class="form-label">سازمان <span class="required">*</span></label>
-        <select id="c-org-id" class="form-control" onchange="ContentPage.onOrgChange()">
-          <option value="">— انتخاب سازمان —</option>
-        </select>
-        <span class="form-hint">این محتوا متعلق به کدام سازمان است — بعد از ثبت قابل تغییر نیست.</span>
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group"><label class="form-label">عنوان <span class="required">*</span></label><input id="c-title" class="form-control" placeholder="مثال: دوره مدیریت زمان"></div>
-        <div class="form-group"><label class="form-label">نوع محتوا <span class="required">*</span></label>
-          <select id="c-type" class="form-control">
-            <option value="course">دوره</option>
-            <option value="article">مقاله</option>
-            <option value="podcast">پادکست</option>
-            <option value="book">کتاب</option>
+
+      <!-- ─── تب ۱: مشخصات ─────────────────────────────────────────── -->
+      <div class="ctab-content active" id="ctab-basic">
+        <div class="form-group" id="c-org-wrap" data-roles="super_admin">
+          <label class="form-label">سازمان <span class="required">*</span></label>
+          <select id="c-org-id" class="form-control" onchange="ContentPage.onOrgChange()">
+            <option value="">— انتخاب سازمان —</option>
           </select>
+          <span class="form-hint">این محتوا متعلق به کدام سازمان است — بعد از ثبت قابل تغییر نیست.</span>
         </div>
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group"><label class="form-label">وضعیت</label>
-          <select id="c-status" class="form-control">
-            <option value="draft">پیش‌نویس</option>
-            <option value="published">منتشرشده</option>
-            <option value="archived">بایگانی‌شده</option>
-          </select>
+        <div class="form-grid-2">
+          <div class="form-group"><label class="form-label">عنوان <span class="required">*</span></label><input id="c-title" class="form-control" placeholder="مثال: دوره مدیریت زمان"></div>
+          <div class="form-group"><label class="form-label">نوع محتوا <span class="required">*</span></label>
+            <select id="c-type" class="form-control">
+              <option value="course">دوره</option>
+              <option value="article">مقاله</option>
+              <option value="podcast">پادکست</option>
+              <option value="book">کتاب</option>
+            </select>
+            <span class="form-hint" id="c-type-hint"></span>
+          </div>
         </div>
-        <div class="form-group"><label class="form-label">سطح دشواری</label>
-          <select id="c-level" class="form-control">
-            <option value="">— نامشخص —</option>
-            <option value="beginner">مقدماتی</option>
-            <option value="intermediate">متوسط</option>
-            <option value="advanced">پیشرفته</option>
-          </select>
+        <div class="form-grid-2">
+          <div class="form-group"><label class="form-label">نویسنده / مدرس / گوینده</label><input id="c-author" class="form-control" placeholder="نام نویسنده یا مدرس"></div>
+          <div class="form-group"><label class="form-label">سطح دشواری</label>
+            <select id="c-level" class="form-control">
+              <option value="">— نامشخص —</option>
+              <option value="beginner">مقدماتی</option>
+              <option value="intermediate">متوسط</option>
+              <option value="advanced">پیشرفته</option>
+            </select>
+          </div>
         </div>
-      </div>
-      <div class="form-grid-2">
-        <div class="form-group"><label class="form-label">نویسنده / مدرس / گوینده</label><input id="c-author" class="form-control" placeholder="نام نویسنده یا مدرس"></div>
-        <div class="form-group"><label class="form-label">مدت زمان کل (دقیقه)</label><input id="c-duration" class="form-control" type="number" min="0"></div>
-      </div>
-      <div class="form-group"><label class="form-label">توضیحات</label><textarea id="c-desc" class="form-control" rows="3"></textarea></div>
-      <div class="form-group"><label class="form-label">تگ‌ها</label><input id="c-tags" class="form-control" placeholder="مثال: مدیریت، رهبری، نرم‌افزار (با کاما جدا کنید)"></div>
-      <div class="form-group">
-        <label class="form-label">تصویر کاور</label>
-        <div class="upload-box">
-          <label class="btn btn-secondary" for="c-thumb-file" style="margin:0;">انتخاب فایل</label>
-          <input type="file" id="c-thumb-file" accept="image/*" onchange="ContentPage.uploadThumbnail(this)">
-          <span class="upload-box-name" id="c-thumb-name">فایلی انتخاب نشده</span>
-        </div>
+        <div class="form-group"><label class="form-label">توضیحات</label><textarea id="c-desc" class="form-control" rows="3"></textarea></div>
+        <div class="form-group"><label class="form-label">تگ‌ها</label><input id="c-tags" class="form-control" placeholder="مثال: مدیریت، رهبری، نرم‌افزار (با کاما جدا کنید)"></div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">محتوای اصلی</label>
-        <select id="c-main-type" class="form-control" onchange="ContentPage.toggleMainContentFields()">
-          <option value="">— بدون محتوای اصلی —</option>
-          <option value="video">ویدیو</option>
-          <option value="pdf">کتاب / سند (PDF)</option>
-          <option value="file">پاورپوینت / فایل آفیس</option>
-          <option value="image">تصویر</option>
-          <option value="link">لینک خارجی</option>
-        </select>
-        <input type="hidden" id="c-main-url">
-        <div class="upload-box hidden" id="c-main-upload-wrap" style="margin-top:8px;">
-          <label class="btn btn-secondary" for="c-main-file" style="margin:0;">انتخاب فایل</label>
-          <input type="file" id="c-main-file" onchange="ContentPage.uploadMainContent(this)">
-          <span class="upload-box-name" id="c-main-file-name">فایلی انتخاب نشده</span>
+      <!-- ─── تب ۲: دسترسی و کاور ──────────────────────────────────── -->
+      <div class="ctab-content" id="ctab-access">
+        <div class="form-grid-2">
+          <div class="form-group"><label class="form-label">وضعیت</label>
+            <select id="c-status" class="form-control">
+              <option value="draft">پیش‌نویس</option>
+              <option value="published">منتشرشده</option>
+              <option value="archived">بایگانی‌شده</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">مدت زمان کل (دقیقه)</label><input id="c-duration" class="form-control" type="number" min="0"></div>
         </div>
-        <input id="c-main-link" class="form-control hidden" style="margin-top:8px;" placeholder="https://...">
-        <span class="form-hint">این فایل به‌عنوان اولین آیتم محتوا ثبت می‌شود. برای افزودن آیتم‌های بیشتر (چند درس/فصل یا آزمون)، بعد از ذخیره از دکمه «آیتم‌ها» استفاده کنید.</span>
-      </div>
-
-      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="c-featured" style="width:16px;height:16px;">
-        <label class="form-label" for="c-featured" style="margin:0;">محتوای ویژه (نمایش در صفحه اول کاربران)</label>
-      </div>
-
-      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="c-sequential" style="width:16px;height:16px;">
-        <label class="form-label" for="c-sequential" style="margin:0;">قفل ترتیبی آیتم‌ها 🔒</label>
-      </div>
-      <span class="form-hint" style="margin-top:-10px;margin-bottom:14px;display:block;">در صورت فعال بودن، کاربر باید آیتم‌ها (ویدیو/PDF/آزمون و ...) را دقیقاً به ترتیب تکمیل کند و نمی‌تواند آیتم بعدی را قبل از تکمیل آیتم قبلی ببیند یا شروع کند.</span>
-
-      <hr class="form-divider">
-      <div class="form-section-title">انتشار هدف‌مند (اختیاری)</div>
-      <div class="form-section-hint">
-        اگر هیچ‌کدام از گزینه‌های زیر را انتخاب نکنید، این محتوا برای <b>کل سازمان</b> نمایش داده می‌شود.
-        اگر هم واحد و هم پست انتخاب کنید، فقط کاربرانی که هم‌زمان در یکی از واحدها <b>و</b> یکی از پست‌های انتخابی هستند دسترسی خواهند داشت.
-        کاربران خاص، صرف‌نظر از این شرط‌ها، همیشه دسترسی دارند.
-      </div>
-      <div class="form-grid-2">
         <div class="form-group">
-          <label class="form-label">محدود به واحدها</label>
-          <div class="checkbox-scroll-box" id="c-target-depts">
-            <div class="checkbox-scroll-box-empty">ابتدا سازمان را انتخاب کنید</div>
+          <label class="form-label">تصویر کاور</label>
+          <div class="upload-box">
+            <label class="btn btn-secondary" for="c-thumb-file" style="margin:0;">انتخاب فایل</label>
+            <input type="file" id="c-thumb-file" accept="image/*" onchange="ContentPage.uploadThumbnail(this)">
+            <span class="upload-box-name" id="c-thumb-name">فایلی انتخاب نشده</span>
+          </div>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="c-featured" style="width:16px;height:16px;">
+          <label class="form-label" for="c-featured" style="margin:0;">محتوای ویژه (نمایش در صفحه اول کاربران)</label>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="c-sequential" style="width:16px;height:16px;">
+          <label class="form-label" for="c-sequential" style="margin:0;">قفل ترتیبی آیتم‌ها 🔒</label>
+        </div>
+        <span class="form-hint" style="margin-top:-10px;margin-bottom:14px;display:block;">در صورت فعال بودن، کاربر باید آیتم‌ها (ویدیو/PDF/آزمون و ...) را دقیقاً به ترتیب تکمیل کند و نمی‌تواند آیتم بعدی را قبل از تکمیل آیتم قبلی ببیند یا شروع کند.</span>
+
+        <hr class="form-divider">
+        <div class="form-section-title">انتشار هدف‌مند (اختیاری)</div>
+        <div class="form-section-hint">
+          اگر هیچ‌کدام از گزینه‌های زیر را انتخاب نکنید، این محتوا برای <b>کل سازمان</b> نمایش داده می‌شود.
+          اگر هم واحد و هم پست انتخاب کنید، فقط کاربرانی که هم‌زمان در یکی از واحدها <b>و</b> یکی از پست‌های انتخابی هستند دسترسی خواهند داشت.
+          کاربران خاص، صرف‌نظر از این شرط‌ها، همیشه دسترسی دارند.
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">محدود به واحدها</label>
+            <div class="checkbox-scroll-box" id="c-target-depts">
+              <div class="checkbox-scroll-box-empty">ابتدا سازمان را انتخاب کنید</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">محدود به پست‌ها</label>
+            <div class="checkbox-scroll-box" id="c-target-positions">
+              <div class="checkbox-scroll-box-empty">ابتدا سازمان را انتخاب کنید</div>
+            </div>
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">محدود به پست‌ها</label>
-          <div class="checkbox-scroll-box" id="c-target-positions">
-            <div class="checkbox-scroll-box-empty">ابتدا سازمان را انتخاب کنید</div>
+          <label class="form-label">دسترسی کاربران خاص</label>
+          <input id="c-target-user-search" class="form-control" placeholder="جستجوی نام یا ایمیل کاربر..." oninput="ContentPage.searchTargetUsers()">
+          <div class="checkbox-scroll-box" id="c-target-users" style="margin-top:8px;">
+            <div class="checkbox-scroll-box-empty">برای جستجو تایپ کنید</div>
           </div>
+          <div class="chip-list" id="c-target-users-selected" style="margin-top:8px;"></div>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">دسترسی کاربران خاص</label>
-        <input id="c-target-user-search" class="form-control" placeholder="جستجوی نام یا ایمیل کاربر..." oninput="ContentPage.searchTargetUsers()">
-        <div class="checkbox-scroll-box" id="c-target-users" style="margin-top:8px;">
-          <div class="checkbox-scroll-box-empty">برای جستجو تایپ کنید</div>
-        </div>
-        <div class="chip-list" id="c-target-users-selected" style="margin-top:8px;"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-primary" id="btn-save-content" onclick="ContentPage.save()">ذخیره محتوا</button>
-      <button class="btn btn-secondary" onclick="closeModal('modal-content')">انصراف</button>
-    </div>
-  </div>
-</div>
 
-<!-- ═══ MODAL: مدیریت آیتم‌های محتوا ═══ -->
-<div id="modal-content-items" class="modal-overlay hidden">
-  <div class="modal-box modal-lg">
-    <div class="modal-header"><h3 id="itemsModalTitle">آیتم‌های محتوا</h3><button class="btn btn-icon" onclick="closeModal('modal-content-items')">✕</button></div>
-    <div class="modal-body">
-      <div id="contentItemsList" class="content-items-list"></div>
-      <button class="btn btn-primary" data-roles="super_admin,org_admin" onclick="ContentPage.openCreateItem()" style="width:100%;justify-content:center;">➕ افزودن آیتم</button>
+      <!-- ─── تب ۳: آیتم‌ها / برنامه‌ی درسی ────────────────────────── -->
+      <div class="ctab-content" id="ctab-items">
+        <div class="form-section-hint" style="margin-bottom:14px;">
+          محتوای اصلی این بخش است — هر آیتم می‌تواند ویدیو، PDF، متن، تصویر، فایل، لینک یا آزمون باشد. برای دوره‌های چنددرسی می‌توانید چندین ویدیو/فایل را یک‌جا اضافه کنید.
+        </div>
+        <div id="contentItemsList" class="content-items-list" style="margin-bottom:14px;"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" data-roles="super_admin,org_admin" onclick="ContentPage.openCreateItem()">➕ افزودن آیتم تکی</button>
+          <button class="btn btn-secondary" data-roles="super_admin,org_admin" onclick="ContentPage.pickBulkFiles()">📦 افزودن دسته‌جمعی (چند فایل)</button>
+          <input type="file" id="c-bulk-files" multiple class="hidden" onchange="ContentPage.uploadBulkFiles(this)">
+        </div>
+        <div id="c-bulk-progress" class="form-hint" style="margin-top:10px;"></div>
+      </div>
     </div>
+
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-content-items')">بستن</button>
+      <button class="btn btn-secondary hidden" id="btn-content-back" onclick="ContentPage.prevTab()">قبلی</button>
+      <button class="btn btn-primary" id="btn-content-next" onclick="ContentPage.nextTab()">بعدی</button>
+      <button class="btn btn-primary hidden" id="btn-content-save" onclick="ContentPage.saveChanges()">ذخیره تغییرات</button>
+      <button class="btn btn-primary hidden" id="btn-content-finish" onclick="ContentPage.finishWizard()">پایان</button>
+      <button class="btn btn-secondary" onclick="ContentPage.closeContentModal()">انصراف</button>
     </div>
   </div>
 </div>
@@ -902,6 +914,62 @@
   </div>
 </div>
 
+<!-- ═══ MODAL: Import کاربران از Excel ═══ -->
+<div id="modal-user-import" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header"><h3>Import کاربران از Excel</h3><button class="btn btn-icon" onclick="closeModal('modal-user-import')">✕</button></div>
+    <div class="modal-body">
+      <p class="form-section-hint" style="margin-bottom:14px;">
+        فایل باید مطابق «قالب Excel» باشد (از دکمه‌ی مربوطه دانلود کنید). کاربران تازه با رمز موقت ساخته می‌شوند و باید در اولین ورود رمز خود را تغییر دهند.
+      </p>
+      <div class="form-group" id="ui-org-wrap" data-roles="super_admin">
+        <label class="form-label">سازمان مقصد <span class="required">*</span></label>
+        <select id="ui-org" class="form-control">
+          <option value="">— انتخاب سازمان —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">فایل Excel <span class="required">*</span></label>
+        <div class="upload-box">
+          <label class="btn btn-secondary" for="ui-file" style="margin:0;">انتخاب فایل</label>
+          <input type="file" id="ui-file" accept=".xlsx,.xlsm" onchange="UsersPage.onImportFileChange(this)">
+          <span class="upload-box-name" id="ui-file-name">فایلی انتخاب نشده</span>
+        </div>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="ui-update-existing" style="width:16px;height:16px;">
+        <label class="form-label" for="ui-update-existing" style="margin:0;">به‌روزرسانی کاربران با ایمیل تکراری (به‌جای رد کردن)</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btn-import-users" onclick="UsersPage.submitImport()">شروع Import</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-user-import')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: نتیجه‌ی Import ═══ -->
+<div id="modal-user-import-result" class="modal-overlay hidden">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><h3>نتیجه‌ی Import</h3><button class="btn btn-icon" onclick="closeModal('modal-user-import-result')">✕</button></div>
+    <div class="modal-body">
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px;" id="uiResultStats"></div>
+      <div id="uiResultCredsWrap" class="hidden">
+        <div class="form-section-title">رمزهای موقت کاربران تازه‌ساخته‌شده</div>
+        <div class="form-section-hint" style="margin-bottom:10px;">این رمزها فقط همین یک‌بار نمایش داده می‌شوند — از یک کانال امن به هرکاربر بدهید.</div>
+        <div id="uiResultCredsList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:18px;"></div>
+      </div>
+      <div id="uiResultErrorsWrap" class="hidden">
+        <div class="form-section-title" style="color:var(--danger);">ردیف‌های دارای خطا</div>
+        <div id="uiResultErrorsList" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary w-full" style="width:100%;justify-content:center;" onclick="UsersPage.closeImportResult()">متوجه شدم</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Scripts ─────────────────────────────────────────────── -->
 <script src="../assets/js/config.js?v=20260630"></script>
 <script src="../assets/js/auth.js?v=20260630"></script>
@@ -927,7 +995,7 @@
   App.init();
 
   Router.register('dashboard', { title: 'دید کلی',          load: DashboardPage.load });
-  Router.register('users',     { title: 'مدیریت کاربران',   load: () => UsersPage.load(1) });
+  Router.register('users',     { title: 'مدیریت کاربران',   load: () => UsersPage.init() });
   Router.register('orgs',      { title: 'مدیریت سازمان‌ها', load: OrgsPage.load });
   Router.register('org-profile', { title: 'سازمان من',      load: OrgProfilePage.load });
   Router.register('structure', { title: 'ساختار سازمانی',   load: () => { if (!App.isSuperAdmin) StructurePage.loadOwn(); } });

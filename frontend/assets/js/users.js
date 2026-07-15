@@ -5,7 +5,91 @@
 // org_admin/manager: فقط کاربران سازمان خودشان (org_admin مجاز به ساخت/حذف، manager فقط مشاهده+ویرایش جزئی)
 
 const UsersPage = (() => {
-  const state = { page: 1, pages: 1, items: [], orgs: [], depts: [], positions: [] };
+  const state = { page: 1, pages: 1, items: [], orgs: [], depts: [], positions: [], lastImportCreds: [] };
+
+  // ─── راه‌اندازی صفحه: بارگذاری فیلترها + لیست ────────────────────
+  async function init() {
+    if (App.isSuperAdmin) {
+      await loadOrgFilterOptions();
+      await Promise.all([loadDeptFilterOptions(null), loadPositionFilterOptions(null, null)]);
+    } else {
+      await Promise.all([
+        loadDeptFilterOptions(App.currentUser.org_id),
+        loadPositionFilterOptions(App.currentUser.org_id, null),
+      ]);
+    }
+    await load(1);
+  }
+
+  async function loadOrgFilterOptions() {
+    const sel = document.getElementById('usersOrgFilter');
+    if (!sel || sel.dataset.loaded) return;
+    try {
+      state.orgs = await ensureOrgsLoaded();
+      sel.innerHTML = '<option value="">همه سازمان‌ها</option>' +
+        state.orgs.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+      sel.dataset.loaded = '1';
+    } catch { /* غیرحیاتی — فقط فیلتر است */ }
+  }
+
+  async function loadDeptFilterOptions(orgId) {
+    const sel = document.getElementById('usersDeptFilter');
+    if (!orgId) {
+      sel.innerHTML = '<option value="">همه واحدها</option>';
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    try {
+      const depts = await api.get(`/departments/?org_id=${orgId}`);
+      sel.innerHTML = '<option value="">همه واحدها</option>' +
+        (depts || []).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+    } catch {
+      sel.innerHTML = '<option value="">خطا در بارگذاری واحدها</option>';
+    }
+  }
+
+  async function loadPositionFilterOptions(orgId, deptId) {
+    const sel = document.getElementById('usersPositionFilter');
+    if (!orgId) {
+      sel.innerHTML = '<option value="">همه پست‌ها</option>';
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    try {
+      const p = new URLSearchParams({ org_id: orgId });
+      if (deptId) p.set('dept_id', deptId);
+      const positions = await api.get(`/positions/?${p}`);
+      sel.innerHTML = '<option value="">همه پست‌ها</option>' +
+        (positions || []).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+    } catch {
+      sel.innerHTML = '<option value="">خطا در بارگذاری پست‌ها</option>';
+    }
+  }
+
+  async function onOrgFilterChange() {
+    const orgId = document.getElementById('usersOrgFilter').value || null;
+    document.getElementById('usersDeptFilter').value = '';
+    document.getElementById('usersPositionFilter').value = '';
+    await Promise.all([loadDeptFilterOptions(orgId), loadPositionFilterOptions(orgId, null)]);
+    load(1);
+  }
+
+  async function onDeptFilterChange() {
+    const orgId = App.isSuperAdmin ? (document.getElementById('usersOrgFilter').value || null) : App.currentUser.org_id;
+    const deptId = document.getElementById('usersDeptFilter').value || null;
+    document.getElementById('usersPositionFilter').value = '';
+    await loadPositionFilterOptions(orgId, deptId);
+    load(1);
+  }
+
+  async function ensureOrgsLoaded() {
+    if (!state.orgs.length) {
+      try { state.orgs = await api.get('/orgs/') || []; } catch { /* ignore */ }
+    }
+    return state.orgs;
+  }
 
   async function load(page = state.page) {
     state.page = page;
@@ -15,10 +99,16 @@ const UsersPage = (() => {
     const search = document.getElementById('usersSearch')?.value.trim() || '';
     const role = document.getElementById('usersRoleFilter')?.value || '';
     const active = document.getElementById('usersStatusFilter')?.value || '';
+    const orgFilter = App.isSuperAdmin ? (document.getElementById('usersOrgFilter')?.value || '') : '';
+    const deptFilter = document.getElementById('usersDeptFilter')?.value || '';
+    const posFilter = document.getElementById('usersPositionFilter')?.value || '';
     const params = new URLSearchParams({ page, per_page: 20 });
     if (search) params.set('search', search);
     if (role) params.set('role', role);
     if (active) params.set('is_active', active);
+    if (orgFilter) params.set('org_id', orgFilter);
+    if (deptFilter) params.set('dept_id', deptFilter);
+    if (posFilter) params.set('position_id', posFilter);
 
     try {
       const endpoint = App.isSuperAdmin ? '/users/all' : '/users/';
@@ -153,9 +243,7 @@ const UsersPage = (() => {
   }
 
   async function populateOrgSelect(selectedOrgId) {
-    if (!state.orgs.length) {
-      try { state.orgs = await api.get('/orgs/') || []; } catch { /* ignore */ }
-    }
+    await ensureOrgsLoaded();
     const sel = document.getElementById('un-org');
     sel.innerHTML = state.orgs.map(o =>
       `<option value="${o.id}" ${o.id === selectedOrgId ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
@@ -221,9 +309,146 @@ const UsersPage = (() => {
   }
 
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+  function setUploadName(id, name, hasFile = !!name) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = name || 'فایلی انتخاب نشده';
+    el.classList.toggle('has-file', hasFile);
+  }
 
   // search/filter با debounce
   const searchDebounced = (() => { let t; return () => { clearTimeout(t); t = setTimeout(() => load(1), 400); }; })();
 
-  return { load, openCreate, openEdit, save, toggleActive, remove, searchDebounced, resetPassword, copyTempPassword };
+  // ─── Excel: قالب / خروجی / Import ─────────────────────────────────
+  function currentFilterParams() {
+    const search = document.getElementById('usersSearch')?.value.trim() || '';
+    const role = document.getElementById('usersRoleFilter')?.value || '';
+    const active = document.getElementById('usersStatusFilter')?.value || '';
+    const orgFilter = App.isSuperAdmin ? (document.getElementById('usersOrgFilter')?.value || '') : '';
+    const deptFilter = document.getElementById('usersDeptFilter')?.value || '';
+    const posFilter = document.getElementById('usersPositionFilter')?.value || '';
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (role) params.set('role', role);
+    if (active) params.set('is_active', active);
+    if (orgFilter) params.set('org_id', orgFilter);
+    if (deptFilter) params.set('dept_id', deptFilter);
+    if (posFilter) params.set('position_id', posFilter);
+    return params;
+  }
+
+  async function downloadTemplate() {
+    try {
+      await api.download('/users/template', 'talentick-users-template.xlsx');
+    } catch (e) { toastError(e.message); }
+  }
+
+  async function exportExcel() {
+    try {
+      await api.download(`/users/export?${currentFilterParams()}`, 'talentick-users-export.xlsx');
+      toastSuccess('فایل Excel دانلود شد');
+    } catch (e) { toastError(e.message); }
+  }
+
+  function onImportFileChange(inputEl) {
+    const file = inputEl.files?.[0];
+    setUploadName('ui-file-name', file ? file.name : '', !!file);
+  }
+
+  async function openImport() {
+    document.getElementById('ui-file').value = '';
+    setUploadName('ui-file-name', '');
+    document.getElementById('ui-update-existing').checked = false;
+    if (App.isSuperAdmin) {
+      await ensureOrgsLoaded();
+      const sel = document.getElementById('ui-org');
+      sel.innerHTML = '<option value="">— انتخاب سازمان —</option>' +
+        state.orgs.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+    }
+    openModal('modal-user-import');
+  }
+
+  async function submitImport() {
+    const fileInput = document.getElementById('ui-file');
+    const file = fileInput.files?.[0];
+    if (!file) { toastError('لطفاً یک فایل Excel انتخاب کنید'); return; }
+    let orgId = null;
+    if (App.isSuperAdmin) {
+      orgId = document.getElementById('ui-org').value;
+      if (!orgId) { toastError('لطفاً سازمان مقصد را انتخاب کنید'); return; }
+    }
+    const updateExisting = document.getElementById('ui-update-existing').checked;
+
+    const btn = document.getElementById('btn-import-users');
+    setLoading(btn, true);
+    try {
+      const params = new URLSearchParams({ update_existing: updateExisting });
+      if (orgId) params.set('org_id', orgId);
+      const result = await api.upload(`/users/import?${params}`, file);
+      closeModal('modal-user-import');
+      showImportResult(result);
+      await load(1);
+    } catch (e) { toastError(e.message); }
+    finally { setLoading(btn, false); }
+  }
+
+  function showImportResult(result) {
+    state.lastImportCreds = result.created_users || [];
+
+    document.getElementById('uiResultStats').innerHTML = [
+      ['کل ردیف‌ها', result.total_rows, 'var(--gray-700)'],
+      ['ساخته‌شده', result.created, 'var(--success)'],
+      ['به‌روزرسانی‌شده', result.updated, 'var(--primary)'],
+      ['رد‌شده / خطا', result.skipped + (result.errors?.length || 0), 'var(--danger)'],
+    ].map(([label, value, color]) => `
+      <div class="stat-card"><div class="stat-card-info"><div class="stat-card-label">${label}</div><div class="stat-card-value" style="color:${color};">${numFa(value)}</div></div></div>
+    `).join('');
+
+    const credsWrap = document.getElementById('uiResultCredsWrap');
+    const credsList = document.getElementById('uiResultCredsList');
+    if (state.lastImportCreds.length) {
+      credsWrap.classList.remove('hidden');
+      credsList.innerHTML = state.lastImportCreds.map((c, idx) => `
+        <div style="display:flex;align-items:center;gap:8px;background:var(--gray-50);border:1.5px dashed var(--gray-300);border-radius:var(--radius-md);padding:9px 12px;">
+          <span style="flex:1;font-size:12.5px;color:var(--gray-700);direction:ltr;text-align:left;">${esc(c.email)}</span>
+          <code style="font-weight:700;letter-spacing:.4px;direction:ltr;color:var(--gray-800);">${esc(c.temp_password)}</code>
+          <button class="btn-icon" title="کپی" onclick="UsersPage.copyCred(${idx})">📋</button>
+        </div>`).join('');
+    } else {
+      credsWrap.classList.add('hidden');
+    }
+
+    const errorsWrap = document.getElementById('uiResultErrorsWrap');
+    const errorsList = document.getElementById('uiResultErrorsList');
+    if (result.errors?.length) {
+      errorsWrap.classList.remove('hidden');
+      errorsList.innerHTML = result.errors.map(er => `
+        <div style="font-size:12.5px;color:var(--danger);background:#FEF2F2;border-radius:var(--radius-sm);padding:8px 10px;">
+          سطر ${numFa(er.row)}${er.email ? ' (' + esc(er.email) + ')' : ''}: ${esc(er.message)}
+        </div>`).join('');
+    } else {
+      errorsWrap.classList.add('hidden');
+    }
+
+    openModal('modal-user-import-result');
+  }
+
+  function copyCred(idx) {
+    const c = state.lastImportCreds[idx];
+    if (!c) return;
+    navigator.clipboard?.writeText(c.temp_password).then(
+      () => toastSuccess(`رمز ${c.email} کپی شد`),
+      () => toastError('کپی خودکار پشتیبانی نمی‌شود — رمز را دستی انتخاب کنید')
+    );
+  }
+
+  function closeImportResult() {
+    closeModal('modal-user-import-result');
+  }
+
+  return {
+    init, load, openCreate, openEdit, save, toggleActive, remove, searchDebounced, resetPassword, copyTempPassword,
+    onOrgFilterChange, onDeptFilterChange,
+    downloadTemplate, exportExcel, openImport, onImportFileChange, submitImport, copyCred, closeImportResult,
+  };
 })();

@@ -129,6 +129,12 @@ textarea.form-control { resize: vertical; }
 
 /* ─── Modal — اندازه بزرگ‌تر برای فرم محتوا ─────────────────────────── */
 .modal-box.modal-lg { max-width: 720px; }
+.modal-box.modal-xl { max-width: 900px; }
+
+/* ─── تب‌های ویزارد محتوا (مشخصات / دسترسی و کاور / آیتم‌ها) ────────── */
+.ctab-content { display: none; }
+.ctab-content.active { display: block; }
+.tab-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ─── Upload widget ────────────────────────────────────────────────── */
 .upload-box { display: flex; align-items: center; gap: 10px; }

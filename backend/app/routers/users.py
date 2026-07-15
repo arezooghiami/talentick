@@ -134,6 +134,8 @@ async def list_all_users(
     search: str | None = Query(None),
     role: str | None = Query(None),
     org_id: str | None = Query(None),
+    dept_id: str | None = Query(None, description="فیلتر بر اساس واحد"),
+    position_id: str | None = Query(None, description="فیلتر بر اساس پست"),
     is_active: bool | None = Query(
         None, description="پیش‌فرض فقط کاربران فعال. برای دیدن غیرفعال‌ها صراحتاً false بدهید."
     ),
@@ -142,7 +144,7 @@ async def list_all_users(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "دسترسی محدود است — نقش مورد نیاز: super_admin")
     return await user_service.list_users(
         db, page=page, per_page=per_page, search=search,
-        role=role, org_id=org_id, is_active=is_active,
+        role=role, org_id=org_id, dept_id=dept_id, position_id=position_id, is_active=is_active,
     )
 
 
@@ -165,6 +167,8 @@ async def list_org_users(
     search: str | None = Query(None),
     role: str | None = Query(None),
     org_id: str | None = Query(None, description="فقط برای super_admin معتبر است"),
+    dept_id: str | None = Query(None, description="فیلتر بر اساس واحد"),
+    position_id: str | None = Query(None, description="فیلتر بر اساس پست"),
     is_active: bool | None = Query(
         None, description="پیش‌فرض فقط کاربران فعال. برای دیدن غیرفعال‌ها (soft-deleted) صراحتاً false بدهید."
     ),
@@ -172,7 +176,7 @@ async def list_org_users(
     scoped_org_id = org_id if current_user.role == "super_admin" else str(current_user.org_id)
     return await user_service.list_users(
         db, page=page, per_page=per_page, search=search,
-        role=role, org_id=scoped_org_id, is_active=is_active,
+        role=role, org_id=scoped_org_id, dept_id=dept_id, position_id=position_id, is_active=is_active,
     )
 
 
@@ -200,7 +204,7 @@ async def download_user_import_template(
     "/export",
     summary="خروجی Excel از کاربران (بر اساس فیلترهای اعمال‌شده)",
     description="""
-    خروجی بر اساس همان فیلترهای لیست کاربران (search/role/org_id/is_active).
+    خروجی بر اساس همان فیلترهای لیست کاربران (search/role/org_id/dept_id/position_id/is_active).
     org_admin/manager همیشه فقط سازمان خودشان را export می‌کنند؛
     super_admin می‌تواند با org_id فیلتر کند یا خالی بگذارد (خروجی همه سازمان‌ها).
     """,
@@ -211,6 +215,8 @@ async def export_users_excel(
     search: str | None = Query(None),
     role: str | None = Query(None),
     org_id: str | None = Query(None, description="فقط برای super_admin معتبر است"),
+    dept_id: str | None = Query(None, description="فیلتر بر اساس واحد"),
+    position_id: str | None = Query(None, description="فیلتر بر اساس پست"),
     is_active: bool | None = Query(None),
 ) -> StreamingResponse:
     scoped_org_id = org_id if current_user.role == "super_admin" else str(current_user.org_id)
@@ -227,6 +233,10 @@ async def export_users_excel(
         q = q.where(User.role == role)
     if scoped_org_id:
         q = q.where(User.org_id == uuid.UUID(scoped_org_id))
+    if dept_id:
+        q = q.where(User.dept_id == uuid.UUID(dept_id))
+    if position_id:
+        q = q.where(User.position_id == uuid.UUID(position_id))
     q = q.where(User.is_active.is_(is_active if is_active is not None else True))
 
     result = await db.execute(q.order_by(User.created_at.desc()))

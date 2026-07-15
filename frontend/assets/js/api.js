@@ -78,4 +78,41 @@ const api = {
     }
     return data;
   },
+
+  /** دانلود فایل باینری (Excel و ...) با هدر احراز هویت — دانلود مستقیم در مرورگر. */
+  async download(path, filename, _isRetry = false) {
+    const token = Auth.getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(CONFIG.API_BASE + path, { headers });
+
+    if (res.status === 401 && !_isRetry) {
+      const refreshed = await Auth.refreshSession();
+      if (refreshed) return this.download(path, filename, true);
+      Auth.clear();
+      window.location.href = '/login.html';
+      throw new Error('Unauthorized');
+    }
+    if (res.status === 401) {
+      Auth.clear();
+      window.location.href = '/login.html';
+      throw new Error('Unauthorized');
+    }
+    if (!res.ok) {
+      let msg = `خطا: ${res.status}`;
+      try { const data = await res.json(); msg = data?.detail || msg; } catch { /* body غیر JSON */ }
+      throw new Error(Array.isArray(msg) ? msg[0]?.msg || msg : msg);
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };

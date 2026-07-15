@@ -3,27 +3,39 @@
 // ════════════════════════════════════════════════════════════════════
 // org_admin/super_admin: ساخت/ویرایش/حذف محتوا + آیتم‌های داخل آن.
 // همیشه محدود به سازمان خودشان (بک‌اند enforce می‌کند).
+//
+// فرم محتوا یک ویزارد ۳ تبی است — مطابق منطق استاندارد LMS:
+//   تب ۱ «مشخصات»            → نوع محتوا و اطلاعات پایه (سازنده‌ی رکورد محتوا)
+//   تب ۲ «دسترسی و کاور»      → وضعیت/کاور/انتشار هدف‌مند/قفل ترتیبی
+//   تب ۳ «آیتم‌ها»            → برنامه‌ی درسی واقعی (چندین ویدیو/فایل/آزمون)
+// در «ساخت محتوای جدید» تب‌ها به‌ترتیب باز می‌شوند (چون افزودن آیتم‌ها به
+// content_id واقعی نیاز دارد که فقط بعد از تب ۱ ساخته می‌شود). در «ویرایش»
+// هر سه تب بلافاصله باز و قابل‌جابه‌جایی آزادند.
 
 const TYPE_LABELS = { course: 'دوره', article: 'مقاله', podcast: 'پادکست', book: 'کتاب' };
 const STATUS_LABELS = { draft: 'پیش‌نویس', published: 'منتشرشده', archived: 'بایگانی‌شده' };
 const ITEM_TYPE_LABELS = { text: 'متن', video: 'ویدیو', pdf: 'PDF', image: 'تصویر', link: 'لینک', file: 'فایل', quiz_ref: 'آزمون' };
 const ITEM_TYPE_ICONS = { text: '📄', video: '🎬', pdf: '📕', image: '🖼️', link: '🔗', file: '📎', quiz_ref: '📝' };
+const CTAB_ORDER = ['basic', 'access', 'items'];
+const BULK_TYPE_BY_EXT = {
+  mp4: 'video', webm: 'video', mov: 'video',
+  pdf: 'pdf',
+  jpg: 'image', jpeg: 'image', png: 'image', webp: 'image', gif: 'image',
+};
 
 const ContentPage = (() => {
   const state = {
     type: 'course', page: 1, search: '', status: '',
     items: [], total: 0, totalPages: 1,
-    // مودال آیتم‌ها
-    activeContent: null, activeItems: [], quizzesLoaded: false,
+    // ویزارد محتوا
+    mode: null, contentId: null, activeTab: 'basic', maxUnlockedTab: 'basic',
+    activeItems: [], quizzesLoaded: false,
     // انتشار هدف‌مند (targeting)
     orgs: [], orgsLoaded: false, targetOrgId: null,
     depts: [], positions: [],
     selectedDepts: new Set(), selectedPositions: new Set(), selectedUsers: new Map(),
     userSearchResults: [],
-    // محتوای اصلی (اولین آیتم محتوا — میان‌بر برای content های تک‌فایلی)
-    mainItemId: null,
   };
-  const MAIN_ITEM_TYPES = ['video', 'pdf', 'file', 'image', 'link'];
   let searchTimer = null;
   let targetUserSearchTimer = null;
 
@@ -57,7 +69,7 @@ const ContentPage = (() => {
     } catch { /* غیرحیاتی — فقط فیلتر است */ }
   }
 
-  // ─── Tabs / Load ────────────────────────────────────────────────
+  // ─── Tabs / Load (لیست محتوا) ───────────────────────────────────
   function setType(type) {
     state.type = type;
     state.page = 1;
@@ -124,7 +136,7 @@ const ContentPage = (() => {
         <td style="color:var(--gray-500);">${fmtDate(c.created_at)}</td>
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
-            <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" onclick="ContentPage.openItemsModal('${c.id}')">آیتم‌ها</button>
+            <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" onclick="ContentPage.openEdit('${c.id}','items')">آیتم‌ها</button>
             ${canEdit ? `<button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="ContentPage.openEdit('${c.id}')">ویرایش</button>` : ''}
             ${canEdit ? `<button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="ContentPage.remove('${c.id}','${esc(c.title)}')">حذف</button>` : ''}
           </div>
@@ -132,7 +144,108 @@ const ContentPage = (() => {
       </tr>`).join('');
   }
 
-  // ─── Create / Edit Content ──────────────────────────────────────
+  // ─── Wizard: تب‌ها ───────────────────────────────────────────────
+  function switchTab(tab) {
+    if (state.mode === 'create') {
+      const targetIdx = CTAB_ORDER.indexOf(tab);
+      const maxIdx = CTAB_ORDER.indexOf(state.maxUnlockedTab);
+      if (targetIdx > maxIdx) return; // هنوز باز نشده
+    }
+    state.activeTab = tab;
+    document.querySelectorAll('#contentModalTabs .tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.ctab === tab));
+    document.querySelectorAll('.ctab-content').forEach(el =>
+      el.classList.toggle('active', el.id === 'ctab-' + tab));
+    updateFooterButtons();
+  }
+
+  function setTabsUnlocked(maxTab) {
+    state.maxUnlockedTab = maxTab;
+    const maxIdx = CTAB_ORDER.indexOf(maxTab);
+    document.querySelectorAll('#contentModalTabs .tab-btn').forEach(b => {
+      b.disabled = state.mode === 'create' && CTAB_ORDER.indexOf(b.dataset.ctab) > maxIdx;
+    });
+  }
+
+  function updateFooterButtons() {
+    const back = document.getElementById('btn-content-back');
+    const next = document.getElementById('btn-content-next');
+    const save = document.getElementById('btn-content-save');
+    const finish = document.getElementById('btn-content-finish');
+
+    if (state.mode === 'edit') {
+      back.classList.add('hidden');
+      next.classList.add('hidden');
+      finish.classList.add('hidden');
+      save.classList.remove('hidden');
+      return;
+    }
+    save.classList.add('hidden');
+    const idx = CTAB_ORDER.indexOf(state.activeTab);
+    back.classList.toggle('hidden', idx === 0);
+    next.classList.toggle('hidden', idx === CTAB_ORDER.length - 1);
+    finish.classList.toggle('hidden', idx !== CTAB_ORDER.length - 1);
+  }
+
+  function prevTab() {
+    const idx = CTAB_ORDER.indexOf(state.activeTab);
+    if (idx > 0) switchTab(CTAB_ORDER[idx - 1]);
+  }
+
+  async function nextTab() {
+    if (state.activeTab === 'basic') {
+      const title = document.getElementById('c-title').value.trim();
+      if (!title) { toastError('عنوان محتوا اجباری است'); return; }
+      let orgId = null;
+      if (App.isSuperAdmin) {
+        orgId = document.getElementById('c-org-id').value;
+        if (!orgId) { toastError('لطفاً سازمان را انتخاب کنید'); return; }
+      }
+      const btn = document.getElementById('btn-content-next');
+      setLoading(btn, true);
+      try {
+        const payload = basicPayload();
+        if (orgId) payload.org_id = orgId;
+        const created = await api.post('/contents/', payload);
+        state.contentId = created.id;
+        document.getElementById('c-id').value = created.id;
+        document.getElementById('c-type').disabled = true;
+        document.getElementById('c-org-id').disabled = true;
+        toastSuccess('مشخصات پایه ذخیره شد — حالا دسترسی و کاور را تنظیم کنید');
+        setTabsUnlocked('access');
+        switchTab('access');
+      } catch (e) { toastError(e.message); }
+      finally { setLoading(btn, false); }
+      return;
+    }
+
+    if (state.activeTab === 'access') {
+      const btn = document.getElementById('btn-content-next');
+      setLoading(btn, true);
+      try {
+        await api.patch(`/contents/${state.contentId}`, collectEditablePayload());
+        state.activeItems = [];
+        renderItems();
+        setTabsUnlocked('items');
+        switchTab('items');
+      } catch (e) { toastError(e.message); }
+      finally { setLoading(btn, false); }
+      return;
+    }
+  }
+
+  async function finishWizard() {
+    closeModal('modal-content');
+    await load(1);
+  }
+
+  function closeContentModal() {
+    const wasCreatingDraft = state.mode === 'create' && state.contentId;
+    closeModal('modal-content');
+    if (wasCreatingDraft) load(1); // محتوا از مرحله ۱ به بعد از قبل روی سرور ساخته شده
+  }
+
+  // ─── ساخت / ویرایش محتوا ────────────────────────────────────────
   function resetTargetSelections() {
     state.selectedDepts = new Set();
     state.selectedPositions = new Set();
@@ -143,38 +256,46 @@ const ContentPage = (() => {
     document.getElementById('c-target-users').innerHTML = '<div class="checkbox-scroll-box-empty">برای جستجو تایپ کنید</div>';
   }
 
-  function resetMainContentFields() {
-    state.mainItemId = null;
-    document.getElementById('c-main-type').value = '';
-    document.getElementById('c-main-url').value = '';
-    document.getElementById('c-main-link').value = '';
-    setUploadName('c-main-file-name', '');
-    toggleMainContentFields();
+  function parseTagsInput() {
+    const tagsRaw = document.getElementById('c-tags').value.trim();
+    return tagsRaw ? tagsRaw.split(/[،,]/).map(t => t.trim()).filter(Boolean) : [];
   }
 
-  function toggleMainContentFields() {
-    const type = document.getElementById('c-main-type').value;
-    document.getElementById('c-main-upload-wrap').classList.toggle('hidden', !type || type === 'link');
-    document.getElementById('c-main-link').classList.toggle('hidden', type !== 'link');
+  function basicPayload() {
+    return {
+      title: document.getElementById('c-title').value.trim(),
+      type: document.getElementById('c-type').value,
+      description: document.getElementById('c-desc').value.trim() || null,
+      level: document.getElementById('c-level').value || null,
+      author: document.getElementById('c-author').value.trim() || null,
+      tags: parseTagsInput(),
+    };
   }
 
-  async function uploadMainContent(inputEl) {
-    const file = inputEl.files?.[0];
-    if (!file) return;
-    try {
-      const res = await api.upload('/contents/upload', file);
-      document.getElementById('c-main-url').value = res.url;
-      setUploadName('c-main-file-name', file.name, true);
-      toastSuccess('فایل با موفقیت آپلود شد');
-    } catch (e) { toastError(e.message); }
-    finally { inputEl.value = ''; }
+  function collectEditablePayload() {
+    return {
+      title: document.getElementById('c-title').value.trim(),
+      description: document.getElementById('c-desc').value.trim() || null,
+      level: document.getElementById('c-level').value || null,
+      author: document.getElementById('c-author').value.trim() || null,
+      tags: parseTagsInput(),
+      status: document.getElementById('c-status').value,
+      total_duration_min: document.getElementById('c-duration').value ? parseInt(document.getElementById('c-duration').value, 10) : null,
+      is_featured: document.getElementById('c-featured').checked,
+      sequential_progress: document.getElementById('c-sequential').checked,
+      thumbnail_url: document.getElementById('c-thumb-url').value || null,
+      targets: collectTargets(),
+    };
   }
 
   async function openCreate() {
+    state.mode = 'create';
+    state.contentId = null;
     document.getElementById('contentModalTitle').textContent = `${TYPE_LABELS[state.type]} جدید`;
     document.getElementById('c-id').value = '';
     document.getElementById('c-title').value = '';
     document.getElementById('c-type').value = state.type;
+    document.getElementById('c-type').disabled = false;
     document.getElementById('c-status').value = 'draft';
     document.getElementById('c-level').value = '';
     document.getElementById('c-author').value = '';
@@ -185,8 +306,9 @@ const ContentPage = (() => {
     document.getElementById('c-sequential').checked = false;
     document.getElementById('c-thumb-url').value = '';
     setUploadName('c-thumb-name', '');
-    resetMainContentFields();
     resetTargetSelections();
+    state.activeItems = [];
+    renderItems();
 
     const orgSel = document.getElementById('c-org-id');
     orgSel.disabled = false;
@@ -199,18 +321,25 @@ const ContentPage = (() => {
       state.targetOrgId = App.homeOrgId;
       await loadTargetingLists(state.targetOrgId);
     }
+
+    setTabsUnlocked('basic');
+    switchTab('basic');
     openModal('modal-content');
   }
 
-  async function openEdit(id) {
+  async function openEdit(id, jumpToTab = 'basic') {
     let c;
     try { c = await api.get(`/contents/${id}`); }
     catch (e) { toastError(e.message); return; }
+
+    state.mode = 'edit';
+    state.contentId = c.id;
 
     document.getElementById('contentModalTitle').textContent = 'ویرایش محتوا';
     document.getElementById('c-id').value = c.id;
     document.getElementById('c-title').value = c.title || '';
     document.getElementById('c-type').value = c.type;
+    document.getElementById('c-type').disabled = true; // نوع بعد از ساخت غیرقابل تغییر است
     document.getElementById('c-status').value = c.status;
     document.getElementById('c-level').value = c.level || '';
     document.getElementById('c-author').value = c.author || '';
@@ -221,17 +350,6 @@ const ContentPage = (() => {
     document.getElementById('c-sequential').checked = !!c.sequential_progress;
     document.getElementById('c-thumb-url').value = c.thumbnail_url || '';
     setUploadName('c-thumb-name', c.thumbnail_url ? 'تصویر فعلی ثبت شده' : '');
-    resetMainContentFields();
-
-    const mainItem = (c.items || [])[0];
-    if (mainItem && MAIN_ITEM_TYPES.includes(mainItem.type)) {
-      state.mainItemId = mainItem.id;
-      document.getElementById('c-main-type').value = mainItem.type;
-      document.getElementById('c-main-url').value = mainItem.media_url || '';
-      if (mainItem.type === 'link') document.getElementById('c-main-link').value = mainItem.media_url || '';
-      else setUploadName('c-main-file-name', mainItem.media_url ? 'فایل فعلی ثبت شده' : '');
-      toggleMainContentFields();
-    }
     resetTargetSelections();
 
     state.targetOrgId = c.org_id;
@@ -247,7 +365,26 @@ const ContentPage = (() => {
     }
     renderUserChips();
     await loadTargetingLists(c.org_id);
+
+    state.activeItems = c.items || [];
+    renderItems();
+
+    setTabsUnlocked('items'); // در ویرایش همه‌ی تب‌ها باز است
+    switchTab(jumpToTab);
     openModal('modal-content');
+  }
+
+  async function saveChanges() {
+    const title = document.getElementById('c-title').value.trim();
+    if (!title) { toastError('عنوان محتوا اجباری است'); return; }
+    const btn = document.getElementById('btn-content-save');
+    setLoading(btn, true);
+    try {
+      await api.patch(`/contents/${state.contentId}`, collectEditablePayload());
+      toastSuccess('تغییرات با موفقیت ذخیره شد');
+      await load(state.page);
+    } catch (e) { toastError(e.message); }
+    finally { setLoading(btn, false); }
   }
 
   function collectTargets() {
@@ -258,65 +395,24 @@ const ContentPage = (() => {
     return targets;
   }
 
-  async function save() {
-    const id = document.getElementById('c-id').value;
-    const title = document.getElementById('c-title').value.trim();
-    if (!title) { toastError('عنوان محتوا اجباری است'); return; }
+  function remove(id, title) {
+    confirmAction(`آیا مطمئن هستید که می‌خواهید "${title}" را حذف کنید؟ تمام آیتم‌های داخل آن نیز حذف می‌شوند.`, async () => {
+      await api.delete(`/contents/${id}`);
+      toastSuccess('محتوا با موفقیت حذف شد');
+      await load(1);
+    });
+  }
 
-    if (!id && App.isSuperAdmin) {
-      const orgId = document.getElementById('c-org-id').value;
-      if (!orgId) { toastError('لطفاً سازمان را انتخاب کنید'); return; }
-    }
-
-    const mainType = document.getElementById('c-main-type').value;
-    const mainMediaUrl = mainType === 'link'
-      ? document.getElementById('c-main-link').value.trim()
-      : document.getElementById('c-main-url').value;
-    if (mainType && !mainMediaUrl) {
-      toastError(mainType === 'link' ? 'لطفاً لینک محتوای اصلی را وارد کنید' : 'لطفاً فایل محتوای اصلی را آپلود کنید');
-      return;
-    }
-
-    const tagsRaw = document.getElementById('c-tags').value.trim();
-    const payload = {
-      title,
-      description: document.getElementById('c-desc').value.trim() || null,
-      level: document.getElementById('c-level').value || null,
-      author: document.getElementById('c-author').value.trim() || null,
-      status: document.getElementById('c-status').value,
-      tags: tagsRaw ? tagsRaw.split(/[،,]/).map(t => t.trim()).filter(Boolean) : [],
-      total_duration_min: document.getElementById('c-duration').value ? parseInt(document.getElementById('c-duration').value, 10) : null,
-      is_featured: document.getElementById('c-featured').checked,
-      sequential_progress: document.getElementById('c-sequential').checked,
-      thumbnail_url: document.getElementById('c-thumb-url').value || null,
-      targets: collectTargets(),
-    };
-    if (!id) {
-      payload.type = document.getElementById('c-type').value;
-      if (App.isSuperAdmin) payload.org_id = document.getElementById('c-org-id').value;
-    }
-
-    const btn = document.getElementById('btn-save-content');
-    setLoading(btn, true);
+  async function uploadThumbnail(inputEl) {
+    const file = inputEl.files?.[0];
+    if (!file) return;
     try {
-      let contentId = id;
-      if (id) { await api.patch(`/contents/${id}`, payload); toastSuccess('محتوا با موفقیت ویرایش شد'); }
-      else {
-        const created = await api.post('/contents/', payload);
-        contentId = created.id;
-        toastSuccess('محتوا با موفقیت ایجاد شد');
-      }
-
-      if (mainType) {
-        const itemPayload = { title, type: mainType, media_url: mainMediaUrl, order_index: 0, is_free: true };
-        if (state.mainItemId) await api.patch(`/contents/items/${state.mainItemId}`, itemPayload);
-        else await api.post(`/contents/${contentId}/items`, itemPayload);
-      }
-
-      closeModal('modal-content');
-      await load(id ? state.page : 1);
+      const res = await api.upload('/contents/upload', file);
+      document.getElementById('c-thumb-url').value = res.url;
+      setUploadName('c-thumb-name', file.name, true);
+      toastSuccess('تصویر با موفقیت آپلود شد');
     } catch (e) { toastError(e.message); }
-    finally { setLoading(btn, false); }
+    finally { inputEl.value = ''; }
   }
 
   // ─── Targeting: سازمان (فقط super_admin) ────────────────────────
@@ -452,40 +548,12 @@ const ContentPage = (() => {
       <span class="chip">${esc(label)}<span class="chip-remove" onclick="ContentPage.removeUserChip('${id}')">✕</span></span>`).join('');
   }
 
-  function remove(id, title) {
-    confirmAction(`آیا مطمئن هستید که می‌خواهید "${title}" را حذف کنید؟ تمام آیتم‌های داخل آن نیز حذف می‌شوند.`, async () => {
-      await api.delete(`/contents/${id}`);
-      toastSuccess('محتوا با موفقیت حذف شد');
-      await load(1);
-    });
-  }
-
-  async function uploadThumbnail(inputEl) {
-    const file = inputEl.files?.[0];
-    if (!file) return;
-    try {
-      const res = await api.upload('/contents/upload', file);
-      document.getElementById('c-thumb-url').value = res.url;
-      setUploadName('c-thumb-name', file.name, true);
-      toastSuccess('تصویر با موفقیت آپلود شد');
-    } catch (e) { toastError(e.message); }
-    finally { inputEl.value = ''; }
-  }
-
-  // ─── Items Modal ────────────────────────────────────────────────
-  async function openItemsModal(contentId) {
-    const c = state.items.find(x => x.id === contentId);
-    state.activeContent = contentId;
-    document.getElementById('itemsModalTitle').textContent = c ? `آیتم‌های «${c.title}»` : 'آیتم‌های محتوا';
-    openModal('modal-content-items');
-    await loadItems();
-  }
-
+  // ─── تب ۳: آیتم‌ها / برنامه‌ی درسی ───────────────────────────────
   async function loadItems() {
     const wrap = document.getElementById('contentItemsList');
     wrap.innerHTML = `<div class="loading-row" style="padding:20px;text-align:center;">در حال بارگذاری...</div>`;
     try {
-      const detail = await api.get(`/contents/${state.activeContent}`);
+      const detail = await api.get(`/contents/${state.contentId}`);
       state.activeItems = detail.items || [];
       renderItems();
     } catch (e) {
@@ -493,14 +561,19 @@ const ContentPage = (() => {
     }
   }
 
+  function sortedItems() {
+    return [...state.activeItems].sort((a, b) => a.order_index - b.order_index);
+  }
+
   function renderItems() {
     const wrap = document.getElementById('contentItemsList');
     if (!state.activeItems.length) {
-      wrap.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>هنوز آیتمی اضافه نشده</div>`;
+      wrap.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>هنوز آیتمی اضافه نشده — یا با «افزودن آیتم تکی» یا با «افزودن دسته‌جمعی» شروع کنید</div>`;
       return;
     }
     const canEdit = App.isSuperAdmin || App.isOrgAdmin;
-    wrap.innerHTML = state.activeItems.map((it, idx) => `
+    const sorted = sortedItems();
+    wrap.innerHTML = sorted.map((it, idx) => `
       <div class="item-row">
         <div class="item-row-order">${numFa(idx + 1)}</div>
         <div class="item-row-icon">${ITEM_TYPE_ICONS[it.type] || '📄'}</div>
@@ -509,11 +582,30 @@ const ContentPage = (() => {
           <div class="item-row-meta">${ITEM_TYPE_LABELS[it.type] || it.type}${it.duration_min ? ' • ' + numFa(it.duration_min) + ' دقیقه' : ''}${it.is_free ? ' • رایگان' : ''}</div>
         </div>
         <div class="item-row-actions">
+          ${canEdit && idx > 0 ? `<button class="btn-icon" title="جابه‌جایی به بالا" onclick="ContentPage.moveItemUp('${it.id}')">▲</button>` : ''}
+          ${canEdit && idx < sorted.length - 1 ? `<button class="btn-icon" title="جابه‌جایی به پایین" onclick="ContentPage.moveItemDown('${it.id}')">▼</button>` : ''}
           ${canEdit ? `<button class="btn-icon" title="ویرایش" onclick="ContentPage.openEditItem('${it.id}')">✎</button>` : ''}
           ${canEdit ? `<button class="btn-icon" title="حذف" onclick="ContentPage.removeItem('${it.id}','${esc(it.title)}')">🗑</button>` : ''}
         </div>
       </div>`).join('');
   }
+
+  async function swapOrder(id, dir) {
+    const sorted = sortedItems();
+    const idx = sorted.findIndex(x => x.id === id);
+    const swapIdx = idx + dir;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= sorted.length) return;
+    const a = sorted[idx], b = sorted[swapIdx];
+    try {
+      await Promise.all([
+        api.patch(`/contents/items/${a.id}`, { order_index: b.order_index }),
+        api.patch(`/contents/items/${b.id}`, { order_index: a.order_index }),
+      ]);
+      await loadItems();
+    } catch (e) { toastError(e.message); }
+  }
+  function moveItemUp(id) { return swapOrder(id, -1); }
+  function moveItemDown(id) { return swapOrder(id, 1); }
 
   function toggleItemFields() {
     const type = document.getElementById('i-type').value;
@@ -609,7 +701,7 @@ const ContentPage = (() => {
     setLoading(btn, true);
     try {
       if (id) { await api.patch(`/contents/items/${id}`, payload); toastSuccess('آیتم با موفقیت ویرایش شد'); }
-      else { await api.post(`/contents/${state.activeContent}/items`, payload); toastSuccess('آیتم با موفقیت اضافه شد'); }
+      else { await api.post(`/contents/${state.contentId}/items`, payload); toastSuccess('آیتم با موفقیت اضافه شد'); }
       closeModal('modal-item');
       await loadItems();
       await load(state.page); // به‌روزرسانی تعداد آیتم در جدول اصلی
@@ -626,6 +718,52 @@ const ContentPage = (() => {
     });
   }
 
+  // ─── تب ۳: افزودن دسته‌جمعی (چند فایل هم‌زمان) ───────────────────
+  function pickBulkFiles() {
+    document.getElementById('c-bulk-files').click();
+  }
+
+  function inferItemType(filename) {
+    const ext = (filename.split('.').pop() || '').toLowerCase();
+    return BULK_TYPE_BY_EXT[ext] || 'file';
+  }
+
+  function titleFromFilename(filename) {
+    return filename.replace(/\.[^.]+$/, '');
+  }
+
+  async function uploadBulkFiles(inputEl) {
+    const files = Array.from(inputEl.files || []);
+    if (!files.length) return;
+    const progressEl = document.getElementById('c-bulk-progress');
+    let nextOrder = state.activeItems.length
+      ? Math.max(...state.activeItems.map(it => it.order_index)) + 1
+      : 0;
+    let done = 0, failed = 0;
+    for (const file of files) {
+      progressEl.textContent = `در حال آپلود ${numFa(done + failed + 1)} از ${numFa(files.length)}: ${file.name}`;
+      try {
+        const uploaded = await api.upload('/contents/upload', file);
+        await api.post(`/contents/${state.contentId}/items`, {
+          title: titleFromFilename(file.name),
+          type: inferItemType(file.name),
+          media_url: uploaded.url,
+          order_index: nextOrder++,
+          is_free: true,
+        });
+        done++;
+      } catch {
+        failed++;
+      }
+    }
+    progressEl.textContent = failed
+      ? `${numFa(done)} فایل با موفقیت اضافه شد — ${numFa(failed)} فایل با خطا مواجه شد`
+      : `${numFa(done)} فایل با موفقیت اضافه شد`;
+    inputEl.value = '';
+    await loadItems();
+    await load(state.page);
+  }
+
   // ─── Helpers ────────────────────────────────────────────────────
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
   function setUploadName(id, name, hasFile = !!name) {
@@ -637,10 +775,10 @@ const ContentPage = (() => {
 
   return {
     goto, setType, load, searchDebounced,
-    openCreate, openEdit, save, remove, uploadThumbnail,
-    toggleMainContentFields, uploadMainContent,
-    openItemsModal, loadItems,
-    toggleItemFields, openCreateItem, openEditItem, uploadItemMedia, saveItem, removeItem,
+    switchTab, prevTab, nextTab, finishWizard, closeContentModal,
+    openCreate, openEdit, saveChanges, remove, uploadThumbnail,
+    loadItems, toggleItemFields, openCreateItem, openEditItem, uploadItemMedia, saveItem, removeItem,
+    moveItemUp, moveItemDown, pickBulkFiles, uploadBulkFiles,
     onOrgChange, toggleDeptTarget, togglePositionTarget,
     searchTargetUsers, toggleUserTarget, removeUserChip,
   };

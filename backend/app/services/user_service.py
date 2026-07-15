@@ -57,6 +57,8 @@ async def list_users(
     search: str | None = None,
     role: str | None = None,
     org_id: str | None = None,
+    dept_id: str | None = None,
+    position_id: str | None = None,
     is_active: bool | None = None,
 ) -> PaginatedUsers:
     """
@@ -88,6 +90,10 @@ async def list_users(
         base_q = base_q.where(User.role == role)
     if org_id:
         base_q = base_q.where(User.org_id == uuid.UUID(org_id))
+    if dept_id:
+        base_q = base_q.where(User.dept_id == uuid.UUID(dept_id))
+    if position_id:
+        base_q = base_q.where(User.position_id == uuid.UUID(position_id))
     if is_active is not None:
         base_q = base_q.where(User.is_active.is_(is_active))
 
