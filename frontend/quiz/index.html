@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>آزمون — Talentick</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260714" />
+</head>
+<body>
+
+  <nav class="emp-navbar">
+    <a href="/onboarding/index.html" class="emp-brand"><span class="logo-dot"></span>Talenti<span class="accent">ck</span></a>
+    <div class="emp-nav-links">
+      <a href="/onboarding/index.html" data-nav="home">🏠 خانه</a>
+      <a href="/content/list.html" data-nav="content">📚 محتوای من</a>
+    </div>
+    <div class="emp-nav-right">
+      <span class="hidden" id="quizTimer" style="font-weight:800;font-size:15px;color:var(--gray-700);"></span>
+      <div class="emp-user-menu">
+        <button class="emp-user-btn" id="empUserBtn">
+          <span class="emp-user-avatar" id="empUserAvatar">—</span>
+          <span class="emp-user-name" id="empUserName">—</span>
+        </button>
+        <div class="emp-user-dropdown" id="empUserDropdown">
+          <a href="/change-password.html">🔒 تغییر رمز عبور</a>
+          <hr>
+          <button class="danger" onclick="EmployeeShell.logout()">🚪 خروج از حساب</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="emp-page quiz-shell" id="quizRoot">
+
+    <!-- ═══ Intro ═══ -->
+    <div id="view-intro">
+      <div class="quiz-head-card">
+        <div class="quiz-head-icon">📝</div>
+        <div class="quiz-head-title" id="introTitle">در حال بارگذاری...</div>
+        <div class="quiz-head-desc" id="introDesc"></div>
+
+        <div class="quiz-meta-row">
+          <div class="quiz-meta-item"><div class="quiz-meta-value" id="introQuestionCount">—</div><div class="quiz-meta-label">تعداد سوال</div></div>
+          <div class="quiz-meta-item"><div class="quiz-meta-value" id="introPassScore">—</div><div class="quiz-meta-label">نمره قبولی</div></div>
+          <div class="quiz-meta-item"><div class="quiz-meta-value" id="introTimeLimit">—</div><div class="quiz-meta-label">محدودیت زمانی</div></div>
+          <div class="quiz-meta-item"><div class="quiz-meta-value" id="introAttempts">—</div><div class="quiz-meta-label">تلاش‌های استفاده‌شده</div></div>
+        </div>
+
+        <button class="btn btn-primary" id="btnStartQuiz" onclick="QuizTakePage.start()" style="padding:12px 32px;" disabled>در حال بارگذاری...</button>
+        <div id="introHistory"></div>
+      </div>
+    </div>
+
+    <!-- ═══ Question Flow ═══ -->
+    <div id="view-quiz" class="hidden">
+      <div class="quiz-progress-bar" id="quizProgressBar"></div>
+
+      <div class="quiz-question-card">
+        <div class="quiz-question-idx" id="quizQuestionIdx"></div>
+        <div class="quiz-question-body" id="quizQuestionBody"></div>
+        <div id="quizAnswerArea"></div>
+      </div>
+
+      <div class="quiz-dots" id="quizDots" style="margin-bottom:18px;"></div>
+
+      <div class="quiz-nav-row">
+        <button class="btn btn-outline" id="btnPrevQuestion" onclick="QuizTakePage.prev()">→ سوال قبل</button>
+        <button class="btn btn-primary" id="btnNextQuestion" onclick="QuizTakePage.next()">سوال بعد ←</button>
+        <button class="btn btn-primary hidden" id="btnFinishQuiz" onclick="QuizTakePage.submit()">پایان و ثبت پاسخ‌ها</button>
+      </div>
+    </div>
+
+    <!-- ═══ Result ═══ -->
+    <div id="view-result" class="hidden">
+      <div class="quiz-question-card quiz-result-card">
+        <div class="quiz-result-ring" id="resultRing"></div>
+        <div class="quiz-result-verdict" id="resultVerdict"></div>
+        <div class="quiz-result-sub" id="resultSub"></div>
+        <div class="quiz-result-stats">
+          <div><div class="quiz-meta-value" id="resultScore">—</div><div class="quiz-meta-label">امتیاز</div></div>
+          <div><div class="quiz-meta-value" id="resultDuration">—</div><div class="quiz-meta-label">مدت زمان</div></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <a class="btn btn-primary hidden" id="resultBackToContent" href="#" onclick="history.back();return false;">بازگشت به محتوا</a>
+          <a class="btn btn-secondary" href="/onboarding/index.html">بازگشت به خانه</a>
+          <button class="btn btn-outline hidden" id="resultRetry" onclick="QuizTakePage.retry()">تلاش مجدد</button>
+        </div>
+
+        <div class="quiz-answer-review" id="resultAnswers"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="toast-container"></div>
+
+  <script src="../assets/js/config.js?v=20260714"></script>
+  <script src="../assets/js/auth.js?v=20260714"></script>
+  <script src="../assets/js/api.js?v=20260714"></script>
+  <script src="../assets/js/utils.js?v=20260714"></script>
+  <script src="../assets/js/employee_shell.js?v=20260714"></script>
+  <script src="../assets/js/quiz_take.js?v=20260714"></script>
+  <script>
+    EmployeeShell.init('content');
+    QuizTakePage.load();
+  </script>
+</body>
+</html>

@@ -116,11 +116,13 @@ textarea.form-control { resize: vertical; }
 .badge-type-podcast  { background: #F5F3FF; color: #7C3AED; }
 .badge-type-book     { background: #ECFEFF; color: #0891B2; }
 
-/* ─── Tabs (فیلتر نوع محتوا) ───────────────────────────────────────── */
+/* ─── Tabs (فیلتر نوع محتوا / زیربخش‌های گزارش) ─────────────────────── */
 .tab-bar { display: flex; gap: 6px; padding: 4px; background: var(--gray-50); border: 1px solid var(--border); border-radius: var(--radius-md); width: fit-content; flex-wrap: wrap; }
 .tab-btn { padding: 7px 16px; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--gray-500); font-family: 'Vazirmatn', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
 .tab-btn.active { background: var(--primary); color: #fff; }
 .tab-btn:hover:not(.active) { background: var(--gray-100); color: var(--gray-700); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
 
 /* ─── Modal — اندازه بزرگ‌تر برای فرم محتوا ─────────────────────────── */
 .modal-box.modal-lg { max-width: 720px; }
@@ -130,6 +132,25 @@ textarea.form-control { resize: vertical; }
 .upload-box input[type=file] { display: none; }
 .upload-box-name { flex: 1; font-size: 12px; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--gray-50); border: 1.5px dashed var(--gray-200); border-radius: var(--radius-md); padding: 9px 12px; }
 .upload-box-name.has-file { color: var(--gray-800); border-style: solid; }
+
+/* ─── Form divider + section hint (بخش انتشار هدف‌مند) ───────────────── */
+.form-divider { border: none; border-top: 1px solid var(--border); margin: 18px 0 14px; }
+.form-section-title { font-size: 13px; font-weight: 700; color: var(--gray-800); margin-bottom: 3px; }
+.form-section-hint { font-size: 12px; color: var(--gray-400); margin-bottom: 12px; line-height: 1.6; }
+
+/* ─── Checkbox scroll box (واحدها/پست‌ها/کاربران هدف) ────────────────── */
+.checkbox-scroll-box { max-height: 150px; overflow-y: auto; border: 1.5px solid var(--gray-200); border-radius: var(--radius-md); background: var(--card-bg); padding: 4px; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; color: var(--gray-700); }
+.checkbox-row:hover { background: var(--gray-50); }
+.checkbox-row input[type=checkbox] { width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
+.checkbox-row-meta { font-size: 11px; color: var(--gray-400); margin-inline-start: auto; }
+.checkbox-scroll-box-empty { padding: 14px; text-align: center; font-size: 12px; color: var(--gray-400); }
+
+/* ─── Chip list (کاربران هدف انتخاب‌شده) ─────────────────────────────── */
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px 5px 10px; background: var(--primary-light); color: var(--primary); border-radius: 20px; font-size: 12px; font-weight: 500; }
+.chip-remove { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,.08); cursor: pointer; font-size: 11px; line-height: 1; }
+.chip-remove:hover { background: rgba(0,0,0,.16); }
 
 /* ─── Content items manager (داخل مودال آیتم‌ها) ───────────────────── */
 .content-items-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }

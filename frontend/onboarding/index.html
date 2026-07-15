@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>خانه — Talentick</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260714" />
+</head>
+<body>
+
+  <nav class="emp-navbar">
+    <a href="/onboarding/index.html" class="emp-brand"><span class="logo-dot"></span>Talenti<span class="accent">ck</span></a>
+    <div class="emp-nav-links">
+      <a href="/onboarding/index.html" data-nav="home">🏠 خانه</a>
+      <a href="/content/list.html" data-nav="content">📚 محتوای من</a>
+    </div>
+    <div class="emp-nav-right">
+      <div class="emp-user-menu">
+        <button class="emp-user-btn" id="empUserBtn">
+          <span class="emp-user-avatar" id="empUserAvatar">—</span>
+          <span class="emp-user-name" id="empUserName">—</span>
+        </button>
+        <div class="emp-user-dropdown" id="empUserDropdown">
+          <a href="/change-password.html">🔒 تغییر رمز عبور</a>
+          <hr>
+          <button class="danger" onclick="EmployeeShell.logout()">🚪 خروج از حساب</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="emp-page">
+    <div class="emp-hero">
+      <div class="emp-hero-greeting" id="homeGreeting">سلام 👋</div>
+      <div class="emp-hero-title">به <span id="homeOrgName">سازمان شما</span> خوش آمدید</div>
+      <div class="emp-hero-desc">مسیر یادگیری و آشنایی با سازمان از همین‌جا شروع می‌شود. محتواهایی که برای شما در نظر گرفته شده را در «محتوای من» ببینید و پیشرفتتان را دنبال کنید.</div>
+      <div class="emp-hero-stats">
+        <div><div class="emp-hero-stat-value" id="homeStatTotal">—</div><div class="emp-hero-stat-label">محتوای من</div></div>
+        <div><div class="emp-hero-stat-value" id="homeStatInProgress">—</div><div class="emp-hero-stat-label">در حال یادگیری</div></div>
+        <div><div class="emp-hero-stat-value" id="homeStatCompleted">—</div><div class="emp-hero-stat-label">تکمیل‌شده</div></div>
+      </div>
+    </div>
+
+    <div class="emp-section" id="homeInProgressSection">
+      <div class="emp-section-header">
+        <div class="emp-section-title">ادامه‌ی یادگیری</div>
+        <a class="emp-section-link" href="/content/list.html">مشاهده همه ←</a>
+      </div>
+      <div class="content-grid" id="homeInProgress"></div>
+    </div>
+
+    <div class="emp-section">
+      <div class="emp-section-header">
+        <div class="emp-section-title">محتوای من</div>
+        <a class="emp-section-link" href="/content/list.html">مشاهده همه ←</a>
+      </div>
+      <div class="content-grid" id="homeRecent"></div>
+    </div>
+  </main>
+
+  <script src="../assets/js/config.js?v=20260714"></script>
+  <script src="../assets/js/auth.js?v=20260714"></script>
+  <script src="../assets/js/api.js?v=20260714"></script>
+  <script src="../assets/js/utils.js?v=20260714"></script>
+  <script src="../assets/js/employee_shell.js?v=20260714"></script>
+  <script src="../assets/js/content_shared.js?v=20260714"></script>
+  <script src="../assets/js/home.js?v=20260714"></script>
+  <script>
+    EmployeeShell.init('home');
+    HomePage.load();
+  </script>
+</body>
+</html>

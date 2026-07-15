@@ -58,11 +58,37 @@ const UsersPage = (() => {
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="UsersPage.openEdit('${u.id}')">ویرایش</button>
+            <button class="btn-action" style="background:#FFF7ED;color:#D97706;" onclick="UsersPage.resetPassword('${u.id}','${esc(u.full_name)}')" title="یک رمز موقت تصادفی می‌سازد — سرویس ایمیل وجود ندارد، رمز را باید دستی به کاربر بدهید">Reset رمز</button>
             <button class="btn-action ${u.is_active ? 'btn-toggle-on' : 'btn-toggle-off'}" onclick="UsersPage.toggleActive('${u.id}')">${u.is_active ? 'غیرفعال کن' : 'فعال کن'}</button>
             <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="UsersPage.remove('${u.id}','${esc(u.full_name)}')">حذف</button>
           </div>
         </td>
       </tr>`;
+  }
+
+  // ─── Reset Password (بدون سرویس ایمیل — رمز موقت را ادمین دستی می‌دهد) ──
+  function resetPassword(id, name) {
+    confirmAction(
+      `رمز عبور "${name}" Reset می‌شود و یک رمز موقت تصادفی ساخته می‌شود. تمام session های فعال این کاربر باطل می‌شوند و او تا تغییر رمز، به هیچ بخش دیگری دسترسی نخواهد داشت. ادامه می‌دهید؟`,
+      async () => {
+        const res = await api.post(`/users/${id}/reset-password`);
+        showTempPasswordModal(name, res.temp_password);
+      }
+    );
+  }
+
+  function showTempPasswordModal(name, tempPassword) {
+    document.getElementById('tempPasswordUserName').textContent = name;
+    document.getElementById('tempPasswordValue').textContent = tempPassword;
+    openModal('modal-temp-password');
+  }
+
+  function copyTempPassword() {
+    const pw = document.getElementById('tempPasswordValue').textContent;
+    navigator.clipboard?.writeText(pw).then(
+      () => toastSuccess('رمز موقت کپی شد'),
+      () => toastError('کپی خودکار پشتیبانی نمی‌شود — رمز را دستی انتخاب کنید')
+    );
   }
 
   async function toggleActive(id) {
@@ -199,5 +225,5 @@ const UsersPage = (() => {
   // search/filter با debounce
   const searchDebounced = (() => { let t; return () => { clearTimeout(t); t = setTimeout(() => load(1), 400); }; })();
 
-  return { load, openCreate, openEdit, save, toggleActive, remove, searchDebounced };
+  return { load, openCreate, openEdit, save, toggleActive, remove, searchDebounced, resetPassword, copyTempPassword };
 })();

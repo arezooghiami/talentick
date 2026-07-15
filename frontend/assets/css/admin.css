@@ -655,3 +655,10 @@ body {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ─── Utility (پیدا شده حین تست: کلاس‌های عمومی که همه‌ی صفحات به آن نیاز
+   دارند باید همینجا (پایه‌ای‌ترین فایل CSS) باشند، نه فقط در
+   admin-components.css که فقط داخل شِل admin/index.html لود می‌شود) ─── */
+.hidden { display: none !important; }
+.required { color: var(--danger); }
+.form-hint { font-size: 11px; color: var(--gray-400); margin-top: 4px; display: block; }

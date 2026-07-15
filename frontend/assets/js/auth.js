@@ -26,7 +26,16 @@ const Auth = {
       org_id: tokenData.org_id,
       role: tokenData.role,
       full_name: tokenData.full_name,
+      must_change_password: !!tokenData.must_change_password,
     }));
+  },
+
+  /** بعد از تغییر موفق رمز، فقط پرچم must_change_password را پاک می‌کند. */
+  clearMustChangePassword() {
+    const user = this.getUser();
+    if (!user) return;
+    user.must_change_password = false;
+    localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(user));
   },
 
   clear() {
@@ -40,13 +49,20 @@ const Auth = {
   },
 
   // Guard: redirect to login if not authenticated
-  requireAuth(allowedRoles = []) {
+  // allowGatedPassword: فقط change-password.html باید true بدهد — تنها
+  // صفحه‌ای که کاربر با must_change_password=true مجاز به دیدنش است
+  // (هم‌راستا با enforcement سمت بک‌اند در dependencies.get_current_user).
+  requireAuth(allowedRoles = [], { allowGatedPassword = false } = {}) {
     if (!this.isLoggedIn()) {
       window.location.href = '/login.html';
       return false;
     }
+    const user = this.getUser();
+    if (user?.must_change_password && !allowGatedPassword) {
+      window.location.href = '/change-password.html';
+      return false;
+    }
     if (allowedRoles.length > 0) {
-      const user = this.getUser();
       if (!user || !allowedRoles.includes(user.role)) {
         this.redirectByRole();
         return false;
@@ -58,12 +74,13 @@ const Auth = {
   redirectByRole() {
     const user = this.getUser();
     if (!user) { window.location.href = '/login.html'; return; }
-    if (user.role === 'super_admin') {
-      window.location.href = '/admin/index.html';
-    } else if (user.role === 'org_admin' || user.role === 'manager') {
+    if (user.must_change_password) {
+      window.location.href = '/change-password.html';
+    } else if (user.role === 'super_admin' || user.role === 'org_admin' || user.role === 'manager') {
       window.location.href = '/admin/index.html';
     } else {
-      window.location.href = '/home/index.html';
+      // employee — خانه‌ی کارمند («آشنایی با سازمان» / محتواهای من)
+      window.location.href = '/onboarding/index.html';
     }
   },
 
