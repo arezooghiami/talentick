@@ -89,10 +89,16 @@ function setLoading(btn, loading, text = 'در حال پردازش...') {
 }
 
 // ─── HTML escaping ─────────────────────────────────────────────────
+// باید هم برای متن (innerHTML) و هم برای مقدار attribute (بین "..." یا '...')
+// امن باشد — به همین دلیل هر ۵ کاراکتر حساس HTML را escape می‌کند، نه فقط
+// آن‌هایی که سریالایز کردن یک text node آن‌ها را نیاز دارد.
 function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s ?? '';
-  return d.innerHTML;
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ─── Persian number formatting ─────────────────────────────────────

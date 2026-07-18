@@ -138,7 +138,7 @@ const ContentPage = (() => {
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" onclick="ContentPage.openEdit('${c.id}','items')">آیتم‌ها</button>
             ${canEdit ? `<button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="ContentPage.openEdit('${c.id}')">ویرایش</button>` : ''}
-            ${canEdit ? `<button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="ContentPage.remove('${c.id}','${esc(c.title)}')">حذف</button>` : ''}
+            ${canEdit ? `<button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-content" data-id="${c.id}" data-title="${esc(c.title)}">حذف</button>` : ''}
           </div>
         </td>
       </tr>`).join('');
@@ -585,7 +585,7 @@ const ContentPage = (() => {
           ${canEdit && idx > 0 ? `<button class="btn-icon" title="جابه‌جایی به بالا" onclick="ContentPage.moveItemUp('${it.id}')">▲</button>` : ''}
           ${canEdit && idx < sorted.length - 1 ? `<button class="btn-icon" title="جابه‌جایی به پایین" onclick="ContentPage.moveItemDown('${it.id}')">▼</button>` : ''}
           ${canEdit ? `<button class="btn-icon" title="ویرایش" onclick="ContentPage.openEditItem('${it.id}')">✎</button>` : ''}
-          ${canEdit ? `<button class="btn-icon" title="حذف" onclick="ContentPage.removeItem('${it.id}','${esc(it.title)}')">🗑</button>` : ''}
+          ${canEdit ? `<button class="btn-icon" title="حذف" data-role="delete-item" data-id="${it.id}" data-title="${esc(it.title)}">🗑</button>` : ''}
         </div>
       </div>`).join('');
   }
@@ -772,6 +772,22 @@ const ContentPage = (() => {
     el.textContent = name || 'فایلی انتخاب نشده';
     el.classList.toggle('has-file', hasFile);
   }
+
+  // ─── Delegated Row Actions (نه onclick اینلاین با عنوان کاربر داخلش) ──
+  // چون confirmAction عنوان را با textContent نشان می‌دهد، امن است — اما
+  // onclick="fn('${esc(title)}')" روی یک attribute تک‌کوتیشن، امن نیست:
+  // esc() فرار از HTML را می‌بندد ولی فرار از رشته‌ی جاوااسکریپت داخل
+  // onclick را نه (یک تک‌کوتیشن در عنوان کافی است). به همین دلیل عنوان از
+  // data-title (که مرورگر هنگام خواندن dataset خودش HTML-decode می‌کند)
+  // خوانده می‌شود، نه از یک رشته‌ی تولیدشده با template literal.
+  document.getElementById('contentTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-content"]');
+    if (btn) remove(btn.dataset.id, btn.dataset.title);
+  });
+  document.getElementById('contentItemsList')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-item"]');
+    if (btn) removeItem(btn.dataset.id, btn.dataset.title);
+  });
 
   return {
     goto, setType, load, searchDebounced,

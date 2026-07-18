@@ -136,6 +136,10 @@ textarea.form-control { resize: vertical; }
 .ctab-content.active { display: block; }
 .tab-btn:disabled { opacity: .4; cursor: not-allowed; }
 
+/* ─── تب‌های ویزارد آنبوردینگ (مشخصات و هدف‌گذاری / مراحل) ──────────── */
+.obtab-content { display: none; }
+.obtab-content.active { display: block; }
+
 /* ─── Upload widget ────────────────────────────────────────────────── */
 .upload-box { display: flex; align-items: center; gap: 10px; }
 .upload-box input[type=file] { display: none; }

@@ -148,9 +148,9 @@ const UsersPage = (() => {
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="UsersPage.openEdit('${u.id}')">ویرایش</button>
-            <button class="btn-action" style="background:#FFF7ED;color:#D97706;" onclick="UsersPage.resetPassword('${u.id}','${esc(u.full_name)}')" title="یک رمز موقت تصادفی می‌سازد — سرویس ایمیل وجود ندارد، رمز را باید دستی به کاربر بدهید">Reset رمز</button>
+            <button class="btn-action" style="background:#FFF7ED;color:#D97706;" data-role="reset-password" data-id="${u.id}" data-title="${esc(u.full_name)}" title="یک رمز موقت تصادفی می‌سازد — سرویس ایمیل وجود ندارد، رمز را باید دستی به کاربر بدهید">Reset رمز</button>
             <button class="btn-action ${u.is_active ? 'btn-toggle-on' : 'btn-toggle-off'}" onclick="UsersPage.toggleActive('${u.id}')">${u.is_active ? 'غیرفعال کن' : 'فعال کن'}</button>
-            <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="UsersPage.remove('${u.id}','${esc(u.full_name)}')">حذف</button>
+            <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-user" data-id="${u.id}" data-title="${esc(u.full_name)}">حذف</button>
           </div>
         </td>
       </tr>`;
@@ -445,6 +445,15 @@ const UsersPage = (() => {
   function closeImportResult() {
     closeModal('modal-user-import-result');
   }
+
+  // ─── Delegated Row Actions — به‌جای onclick اینلاین با نام کاربر ──────
+  document.getElementById('usersTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role]');
+    if (!btn) return;
+    const { role, id, title } = btn.dataset;
+    if (role === 'reset-password') resetPassword(id, title);
+    else if (role === 'delete-user') remove(id, title);
+  });
 
   return {
     init, load, openCreate, openEdit, save, toggleActive, remove, searchDebounced, resetPassword, copyTempPassword,

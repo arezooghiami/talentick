@@ -72,7 +72,7 @@ const StructurePage = (() => {
             <td>
               <div style="display:flex;gap:4px;flex-wrap:wrap;">
                 <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="StructurePage.openEditDept('${d.id}')">ویرایش</button>
-                <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="StructurePage.removeDept('${d.id}','${esc(d.name)}')">حذف</button>
+                <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-dept" data-id="${d.id}" data-title="${esc(d.name)}">حذف</button>
               </div>
             </td>
           </tr>`;
@@ -178,7 +178,7 @@ const StructurePage = (() => {
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
               <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="StructurePage.openEditPosition('${pos.id}')">ویرایش</button>
-              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="StructurePage.removePosition('${pos.id}','${esc(pos.name)}')">حذف</button>
+              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-position" data-id="${pos.id}" data-title="${esc(pos.name)}">حذف</button>
             </div>
           </td>
         </tr>`).join('');
@@ -247,6 +247,16 @@ const StructurePage = (() => {
   }
 
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+  // ─── Delegated Row Actions — به‌جای onclick اینلاین با نام کاربر ──────
+  document.getElementById('deptsTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-dept"]');
+    if (btn) removeDept(btn.dataset.id, btn.dataset.title);
+  });
+  document.getElementById('positionsTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-position"]');
+    if (btn) removePosition(btn.dataset.id, btn.dataset.title);
+  });
 
   return {
     openFor, loadOwn,

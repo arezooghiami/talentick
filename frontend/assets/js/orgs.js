@@ -27,10 +27,10 @@ const OrgsPage = (() => {
           <td style="color:var(--gray-500);">${fmtDate(o.created_at)}</td>
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" onclick="StructurePage.openFor('${o.id}','${esc(o.name)}')">ساختار سازمانی</button>
-              <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" onclick="DocumentsPage.openFor('${o.id}','${esc(o.name)}')">کتابخانه اسناد</button>
+              <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" data-role="open-structure" data-id="${o.id}" data-title="${esc(o.name)}">ساختار سازمانی</button>
+              <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" data-role="open-docs" data-id="${o.id}" data-title="${esc(o.name)}">کتابخانه اسناد</button>
               <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="OrgsPage.openEdit('${o.id}')">ویرایش</button>
-              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="OrgsPage.remove('${o.id}','${esc(o.name)}')">حذف</button>
+              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-org" data-id="${o.id}" data-title="${esc(o.name)}">حذف</button>
             </div>
           </td>
         </tr>`).join('');
@@ -113,6 +113,16 @@ const OrgsPage = (() => {
   }
 
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+  // ─── Delegated Row Actions — به‌جای onclick اینلاین با نام سازمان ─────
+  document.getElementById('orgsTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role]');
+    if (!btn) return;
+    const { role, id, title } = btn.dataset;
+    if (role === 'open-structure') StructurePage.openFor(id, title);
+    else if (role === 'open-docs') DocumentsPage.openFor(id, title);
+    else if (role === 'delete-org') remove(id, title);
+  });
 
   return { load, openCreate, openEdit, save, remove, getCache: () => state.items };
 })();

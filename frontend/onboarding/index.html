@@ -6,7 +6,7 @@
   <title>خانه — Talentick</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/employee.css?v=20260718b" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260718c" />
 </head>
 <body>
 
@@ -63,6 +63,11 @@
 
     <div class="emp-home-grid">
       <div class="emp-home-main">
+        <div class="emp-section hidden" id="homeOnboardingSection">
+          <div class="emp-section-header"><div class="emp-section-title">برنامه‌های آشنایی من</div></div>
+          <div id="homeOnboarding"></div>
+        </div>
+
         <div class="emp-section hidden" id="homeSpotlightSection">
           <div class="emp-section-header"><div class="emp-section-title">ادامه بده</div></div>
           <div id="homeSpotlight"></div>
@@ -115,14 +120,14 @@
     </div>
   </main>
 
-  <script src="../assets/js/config.js?v=20260718b"></script>
-  <script src="../assets/js/auth.js?v=20260718b"></script>
-  <script src="../assets/js/api.js?v=20260718b"></script>
-  <script src="../assets/js/utils.js?v=20260718b"></script>
-  <script src="../assets/js/employee_shell.js?v=20260718b"></script>
-  <script src="../assets/js/content_shared.js?v=20260718b"></script>
-  <script src="../assets/js/command_palette.js?v=20260718b"></script>
-  <script src="../assets/js/home.js?v=20260718b"></script>
+  <script src="../assets/js/config.js?v=20260718c"></script>
+  <script src="../assets/js/auth.js?v=20260718c"></script>
+  <script src="../assets/js/api.js?v=20260718c"></script>
+  <script src="../assets/js/utils.js?v=20260718c"></script>
+  <script src="../assets/js/employee_shell.js?v=20260718c"></script>
+  <script src="../assets/js/content_shared.js?v=20260718c"></script>
+  <script src="../assets/js/command_palette.js?v=20260718c"></script>
+  <script src="../assets/js/home.js?v=20260718c"></script>
   <script>
     EmployeeShell.init('home');
     HomePage.load();

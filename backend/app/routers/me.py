@@ -42,6 +42,11 @@ from app.schemas.me import (
     MyContentListResponse,
     MyContentResponse,
 )
+from app.schemas.onboarding import (
+    MyEnrollmentDetailResponse,
+    MyEnrollmentResponse,
+    StepCompleteRequest,
+)
 from app.schemas.organization import OrganizationResponse
 from app.schemas.progress import ItemProgressUpdate
 from app.schemas.quiz import (
@@ -55,6 +60,7 @@ from app.services import (
     content_service,
     department_service,
     document_service,
+    onboarding_service,
     org_service,
     progress_service,
     quiz_service,
@@ -298,6 +304,71 @@ async def list_my_announcements(
         viewer=current_user, apply_visibility=True, active_only=True,
     )
     return [await announcement_service.announcement_to_response(db, a) for a in items]
+
+
+# ─── Onboarding Routes («مسیر آنبوردینگ من») ──────────────────────────────
+
+@router.get(
+    "/onboarding", response_model=list[MyEnrollmentResponse],
+    summary="برنامه‌های آشنایی که در آن‌ها ثبت‌نام شده‌ام",
+    description="برنامه‌های در حال انجام قبل از تکمیل‌شده‌ها، و هرکدام بر اساس جدیدترین تاریخ ثبت‌نام مرتب می‌شوند.",
+)
+async def list_my_onboarding(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    return await onboarding_service.get_my_enrollments(db, current_user)
+
+
+@router.get(
+    "/onboarding/{enrollment_id}", response_model=MyEnrollmentDetailResponse,
+    summary="جزئیات یک برنامه‌ی آشنایی + وضعیت من در هر مرحله",
+)
+async def get_my_onboarding_detail(
+    enrollment_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    enrollment = await onboarding_service.get_enrollment_for_user(db, current_user, enrollment_id)
+    if not enrollment:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "ثبت‌نام یافت نشد")
+    return await onboarding_service.get_my_enrollment_detail(db, enrollment)
+
+
+@router.post(
+    "/onboarding/steps/{step_id}/complete", response_model=MyEnrollmentDetailResponse,
+    summary="علامت‌گذاری یک مرحله به‌عنوان انجام‌شده",
+)
+async def complete_onboarding_step(
+    step_id: str,
+    body: StepCompleteRequest,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    step_progress = await onboarding_service.get_step_progress_for_user(db, current_user, step_id)
+    if not step_progress:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "مرحله یافت نشد")
+    await onboarding_service.set_step_status(db, step_progress, "completed", body.notes)
+    enrollment = await onboarding_service.get_enrollment_for_user(db, current_user, str(step_progress.enrollment_id))
+    return await onboarding_service.get_my_enrollment_detail(db, enrollment)
+
+
+@router.post(
+    "/onboarding/steps/{step_id}/skip", response_model=MyEnrollmentDetailResponse,
+    summary="رد کردن یک مرحله‌ی اختیاری",
+    description="فقط برای مراحلی که is_required=False است — رد کردن مرحله‌ی اجباری خطای 400 می‌دهد.",
+)
+async def skip_onboarding_step(
+    step_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    step_progress = await onboarding_service.get_step_progress_for_user(db, current_user, step_id)
+    if not step_progress:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "مرحله یافت نشد")
+    await onboarding_service.set_step_status(db, step_progress, "skipped")
+    enrollment = await onboarding_service.get_enrollment_for_user(db, current_user, str(step_progress.enrollment_id))
+    return await onboarding_service.get_my_enrollment_detail(db, enrollment)
 
 
 # ─── Quiz Routes ─────────────────────────────────────────────────────────────

@@ -61,7 +61,7 @@ const DocumentsPage = (() => {
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
               <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="DocumentsPage.openEditCategory('${c.id}')">ویرایش</button>
-              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="DocumentsPage.removeCategory('${c.id}','${esc(c.name)}')">حذف</button>
+              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-doc-category" data-id="${c.id}" data-title="${esc(c.name)}">حذف</button>
             </div>
           </td>
         </tr>`).join('');
@@ -190,7 +190,7 @@ const DocumentsPage = (() => {
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
               <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="DocumentsPage.openEditDoc('${d.id}')">ویرایش</button>
-              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="DocumentsPage.removeDoc('${d.id}','${esc(d.title)}')">حذف</button>
+              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-doc" data-id="${d.id}" data-title="${esc(d.title)}">حذف</button>
             </div>
           </td>
         </tr>`).join('');
@@ -319,6 +319,16 @@ const DocumentsPage = (() => {
   }
 
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+  // ─── Delegated Row Actions — به‌جای onclick اینلاین با نام/عنوان کاربر ──
+  document.getElementById('docCategoriesTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-doc-category"]');
+    if (btn) removeCategory(btn.dataset.id, btn.dataset.title);
+  });
+  document.getElementById('docsTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-doc"]');
+    if (btn) removeDoc(btn.dataset.id, btn.dataset.title);
+  });
 
   return {
     openFor, loadOwn, loadDocs, searchDebounced,

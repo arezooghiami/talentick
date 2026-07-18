@@ -64,7 +64,7 @@ const QuizAdminPage = (() => {
             <button class="btn-action" style="background:var(--primary-light);color:var(--primary);" onclick="QuizAdminPage.openQuestionsModal('${q.id}')">سوالات</button>
             <button class="btn-action" style="background:#EFF6FF;color:#2563EB;" onclick="QuizAdminPage.openAttemptsModal('${q.id}')">شرکت‌کنندگان</button>
             ${canEdit ? `<button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="QuizAdminPage.openEdit('${q.id}')">ویرایش</button>` : ''}
-            ${canEdit ? `<button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="QuizAdminPage.remove('${q.id}','${esc(q.title)}')">حذف</button>` : ''}
+            ${canEdit ? `<button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-quiz" data-id="${q.id}" data-title="${esc(q.title)}">حذف</button>` : ''}
           </div>
         </td>
       </tr>`).join('');
@@ -363,6 +363,12 @@ const QuizAdminPage = (() => {
   }
 
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+  // ─── Delegated Row Actions — به‌جای onclick اینلاین با عنوان آزمون ────
+  document.getElementById('quizTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-quiz"]');
+    if (btn) remove(btn.dataset.id, btn.dataset.title);
+  });
 
   return {
     load, searchDebounced, openCreate, openEdit, save, remove,

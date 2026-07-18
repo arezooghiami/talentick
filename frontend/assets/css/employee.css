@@ -188,6 +188,22 @@ img { max-width: 100%; display: block; }
 
 .content-card-duration { font-size: var(--font-xs); color: var(--gray-400); display: inline-flex; align-items: center; gap: 3px; }
 
+/* ─── Onboarding — کارت‌های برنامه‌ی آشنایی در خانه ─────────────────── */
+.onboarding-card {
+  display: flex; align-items: center; gap: 16px; background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: var(--shadow-sm); text-decoration: none; margin-bottom: 12px;
+}
+.onboarding-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
+.onboarding-card-icon {
+  width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--primary-light);
+  display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
+}
+.onboarding-card-body { flex: 1; min-width: 0; }
+.onboarding-card-body h3 { font-size: var(--font-md); font-weight: 700; color: var(--gray-800); margin-bottom: 4px; }
+.onboarding-card-body p { font-size: var(--font-xs); color: var(--gray-500); margin-bottom: 8px; }
+.onboarding-card-deadline { display: inline-block; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--warning); }
+.onboarding-card-cta { flex-shrink: 0; font-size: var(--font-sm); font-weight: 700; color: var(--primary); white-space: nowrap; }
+
 /* ─── Home — Two Column Layout ────────────────────────────────────── */
 .emp-home-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; align-items: start; }
 

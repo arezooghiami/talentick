@@ -39,7 +39,7 @@ const AnnouncementsPage = (() => {
           <td>
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
               <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="AnnouncementsPage.openEdit('${a.id}')">ویرایش</button>
-              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" onclick="AnnouncementsPage.remove('${a.id}','${esc(a.title)}')">حذف</button>
+              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-ann" data-id="${a.id}" data-title="${esc(a.title)}">حذف</button>
             </div>
           </td>
         </tr>`).join('');
@@ -273,6 +273,14 @@ const AnnouncementsPage = (() => {
   }
 
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+  // ─── Delegated Row Actions — به‌جای onclick اینلاین با عنوان کاربر ────
+  // دلیل در content.js توضیح داده شده: esc() فقط HTML را می‌بندد، نه
+  // فرار از رشته‌ی جاوااسکریپت داخل onclick را.
+  document.getElementById('annTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-ann"]');
+    if (btn) remove(btn.dataset.id, btn.dataset.title);
+  });
 
   return {
     load, searchDebounced, onOrgChange, onFileSelected,

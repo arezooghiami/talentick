@@ -9,6 +9,7 @@ const HomePage = (() => {
     setText('homeGreeting', greetingByHour() + (user?.full_name ? '، ' + firstName(user.full_name) : ''));
 
     loadOrgWidget();
+    loadOnboarding();
 
     const inProgressWrap = document.getElementById('homeInProgress');
     const notStartedWrap = document.getElementById('homeNotStarted');
@@ -67,6 +68,45 @@ const HomePage = (() => {
       toggle('homeInProgressSection', true);
       toggle('homeCompletedSection', false);
     }
+  }
+
+  async function loadOnboarding() {
+    try {
+      const items = await api.get('/me/onboarding');
+      const active = (items || []).filter(e => !e.completed_at);
+      toggle('homeOnboardingSection', active.length > 0);
+      if (!active.length) return;
+      active.sort((a, b) => {
+        if (a.deadline_at && b.deadline_at) return new Date(a.deadline_at) - new Date(b.deadline_at);
+        if (a.deadline_at) return -1;
+        if (b.deadline_at) return 1;
+        return 0;
+      });
+      document.getElementById('homeOnboarding').innerHTML = active.map(renderOnboardingCard).join('');
+    } catch { toggle('homeOnboardingSection', false); }
+  }
+
+  function renderOnboardingCard(e) {
+    const pct = e.progress_pct || 0;
+    const deadlineHtml = e.deadline_at ? `<span class="onboarding-card-deadline">⏰ ${esc(deadlineLabel(e.deadline_at))}</span>` : '';
+    return `
+      <a class="onboarding-card" href="/onboarding/detail.html?id=${e.enrollment_id}">
+        <div class="onboarding-card-icon">🚀</div>
+        <div class="onboarding-card-body">
+          <h3>${esc(e.program_name)}</h3>
+          <p>${numFa(pct)}٪ پیش رفته‌اید — ${numFa(e.steps_completed)} از ${numFa(e.steps_total)} مرحله</p>
+          <div class="progress-track"><div class="progress-fill" style="width:${pct}%;"></div></div>
+          ${deadlineHtml}
+        </div>
+        <span class="onboarding-card-cta">ادامه ‹</span>
+      </a>`;
+  }
+
+  function deadlineLabel(iso) {
+    const days = Math.ceil((new Date(iso) - new Date()) / 86400000);
+    if (days < 0) return 'مهلت گذشته';
+    if (days === 0) return 'امروز آخرین مهلت';
+    return `${numFa(days)} روز تا پایان مهلت`;
   }
 
   async function loadOrgWidget() {

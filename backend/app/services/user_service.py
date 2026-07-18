@@ -13,6 +13,7 @@ Business logic برای مدیریت کاربران (CRUD کامل).
 
 from __future__ import annotations
 
+import logging
 import math
 import uuid
 
@@ -30,6 +31,7 @@ from app.schemas.user import (
     UserListItem,
     UserUpdateRequest,
 )
+from app.services import onboarding_service
 
 
 def _to_list_item(user: User, org_name: str) -> UserListItem:
@@ -202,6 +204,14 @@ async def create_user(db: AsyncSession, data: UserCreateRequest) -> User:
         await db.rollback()
         raise EmailAlreadyExistsError(data.email) from exc
     await db.commit()
+
+    # ثبت‌نام خودکار در برنامه‌های آشنایی is_default — غیرحیاتی: اگر خطا
+    # بدهد، نباید ساخت کاربر را با شکست مواجه کند (ادمین همیشه می‌تواند
+    # از پنل آنبوردینگ کاربر را دستی ثبت‌نام کند).
+    try:
+        await onboarding_service.auto_enroll_new_user(db, user)
+    except Exception:
+        logging.getLogger(__name__).exception("ثبت‌نام خودکار آنبوردینگ برای کاربر %s ناموفق بود", user.id)
 
     result = await db.execute(
         select(User)
