@@ -40,6 +40,12 @@
         آزمون
       </a>
 
+      <!-- اطلاعیه‌ی تک‌فایلی (عکس/ویدیو) — خارج از سیستم محتوای آموزشی، فقط org_admin به بالا -->
+      <a class="nav-item" data-page="announcements" data-roles="super_admin,org_admin" onclick="Router.navigate('announcements')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+        اطلاعیه‌ها
+      </a>
+
       <div class="nav-item" id="navContent" data-page="content" onclick="Router.toggleSubmenu('submenuContent',this)">
         <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         محتوا
@@ -440,6 +446,32 @@
         </div>
       </div>
 
+      <!-- ═══ VIEW: اطلاعیه‌ها (تک‌فایل عکس/ویدیو — خارج از محتوای آموزشی) ═══ -->
+      <div id="view-announcements" class="view">
+        <div class="view-header">
+          <div><div class="view-title">اطلاعیه‌ها</div><div class="view-subtitle" id="annTotalLabel">در حال بارگذاری...</div></div>
+          <button class="btn btn-primary" onclick="AnnouncementsPage.openCreate()">➕ اطلاعیه جدید</button>
+        </div>
+        <div class="data-table-wrap">
+          <div class="data-table-header">
+            <div class="search-box">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+              <input type="text" id="annSearch" placeholder="جستجو در عنوان یا توضیحات..." oninput="AnnouncementsPage.searchDebounced()" />
+            </div>
+            <select class="filter-select" id="annOrgFilter" data-roles="super_admin" onchange="AnnouncementsPage.load(1)">
+              <option value="">همه سازمان‌ها</option>
+            </select>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>عنوان</th><th class="th-org" data-roles="super_admin">سازمان</th><th>نوع فایل</th><th>بازه‌ی نمایش</th><th>دسترسی</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+              <tbody id="annTableBody"><tr><td colspan="7" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="annPagination"></div>
+        </div>
+      </div>
+
       <!-- ═══ VIEW: گزارش‌ها ═══ -->
       <div id="view-reports" class="view">
         <div class="view-header">
@@ -675,6 +707,69 @@
     <div class="modal-footer">
       <button class="btn btn-primary" id="btn-save-document" onclick="DocumentsPage.saveDoc()">ذخیره سند</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-document')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Create / Edit Announcement ═══ -->
+<div id="modal-announcement" class="modal-overlay hidden">
+  <div class="modal-box modal-xl">
+    <div class="modal-header"><h3 id="annModalTitle">اطلاعیه جدید</h3><button class="btn btn-icon" onclick="closeModal('modal-announcement')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ann-id">
+      <input type="hidden" id="ann-media-url">
+      <input type="hidden" id="ann-file-name">
+      <input type="hidden" id="ann-file-size">
+      <input type="hidden" id="ann-media-type">
+
+      <div class="form-group" id="ann-org-wrap" data-roles="super_admin">
+        <label class="form-label">سازمان <span class="required">*</span></label>
+        <select id="ann-org-id" class="form-control" onchange="AnnouncementsPage.onOrgChange()">
+          <option value="">— انتخاب سازمان —</option>
+        </select>
+      </div>
+
+      <div class="form-group"><label class="form-label">عنوان <span class="required">*</span></label><input id="ann-title" class="form-control" placeholder="مثال: جشن سالگرد تاسیس شرکت"></div>
+      <div class="form-group"><label class="form-label">توضیح کوتاه</label><textarea id="ann-desc" class="form-control" rows="2"></textarea></div>
+
+      <div class="form-group">
+        <label class="form-label">فایل (عکس یا ویدیو) <span class="required">*</span></label>
+        <input type="file" id="ann-file-input" class="form-control" accept="image/*,video/*" onchange="AnnouncementsPage.onFileSelected(event)">
+        <span class="form-hint" id="ann-file-hint">فرمت‌های مجاز: JPG, PNG, WEBP, GIF, MP4, WEBM, MOV</span>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-group"><label class="form-label">شروع نمایش</label><input type="datetime-local" id="ann-starts" class="form-control"><span class="form-hint">خالی = از هم‌اکنون</span></div>
+        <div class="form-group"><label class="form-label">پایان نمایش</label><input type="datetime-local" id="ann-ends" class="form-control"><span class="form-hint">خالی = نامحدود</span></div>
+      </div>
+
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="ann-is-active" style="width:16px;height:16px;" checked>
+        <label class="form-label" for="ann-is-active" style="margin:0;">فعال (نمایش برای کارمندان)</label>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">دسترسی — قابل مشاهده برای</label>
+        <span class="form-hint">اگر هیچ‌کدام انتخاب نشود، اطلاعیه برای کل سازمان قابل مشاهده است.</span>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:8px;">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--gray-500);margin-bottom:6px;">واحدهای سازمانی</div>
+            <div id="ann-dept-checks" style="display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;"></div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--gray-500);margin-bottom:6px;">نقش‌ها</div>
+            <div id="ann-role-checks" style="display:flex;flex-direction:column;gap:4px;">
+              <label><input type="checkbox" value="employee"> کارمند</label>
+              <label><input type="checkbox" value="manager"> مدیر</label>
+              <label><input type="checkbox" value="org_admin"> ادمین سازمان</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btn-save-announcement" onclick="AnnouncementsPage.save()">ذخیره اطلاعیه</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-announcement')">انصراف</button>
     </div>
   </div>
 </div>
@@ -1107,6 +1202,7 @@
 <script src="../assets/js/org_structure.js?v=20260715"></script>
 <script src="../assets/js/org_profile.js?v=20260715"></script>
 <script src="../assets/js/document_admin.js?v=20260715"></script>
+<script src="../assets/js/announcements_admin.js?v=20260715"></script>
 <script src="../assets/js/content.js?v=20260715"></script>
 <script src="../assets/js/quiz_admin.js?v=20260715"></script>
 <script src="../assets/js/reports.js?v=20260715"></script>
@@ -1126,6 +1222,7 @@
   Router.register('structure', { title: 'ساختار سازمانی',   load: () => { if (!App.isSuperAdmin) StructurePage.loadOwn(); } });
   Router.register('documents', { title: 'کتابخانه اسناد',   load: () => { if (!App.isSuperAdmin) DocumentsPage.loadOwn(); } });
   Router.register('quiz',      { title: 'مدیریت آزمون',     load: () => QuizAdminPage.load(1) });
+  Router.register('announcements', { title: 'اطلاعیه‌ها',   load: () => AnnouncementsPage.load(1) });
   Router.register('reports',   { title: 'گزارش‌ها',         load: ReportsPage.load });
   Router.register('support',   { title: 'پشتیبانی',         load: null });
 

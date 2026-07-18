@@ -6,7 +6,7 @@
   <title>خانه — Talentick</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/employee.css?v=20260715" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260718b" />
 </head>
 <body>
 
@@ -18,6 +18,9 @@
       <a href="/organization/index.html" data-nav="organization">🏢 سازمان</a>
     </div>
     <div class="emp-nav-right">
+      <button type="button" class="emp-search-trigger" id="cmdkTrigger">
+        🔍 <span class="label">جست‌وجو یا رفتن به...</span> <kbd>⌘K</kbd>
+      </button>
       <div class="emp-user-menu">
         <button class="emp-user-btn" id="empUserBtn">
           <span class="emp-user-avatar" id="empUserAvatar">—</span>
@@ -32,11 +35,18 @@
     </div>
   </nav>
 
-  <main class="emp-page">
+  <main class="emp-page" style="max-width: 1280px;">
     <div class="emp-hero">
-      <div class="emp-hero-greeting" id="homeGreeting">سلام 👋</div>
-      <div class="emp-hero-title">به <span id="homeOrgName">سازمان شما</span> خوش آمدید</div>
-      <div class="emp-hero-desc">مسیر یادگیری و آشنایی با سازمان از همین‌جا شروع می‌شود. محتواهایی که برای شما در نظر گرفته شده را در «محتوای من» ببینید و پیشرفتتان را دنبال کنید.</div>
+      <div class="emp-hero-top">
+        <div>
+          <div class="emp-hero-greeting" id="homeGreeting">سلام 👋</div>
+          <div class="emp-hero-title">به <span id="homeOrgName">سازمان شما</span> خوش آمدید</div>
+          <div class="emp-hero-desc">مسیر یادگیری و آشنایی با سازمان از همین‌جا شروع می‌شود. محتواهایی که برای شما در نظر گرفته شده را ببینید و پیشرفتتان را دنبال کنید.</div>
+        </div>
+        <div class="emp-hero-ring" id="homeCompletionRing">
+          <div class="emp-hero-ring-inner"><b id="homeCompletionPct">۰٪</b><span>تکمیل‌شده</span></div>
+        </div>
+      </div>
       <div class="emp-hero-stats">
         <div><div class="emp-hero-stat-value" id="homeStatTotal">—</div><div class="emp-hero-stat-label">محتوای من</div></div>
         <div><div class="emp-hero-stat-value" id="homeStatInProgress">—</div><div class="emp-hero-stat-label">در حال یادگیری</div></div>
@@ -44,30 +54,75 @@
       </div>
     </div>
 
-    <div class="emp-section" id="homeInProgressSection">
-      <div class="emp-section-header">
-        <div class="emp-section-title">ادامه‌ی یادگیری</div>
-        <a class="emp-section-link" href="/content/list.html">مشاهده همه ←</a>
-      </div>
-      <div class="content-grid" id="homeInProgress"></div>
+    <div class="emp-quick-actions">
+      <a class="emp-quick-action" href="/content/list.html" id="qaContinue"><span class="ic grad-1">▶</span><span class="label">ادامه یادگیری</span></a>
+      <a class="emp-quick-action" href="/content/list.html"><span class="ic grad-3">📚</span><span class="label">محتوای من</span></a>
+      <a class="emp-quick-action" href="/organization/index.html"><span class="ic grad-2">🏢</span><span class="label">سازمان من</span></a>
+      <a class="emp-quick-action" href="/change-password.html"><span class="ic grad-4">🔒</span><span class="label">تغییر رمز عبور</span></a>
     </div>
 
-    <div class="emp-section">
-      <div class="emp-section-header">
-        <div class="emp-section-title">محتوای من</div>
-        <a class="emp-section-link" href="/content/list.html">مشاهده همه ←</a>
+    <div class="emp-home-grid">
+      <div class="emp-home-main">
+        <div class="emp-section hidden" id="homeSpotlightSection">
+          <div class="emp-section-header"><div class="emp-section-title">ادامه بده</div></div>
+          <div id="homeSpotlight"></div>
+        </div>
+
+        <div class="emp-section hidden" id="homeInProgressSection">
+          <div class="emp-section-header">
+            <div class="emp-section-title">در حال یادگیری</div>
+            <a class="emp-section-link" href="/content/list.html">مشاهده همه ←</a>
+          </div>
+          <div class="content-grid-scroll" id="homeInProgress"></div>
+        </div>
+
+        <div class="emp-section" id="homeNotStartedSection">
+          <div class="emp-section-header">
+            <div class="emp-section-title">برای شما آماده است</div>
+            <a class="emp-section-link" href="/content/list.html">مشاهده همه ←</a>
+          </div>
+          <div class="content-grid-scroll" id="homeNotStarted"></div>
+        </div>
+
+        <div class="emp-section hidden" id="homeCompletedSection">
+          <div class="emp-section-header">
+            <div class="emp-section-title">تکمیل‌شده‌های اخیر</div>
+            <a class="emp-section-link" href="/content/list.html">مشاهده همه ←</a>
+          </div>
+          <div class="content-grid-scroll" id="homeCompleted"></div>
+        </div>
       </div>
-      <div class="content-grid" id="homeRecent"></div>
+
+      <aside class="emp-side-stack">
+        <div class="emp-side-card hidden" id="homeOrgCard">
+          <div class="emp-side-card-head"><span class="dot"></span>سازمان من</div>
+          <div class="emp-org-card-logo" id="homeOrgLogo">🏢</div>
+          <div class="emp-org-card-name" id="homeOrgCardName">—</div>
+          <div class="emp-org-card-desc" id="homeOrgCardDesc"></div>
+          <a class="emp-org-card-link" href="/organization/index.html">معرفی کامل سازمان ←</a>
+        </div>
+
+        <div class="emp-side-card">
+          <div class="emp-side-card-head"><span class="dot"></span>دسترسی سریع</div>
+          <div class="emp-quicklinks">
+            <a class="emp-quicklink" href="/organization/index.html?tab=chart">🌳 چارت سازمانی</a>
+            <a class="emp-quicklink" href="/organization/index.html?tab=docs">📁 کتابخانه اسناد</a>
+            <a class="emp-quicklink" href="/content/list.html">📚 همه‌ی محتوای من</a>
+            <a class="emp-quicklink" href="/change-password.html">🔒 تغییر رمز عبور</a>
+          </div>
+        </div>
+      </aside>
     </div>
   </main>
 
-  <script src="../assets/js/config.js?v=20260715"></script>
-  <script src="../assets/js/auth.js?v=20260715"></script>
-  <script src="../assets/js/api.js?v=20260715"></script>
-  <script src="../assets/js/utils.js?v=20260715"></script>
-  <script src="../assets/js/employee_shell.js?v=20260715"></script>
-  <script src="../assets/js/content_shared.js?v=20260715"></script>
-  <script src="../assets/js/home.js?v=20260715"></script>
+  <script src="../assets/js/config.js?v=20260718b"></script>
+  <script src="../assets/js/auth.js?v=20260718b"></script>
+  <script src="../assets/js/api.js?v=20260718b"></script>
+  <script src="../assets/js/utils.js?v=20260718b"></script>
+  <script src="../assets/js/employee_shell.js?v=20260718b"></script>
+  <script src="../assets/js/content_shared.js?v=20260718b"></script>
+  <script src="../assets/js/command_palette.js?v=20260718b"></script>
+  <script src="../assets/js/home.js?v=20260718b"></script>
   <script>
     EmployeeShell.init('home');
     HomePage.load();

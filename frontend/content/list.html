@@ -6,7 +6,7 @@
   <title>محتوای من — Talentick</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/employee.css?v=20260715" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260718b" />
 </head>
 <body>
 
@@ -18,6 +18,9 @@
       <a href="/organization/index.html" data-nav="organization">🏢 سازمان</a>
     </div>
     <div class="emp-nav-right">
+      <button type="button" class="emp-search-trigger" id="cmdkTrigger">
+        🔍 <span class="label">جست‌وجو یا رفتن به...</span> <kbd>⌘K</kbd>
+      </button>
       <div class="emp-user-menu">
         <button class="emp-user-btn" id="empUserBtn">
           <span class="emp-user-avatar" id="empUserAvatar">—</span>
@@ -56,13 +59,14 @@
     <div class="emp-pagination" id="mcPagination"></div>
   </main>
 
-  <script src="../assets/js/config.js?v=20260715"></script>
-  <script src="../assets/js/auth.js?v=20260715"></script>
-  <script src="../assets/js/api.js?v=20260715"></script>
-  <script src="../assets/js/utils.js?v=20260715"></script>
-  <script src="../assets/js/employee_shell.js?v=20260715"></script>
-  <script src="../assets/js/content_shared.js?v=20260715"></script>
-  <script src="../assets/js/my_content.js?v=20260715"></script>
+  <script src="../assets/js/config.js?v=20260718b"></script>
+  <script src="../assets/js/auth.js?v=20260718b"></script>
+  <script src="../assets/js/api.js?v=20260718b"></script>
+  <script src="../assets/js/utils.js?v=20260718b"></script>
+  <script src="../assets/js/employee_shell.js?v=20260718b"></script>
+  <script src="../assets/js/command_palette.js?v=20260718b"></script>
+  <script src="../assets/js/content_shared.js?v=20260718b"></script>
+  <script src="../assets/js/my_content.js?v=20260718b"></script>
   <script>
     EmployeeShell.init('content');
     MyContentPage.load();

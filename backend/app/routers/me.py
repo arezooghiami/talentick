@@ -32,6 +32,7 @@ from app.database import get_db
 from app.dependencies import Employee
 from app.models.content import Content
 from app.models.quiz import Quiz
+from app.schemas.announcement import AnnouncementResponse
 from app.schemas.content import CONTENT_TYPES
 from app.schemas.department import DepartmentTreeNode
 from app.schemas.document import DocumentCategoryResponse, DocumentListResponse
@@ -49,7 +50,15 @@ from app.schemas.quiz import (
     QuizAttemptSummary,
     QuizTakeResponse,
 )
-from app.services import content_service, department_service, document_service, org_service, progress_service, quiz_service
+from app.services import (
+    announcement_service,
+    content_service,
+    department_service,
+    document_service,
+    org_service,
+    progress_service,
+    quiz_service,
+)
 
 router = APIRouter(prefix="/api/me", tags=["My Contents"])
 
@@ -270,6 +279,25 @@ async def list_my_documents(
         items=responses, total=total, page=page, page_size=page_size,
         total_pages=max(1, math.ceil(total / page_size)),
     )
+
+
+@router.get(
+    "/announcements", response_model=list[AnnouncementResponse],
+    summary="اطلاعیه‌های فعال و مجاز من (صفحه‌ی خانه)",
+    description="اطلاعیه‌های تک‌فایلی (عکس/ویدیو) که هم در بازه‌ی نمایش‌شان هستند (starts_at/ends_at) و هم طبق دسترسی واحد/نقش برای این کاربر مجازند — جدیدترین اول.",
+)
+async def list_my_announcements(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(10, ge=1, le=50),
+):
+    if current_user.org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
+    items, _ = await announcement_service.list_announcements(
+        db, current_user.org_id, page=1, page_size=limit,
+        viewer=current_user, apply_visibility=True, active_only=True,
+    )
+    return [await announcement_service.announcement_to_response(db, a) for a in items]
 
 
 # ─── Quiz Routes ─────────────────────────────────────────────────────────────

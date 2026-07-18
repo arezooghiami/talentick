@@ -11,13 +11,13 @@
 /* ─── CSS Custom Properties ─────────────────────────────────────────────────── */
 :root {
   /* ── Brand Colors (مطابق فیگما) ── */
-  --primary:         #6C63FF;   /* بنفش اصلی سایدبار */
-  --primary-dark:    #5A52E0;   /* hover state */
+  --primary:         #6C4CF1;   /* بنفش اصلی سایدبار */
+  --primary-dark:    #5636D6;   /* hover state */
   --primary-light:   #EEF2FF;   /* پس‌زمینه badge و icon */
   --primary-50:      #F5F3FF;
 
   /* ── Sidebar ── */
-  --sidebar-bg:      #6C63FF;   /* بنفش سایدبار مطابق فیگما */
+  --sidebar-bg:      #6C4CF1;   /* بنفش سایدبار مطابق فیگما */
   --sidebar-width:   220px;
   --sidebar-text:    rgba(255,255,255,.85);
   --sidebar-active:  #fff;
@@ -70,7 +70,7 @@
   /* ── Shadows ── */
   --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
   --shadow-md: 0 4px 12px rgba(0,0,0,.08);
-  --shadow-lg: 0 10px 40px rgba(108,99,255,.15);
+  --shadow-lg: 0 10px 40px rgba(108,76,241,.15);
 
   /* ── Transition ── */
   --transition: .2s ease;

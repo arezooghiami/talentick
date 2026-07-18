@@ -13,19 +13,33 @@ function renderContentCard(c) {
   const pct = c.my_progress_pct || 0;
   return `
     <a class="content-card" href="/content/detail.html?id=${c.id}">
-      <div class="content-card-thumb">
+      <div class="content-card-thumb type-${c.type}">
         ${c.thumbnail_url ? `<img src="${esc(c.thumbnail_url)}" alt="">` : (TYPE_ICON[c.type] || '📄')}
         <span class="content-card-type">${TYPE_LABEL_FA[c.type] || c.type}</span>
+        <span class="play-overlay"><span>▶</span></span>
       </div>
       <div class="content-card-body">
         <div class="content-card-title">${esc(c.title)}</div>
-        <div class="content-card-meta"><span class="status-chip ${c.my_status}">${STATUS_LABEL_FA[c.my_status] || c.my_status}</span></div>
+        <div class="content-card-meta">
+          <span class="status-chip ${c.my_status}">${STATUS_LABEL_FA[c.my_status] || c.my_status}</span>
+          ${c.total_duration_min ? `<span class="content-card-duration">⏱ ${fmtDuration(c.total_duration_min)}</span>` : ''}
+        </div>
         <div class="content-card-progress">
           <div class="progress-track"><div class="progress-fill ${pct >= 100 ? 'done' : ''}" style="width:${pct}%;"></div></div>
           <div class="content-card-progress-label"><span>${numFa(pct)}٪</span><span>${numFa(c.total_items_count)} آیتم</span></div>
         </div>
       </div>
     </a>`;
+}
+
+/** تبدیل دقیقه به رشته‌ی خوانا فارسی — مثلاً «۱ ساعت و ۲۰ دقیقه». */
+function fmtDuration(min) {
+  min = Number(min) || 0;
+  if (min <= 0) return '';
+  const h = Math.floor(min / 60), m = min % 60;
+  if (h && m) return `${numFa(h)} ساعت و ${numFa(m)} دقیقه`;
+  if (h) return `${numFa(h)} ساعت`;
+  return `${numFa(m)} دقیقه`;
 }
 
 function empSkeletonCards(n) {

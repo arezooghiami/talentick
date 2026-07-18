@@ -8,6 +8,7 @@ Talentick — Models Package
 هر مدل جدید را اینجا اضافه کنید.
 """
 
+from app.models.announcement import Announcement, AnnouncementTarget  # noqa: F401
 from app.models.base import Base  # noqa: F401
 from app.models.content import (  # noqa: F401
     Content,
@@ -45,6 +46,9 @@ __all__ = [
     "Document",
     "DocumentCategory",
     "DocumentTarget",
+    # Announcements
+    "Announcement",
+    "AnnouncementTarget",
     # Onboarding
     "OnboardingProgram",
     "ProgramStep",

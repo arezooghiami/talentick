@@ -43,8 +43,8 @@ const DashboardPage = (() => {
       data: {
         labels: data.map(p => p.label),
         datasets: [{
-          data: data.map(p => p.count), borderColor: '#6C63FF', borderWidth: 2.5,
-          tension: 0.4, pointRadius: 4, pointBackgroundColor: '#6C63FF',
+          data: data.map(p => p.count), borderColor: '#6C4CF1', borderWidth: 2.5,
+          tension: 0.4, pointRadius: 4, pointBackgroundColor: '#6C4CF1',
           pointBorderColor: '#fff', pointBorderWidth: 2, fill: true,
           backgroundColor: (c) => {
             const g = c.chart.ctx.createLinearGradient(0, 0, 0, 200);

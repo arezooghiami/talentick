@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -121,11 +121,5 @@ app.include_router(reports.router)        # GET /api/reports/* — BI و گزا�
 # ─── Static Frontend ──────────────────────────────────────────────────────────
 # frontend/ دایرکتوری مجاور backend/ است
 # باید بعد از router ها mount بشه تا /api/* اول match بشه
-from pathlib import Path
-
-@app.get("/", include_in_schema=False)
-async def root():
-    return RedirectResponse(url="/login.html")
-
-# ─── Static frontend — باید آخر از همه باشه ──────────────────────────────────
+# StaticFiles(html=True) خودش «/» را به frontend/index.html (صفحه‌ی landing) سرو می‌کند.
 app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
