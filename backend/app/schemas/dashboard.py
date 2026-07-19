@@ -63,10 +63,12 @@ class TopUserItem(BaseModel):
 # ─── Recent Tickets ───────────────────────────────────────────────────────────
 
 class RecentTicket(BaseModel):
-    """تیکت پشتیبانی — در V0 داده واقعی نداریم، placeholder."""
+    """آخرین تیکت‌های پشتیبانی/بازخورد — برای ویجت «آخرین تیکت‌ها» در داشبورد."""
+    id: str
+    subject: str
     user_name: str
-    status: str
-    rating: int = Field(0, ge=0, le=5)
+    status: str = Field(description="برچسب فارسی — باز | پاسخ داده‌شده | بسته‌شده")
+    rating: int = Field(0, ge=0, le=5, description="۰ یعنی هنوز امتیازدهی نشده")
 
 
 # ─── Dashboard Response ───────────────────────────────────────────────────────

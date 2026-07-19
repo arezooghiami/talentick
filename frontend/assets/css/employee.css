@@ -204,6 +204,42 @@ img { max-width: 100%; display: block; }
 .onboarding-card-deadline { display: inline-block; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--warning); }
 .onboarding-card-cta { flex-shrink: 0; font-size: var(--font-sm); font-weight: 700; color: var(--primary); white-space: nowrap; }
 
+/* ─── فرم‌ها (تیکت جدید و مشابه) ───────────────────────────────────── */
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: var(--font-sm); font-weight: 600; color: var(--gray-700); }
+.form-label .required { color: var(--danger); margin-right: 2px; }
+.form-control {
+  width: 100%; padding: 9px 13px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-md);
+  font-size: var(--font-base); font-family: 'Vazirmatn', sans-serif; color: var(--gray-800);
+  background: var(--card-bg); outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(108,76,241,.12); }
+.form-control::placeholder { color: var(--gray-400); }
+select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236B7280' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: left 12px center; padding-left: 32px;
+}
+
+/* ─── تیکت‌ها (کارمند) ─────────────────────────────────────────────── */
+.ticket-meta-row { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--gray-500); margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.ticket-meta-row b { color: var(--gray-700); font-weight: 600; }
+.ticket-thread { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding: 4px 2px; }
+.ticket-msg { max-width: 85%; padding: 10px 14px; border-radius: var(--radius-md); background: var(--gray-50); border: 1px solid var(--border); }
+.ticket-msg.staff { align-self: flex-start; background: var(--primary-light); border-color: #E4DCFC; }
+.ticket-msg.creator { align-self: flex-end; background: var(--gray-50); }
+.ticket-msg-head { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: var(--gray-500); margin-bottom: 4px; font-weight: 600; }
+.ticket-msg-body { font-size: 13px; color: var(--gray-800); line-height: 1.8; white-space: pre-wrap; }
+.ticket-status-pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.ticket-status-open { background: #FEF3C7; color: #B45309; }
+.ticket-status-answered { background: var(--primary-light); color: var(--primary); }
+.ticket-status-closed { background: var(--gray-100); color: var(--gray-600); }
+.ticket-rating-picker { display: flex; justify-content: center; gap: 6px; font-size: 26px; }
+.ticket-rating-picker .star { cursor: pointer; color: var(--gray-200); transition: color .1s; }
+.ticket-rating-picker .star:hover, .ticket-rating-picker .star.hover { color: #F59E0B; }
+.ticket-rating-stars { color: #F59E0B; letter-spacing: 1px; }
+.ticket-rating-stars .empty { color: var(--gray-200); }
+
 /* ─── Home — Two Column Layout ────────────────────────────────────── */
 .emp-home-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; align-items: start; }
 

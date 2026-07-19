@@ -25,6 +25,12 @@ from app.models.onboarding import (  # noqa: F401
 )
 from app.models.organization import Department, Organization, Position  # noqa: F401
 from app.models.quiz import Quiz, Question, QuestionOption, QuizAttempt  # noqa: F401
+from app.models.ticket import (  # noqa: F401
+    Ticket,
+    TicketAccessGrant,
+    TicketCategory,
+    TicketMessage,
+)
 from app.models.user import Invitation, RefreshToken, User  # noqa: F401
 
 __all__ = [
@@ -59,4 +65,9 @@ __all__ = [
     "Question",
     "QuestionOption",
     "QuizAttempt",
+    # Ticketing
+    "Ticket",
+    "TicketMessage",
+    "TicketCategory",
+    "TicketAccessGrant",
 ]

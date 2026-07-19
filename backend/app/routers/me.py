@@ -55,6 +55,14 @@ from app.schemas.quiz import (
     QuizAttemptSummary,
     QuizTakeResponse,
 )
+from app.schemas.ticket import (
+    TicketCloseRequest,
+    TicketCreate,
+    TicketDetailResponse,
+    TicketListResponse,
+    TicketMessageCreate,
+    TicketMessageResponse,
+)
 from app.services import (
     announcement_service,
     content_service,
@@ -64,6 +72,7 @@ from app.services import (
     org_service,
     progress_service,
     quiz_service,
+    ticket_service,
 )
 
 router = APIRouter(prefix="/api/me", tags=["My Contents"])
@@ -369,6 +378,103 @@ async def skip_onboarding_step(
     await onboarding_service.set_step_status(db, step_progress, "skipped")
     enrollment = await onboarding_service.get_enrollment_for_user(db, current_user, str(step_progress.enrollment_id))
     return await onboarding_service.get_my_enrollment_detail(db, enrollment)
+
+
+# ─── Ticket Routes («تیکت‌های من») ─────────────────────────────────────────
+
+async def _get_my_ticket_or_404(db: AsyncSession, current_user, ticket_id: str):
+    ticket = await ticket_service.get_ticket(db, ticket_id)
+    if not ticket or str(ticket.created_by) != str(current_user.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "تیکت یافت نشد")
+    return ticket
+
+
+@router.post(
+    "/tickets", response_model=TicketDetailResponse, status_code=status.HTTP_201_CREATED,
+    summary="ثبت تیکت جدید (درخواست/بازخورد/سؤال)",
+)
+async def create_my_ticket(
+    body: TicketCreate,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
+    ticket = await ticket_service.create_ticket(db, current_user.org_id, current_user, body)
+    return await ticket_service.ticket_to_detail(db, ticket)
+
+
+@router.get("/tickets", response_model=TicketListResponse, summary="لیست تیکت‌های من")
+async def list_my_tickets(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status_filter: str | None = Query(None, alias="status"),
+):
+    items, total = await ticket_service.list_tickets(
+        db, None, created_by=current_user.id, status_filter=status_filter,
+        page=page, page_size=page_size,
+    )
+    responses = [await ticket_service.ticket_to_response(db, t) for t in items]
+    return TicketListResponse(
+        items=responses, total=total, page=page, page_size=page_size,
+        total_pages=max(1, math.ceil(total / page_size)),
+    )
+
+
+@router.get("/tickets/{ticket_id}", response_model=TicketDetailResponse, summary="جزئیات یک تیکت من + ترد پیام‌ها")
+async def get_my_ticket(
+    ticket_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await _get_my_ticket_or_404(db, current_user, ticket_id)
+    return await ticket_service.ticket_to_detail(db, ticket)
+
+
+@router.post(
+    "/tickets/{ticket_id}/messages", response_model=TicketMessageResponse, status_code=status.HTTP_201_CREATED,
+    summary="افزودن پیام به تیکت خودم",
+)
+async def reply_to_my_ticket(
+    ticket_id: str,
+    body: TicketMessageCreate,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await _get_my_ticket_or_404(db, current_user, ticket_id)
+    message = await ticket_service.add_message(db, ticket, current_user, body.body, is_staff_reply=False)
+    return await ticket_service.message_to_response(db, message)
+
+
+@router.post(
+    "/tickets/{ticket_id}/close", response_model=TicketDetailResponse,
+    summary="بستن تیکت با امتیاز رضایت",
+)
+async def close_my_ticket(
+    ticket_id: str,
+    body: TicketCloseRequest,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await _get_my_ticket_or_404(db, current_user, ticket_id)
+    await ticket_service.close_by_creator(db, ticket, body.satisfaction_rating)
+    return await ticket_service.ticket_to_detail(db, ticket)
+
+
+@router.post(
+    "/tickets/{ticket_id}/reopen", response_model=TicketDetailResponse,
+    summary="بازکردن دوباره‌ی تیکت بسته‌شده",
+)
+async def reopen_my_ticket(
+    ticket_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await _get_my_ticket_or_404(db, current_user, ticket_id)
+    await ticket_service.reopen_ticket(db, ticket)
+    return await ticket_service.ticket_to_detail(db, ticket)
 
 
 # ─── Quiz Routes ─────────────────────────────────────────────────────────────

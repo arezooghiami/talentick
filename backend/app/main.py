@@ -23,7 +23,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.core.storage import ensure_bucket
 from app.database import engine
-from app.routers import announcements, auth, content, dashboard, departments, documents, me, onboarding, organizations, positions, quizzes, reports, users
+from app.routers import announcements, auth, content, dashboard, departments, documents, me, onboarding, organizations, positions, quizzes, reports, tickets, users
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,7 @@ app.include_router(me.router)             # GET /api/me/contents, /api/me/quizze
 app.include_router(reports.router)        # GET /api/reports/* — BI و گزارش‌گیری
 app.include_router(announcements.router)  # CRUD /api/announcements — مدیریت اطلاعیه‌ها
 app.include_router(onboarding.router)     # CRUD /api/onboarding — برنامه‌های آشنایی سازمانی
+app.include_router(tickets.router)        # CRUD /api/tickets — تیکتینگ (پشتیبانی/بازخورد)
 
 # ─── Static Frontend ──────────────────────────────────────────────────────────
 # frontend/ دایرکتوری مجاور backend/ است

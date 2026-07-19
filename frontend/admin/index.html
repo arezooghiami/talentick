@@ -17,8 +17,8 @@
   -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
   <!-- ─── سیستم طراحی واحد (مبنا: ظاهر super-admin.html سابق) ─── -->
-  <link rel="stylesheet" href="../assets/css/admin.css?v=20260718c" />
-  <link rel="stylesheet" href="../assets/css/admin-components.css?v=20260718c" />
+  <link rel="stylesheet" href="../assets/css/admin.css?v=20260719a" />
+  <link rel="stylesheet" href="../assets/css/admin-components.css?v=20260719a" />
 </head>
 <body>
 <div class="admin-layout">
@@ -558,12 +558,41 @@
       </div>
 
       <!-- ═══ VIEW: پشتیبانی (placeholder) ═══ -->
+      <!-- ═══ VIEW: تیکت‌ها (پشتیبانی/بازخورد کارکنان) ═══ -->
       <div id="view-support" class="view">
-        <div class="placeholder-section">
-          <div style="font-size:52px;">🎟️</div>
-          <div class="placeholder-badge">فاز ۳</div>
-          <div class="placeholder-title">سیستم پشتیبانی</div>
-          <div class="placeholder-desc">سیستم تیکتینگ و پشتیبانی در فاز سوم پیاده‌سازی می‌شود.</div>
+        <div class="view-header">
+          <div><div class="view-title">تیکت‌ها</div><div class="view-subtitle" id="tkTotalLabel">در حال بارگذاری...</div></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" data-roles="super_admin" onclick="TicketsPage.openCategories()">🏷️ دسته‌بندی‌ها</button>
+            <button class="btn btn-secondary" data-roles="super_admin" onclick="TicketsPage.openAccessGrants()">🔑 دسترسی‌ها</button>
+          </div>
+        </div>
+        <div class="data-table-wrap">
+          <div class="data-table-header">
+            <div class="search-box">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+              <input type="text" id="tkSearch" placeholder="جستجو در موضوع..." oninput="TicketsPage.searchDebounced()" />
+            </div>
+            <select class="filter-select" id="tkStatusFilter" onchange="TicketsPage.load(1)">
+              <option value="">همه‌ی وضعیت‌ها</option>
+              <option value="open">باز</option>
+              <option value="answered">پاسخ داده‌شده</option>
+              <option value="closed">بسته‌شده</option>
+            </select>
+            <select class="filter-select" id="tkCategoryFilter" onchange="TicketsPage.load(1)">
+              <option value="">همه‌ی دسته‌بندی‌ها</option>
+            </select>
+            <select class="filter-select" id="tkOrgFilter" data-roles="super_admin" onchange="TicketsPage.load(1)">
+              <option value="">همه سازمان‌ها</option>
+            </select>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>موضوع</th><th class="th-org" data-roles="super_admin">سازمان</th><th>دسته‌بندی</th><th>کارمند</th><th>پیام‌ها</th><th>وضعیت</th><th>آخرین بروزرسانی</th><th>عملیات</th></tr></thead>
+              <tbody id="tkTableBody"><tr><td colspan="8" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="tkPagination"></div>
         </div>
       </div>
 
@@ -943,6 +972,101 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-onboarding-enrollments')">بستن</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: جزئیات تیکت + ترد پاسخ ═══ -->
+<div id="modal-ticket-detail" class="modal-overlay hidden">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><h3 id="tkDetailSubject">تیکت</h3><button class="btn btn-icon" onclick="closeModal('modal-ticket-detail')">✕</button></div>
+    <div class="modal-body">
+      <div class="ticket-meta-row" id="tkDetailMeta"></div>
+      <div class="ticket-thread" id="tkThread"></div>
+      <div class="form-group" style="margin-top:14px;">
+        <label class="form-label">پاسخ</label>
+        <textarea id="tk-reply-body" class="form-control" rows="3" placeholder="متن پاسخ خود را بنویسید..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-secondary" id="btn-tk-force-close" onclick="TicketsPage.forceClose()">بستن اجباری تیکت</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="closeModal('modal-ticket-detail')">بستن پنجره</button>
+        <button class="btn btn-primary" id="btn-tk-reply" onclick="TicketsPage.sendReply()">ارسال پاسخ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: دسته‌بندی‌های تیکت (super_admin) ═══ -->
+<div id="modal-ticket-categories" class="modal-overlay hidden">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><h3>دسته‌بندی‌های تیکت</h3><button class="btn btn-icon" onclick="closeModal('modal-ticket-categories')">✕</button></div>
+    <div class="modal-body">
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>نام</th><th>ترتیب</th><th>فعال</th><th>عملیات</th></tr></thead>
+          <tbody id="tkCategoriesTableBody"><tr><td colspan="4" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+        </table>
+      </div>
+      <hr class="form-divider">
+      <div class="form-section-title">دسته‌بندی جدید</div>
+      <div class="form-grid-2">
+        <div class="form-group"><label class="form-label">نام <span class="required">*</span></label><input id="tkc-name" class="form-control" placeholder="مثلاً درخواست دوره‌ی جدید"></div>
+        <div class="form-group"><label class="form-label">ترتیب نمایش</label><input id="tkc-order" type="number" class="form-control" value="0"></div>
+      </div>
+      <button class="btn btn-primary" onclick="TicketsPage.addCategory()">افزودن دسته‌بندی</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ticket-categories')">بستن</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: مجوزهای دسترسی تیکت (super_admin) ═══ -->
+<div id="modal-ticket-access-grants" class="modal-overlay hidden">
+  <div class="modal-box modal-xl">
+    <div class="modal-header"><h3>مجوزهای دسترسی به تیکت‌ها</h3><button class="btn btn-icon" onclick="closeModal('modal-ticket-access-grants')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-section-title">افزودن مجوز جدید</div>
+      <div class="form-grid-2">
+        <div class="form-group"><label class="form-label">سازمان <span class="required">*</span></label>
+          <select id="tkg-org-id" class="form-control" onchange="TicketsPage.onGrantOrgChange()"><option value="">— انتخاب سازمان —</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">نوع مجوز <span class="required">*</span></label>
+          <select id="tkg-type" class="form-control" onchange="TicketsPage.onGrantTypeChange()">
+            <option value="role">یک نقش کامل (مثلاً همه‌ی منیجرها)</option>
+            <option value="user">یک کاربر مشخص</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="tkg-role-wrap">
+        <label class="form-label">نقش</label>
+        <select id="tkg-role" class="form-control">
+          <option value="manager">منیجر</option>
+          <option value="employee">کارمند</option>
+        </select>
+      </div>
+      <div class="form-group hidden" id="tkg-user-wrap">
+        <label class="form-label">جستجوی کاربر</label>
+        <input id="tkg-user-search" class="form-control" placeholder="ابتدا سازمان را انتخاب کنید، سپس جستجو کنید..." oninput="TicketsPage.grantUserSearchDebounced()">
+        <div class="checkbox-scroll-box" id="tkgUserResults" style="margin-top:8px;">
+          <div class="checkbox-scroll-box-empty">برای جستجو تایپ کنید</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="TicketsPage.addGrant()">افزودن مجوز</button>
+
+      <hr class="form-divider">
+      <div class="form-section-title">مجوزهای فعلی</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>سازمان</th><th>نوع</th><th>نقش/کاربر</th><th>ثبت‌شده توسط</th><th>عملیات</th></tr></thead>
+          <tbody id="tkGrantsTableBody"><tr><td colspan="5" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ticket-access-grants')">بستن</button>
     </div>
   </div>
 </div>
@@ -1377,6 +1501,7 @@
 <script src="../assets/js/document_admin.js?v=20260715"></script>
 <script src="../assets/js/announcements_admin.js?v=20260715"></script>
 <script src="../assets/js/onboarding_admin.js?v=20260718c"></script>
+<script src="../assets/js/tickets_admin.js?v=20260719a"></script>
 <script src="../assets/js/content.js?v=20260715"></script>
 <script src="../assets/js/quiz_admin.js?v=20260715"></script>
 <script src="../assets/js/reports.js?v=20260715"></script>
@@ -1399,7 +1524,7 @@
   Router.register('announcements', { title: 'اطلاعیه‌ها',   load: () => AnnouncementsPage.load(1) });
   Router.register('onboarding', { title: 'آنبوردینگ',       load: () => OnboardingPage.load(1) });
   Router.register('reports',   { title: 'گزارش‌ها',         load: ReportsPage.load });
-  Router.register('support',   { title: 'پشتیبانی',         load: null });
+  Router.register('support',   { title: 'تیکت‌ها',           load: () => TicketsPage.load(1) });
 
   Router.navigate('dashboard');
 </script>

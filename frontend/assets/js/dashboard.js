@@ -27,7 +27,9 @@ const DashboardPage = (() => {
       setText('statCompletedCourses', numFa(d.stats.completion?.completed_courses ?? 0));
       setText('statCompletedQuizzes', numFa(d.stats.completion?.completed_quizzes ?? 0));
       setText('statReward', numFa(d.stats.total_reward_points ?? 0));
-      drawChart(d.user_growth);
+      // نمودار جدا try/catch می‌شود — اگر Chart.js از CDN لود نشود، نباید
+      // بخش‌های مستقل دیگر (کاربران برتر، آخرین تیکت‌ها) هم رندر نشوند.
+      try { drawChart(d.user_growth); } catch (chartErr) { console.error('خطا در رسم نمودار:', chartErr); }
       renderTopUsers(d.top_users);
       renderTickets(d.recent_tickets);
     } catch (e) {
@@ -82,9 +84,13 @@ const DashboardPage = (() => {
 
   function renderTickets(tickets) {
     const el = document.getElementById('ticketsRow');
-    if (!tickets.length) { el.innerHTML = ''; return; }
+    if (!tickets.length) {
+      el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--gray-400);font-size:13px;">تیکتی ثبت نشده</div>`;
+      return;
+    }
     el.innerHTML = tickets.map(t => `
-      <div class="ticket-card">
+      <div class="ticket-card" style="cursor:pointer;" onclick="Router.navigate('support')" title="مشاهده در بخش تیکت‌ها">
+        <div class="ticket-subject" style="font-size:13px;font-weight:600;color:var(--gray-800);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.subject)}</div>
         <div class="ticket-user">${esc(t.user_name)}</div>
         <div class="ticket-status">${esc(t.status)}</div>
         <div class="ticket-stars">${[1, 2, 3, 4, 5].map(i => `<span class="star${i > t.rating ? ' empty' : ''}">★</span>`).join('')}</div>

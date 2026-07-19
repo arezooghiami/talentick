@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تیکت‌های من — Talentick</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260719a" />
+</head>
+<body>
+
+  <nav class="emp-navbar">
+    <a href="/onboarding/index.html" class="emp-brand"><span class="logo-dot"></span>Talenti<span class="accent">ck</span></a>
+    <div class="emp-nav-links">
+      <a href="/onboarding/index.html" data-nav="home">🏠 خانه</a>
+      <a href="/content/list.html" data-nav="content">📚 محتوای من</a>
+      <a href="/organization/index.html" data-nav="organization">🏢 سازمان</a>
+      <a href="/tickets/index.html" data-nav="tickets">🎫 تیکت‌های من</a>
+    </div>
+    <div class="emp-nav-right">
+      <button type="button" class="emp-search-trigger" id="cmdkTrigger">
+        🔍 <span class="label">جست‌وجو یا رفتن به...</span> <kbd>⌘K</kbd>
+      </button>
+      <div class="emp-user-menu">
+        <button class="emp-user-btn" id="empUserBtn">
+          <span class="emp-user-avatar" id="empUserAvatar">—</span>
+          <span class="emp-user-name" id="empUserName">—</span>
+        </button>
+        <div class="emp-user-dropdown" id="empUserDropdown">
+          <a href="/change-password.html">🔒 تغییر رمز عبور</a>
+          <hr>
+          <button class="danger" onclick="EmployeeShell.logout()">🚪 خروج از حساب</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="emp-page">
+    <div class="emp-page-header">
+      <div class="emp-page-title">تیکت‌های من</div>
+      <div class="emp-page-subtitle"><span id="tkCount">—</span> — درخواست، بازخورد یا سؤال خود را ثبت کنید</div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+      <div class="emp-filter-pills" id="tkStatusPills">
+        <button class="emp-filter-pill active" data-status="" onclick="MyTicketsPage.setStatus('', this)">همه</button>
+        <button class="emp-filter-pill" data-status="open" onclick="MyTicketsPage.setStatus('open', this)">باز</button>
+        <button class="emp-filter-pill" data-status="answered" onclick="MyTicketsPage.setStatus('answered', this)">پاسخ داده‌شده</button>
+        <button class="emp-filter-pill" data-status="closed" onclick="MyTicketsPage.setStatus('closed', this)">بسته‌شده</button>
+      </div>
+      <button class="btn btn-primary" onclick="MyTicketsPage.openCreate()">➕ تیکت جدید</button>
+    </div>
+
+    <div class="item-list" id="tkList">
+      <div class="emp-skeleton" style="height:66px;"></div>
+      <div class="emp-skeleton" style="height:66px;"></div>
+      <div class="emp-skeleton" style="height:66px;"></div>
+    </div>
+    <div class="emp-pagination" id="tkPagination"></div>
+  </main>
+
+  <!-- ─── ثبت تیکت جدید ─────────────────────────────────────────── -->
+  <div class="viewer-overlay hidden" id="tkCreateModal">
+    <div class="viewer-box">
+      <div class="viewer-header">
+        <h3>ثبت تیکت جدید</h3>
+        <button class="btn-icon" onclick="closeModal('tkCreateModal')" style="background:none;border:none;font-size:18px;cursor:pointer;">✕</button>
+      </div>
+      <div class="viewer-body">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">موضوع <span class="required">*</span></label>
+          <input id="tkc-subject" class="form-control" placeholder="مثلاً: درخواست دوره‌ی جدید React">
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">دسته‌بندی</label>
+          <select id="tkc-category" class="form-control"><option value="">— بدون دسته‌بندی —</option></select>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">محتوای مرتبط (اختیاری)</label>
+          <select id="tkc-content" class="form-control"><option value="">— هیچ‌کدام —</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">توضیحات <span class="required">*</span></label>
+          <textarea id="tkc-body" class="form-control" rows="4" placeholder="جزئیات درخواست یا بازخورد خود را بنویسید..."></textarea>
+        </div>
+      </div>
+      <div class="viewer-footer">
+        <button class="btn btn-primary" id="btn-tkc-submit" onclick="MyTicketsPage.submitCreate()">ثبت تیکت</button>
+        <button class="btn btn-secondary" onclick="closeModal('tkCreateModal')">انصراف</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── جزئیات تیکت + ترد پاسخ ────────────────────────────────── -->
+  <div class="viewer-overlay hidden" id="tkDetailModal">
+    <div class="viewer-box">
+      <div class="viewer-header">
+        <h3 id="tkDetailSubject">تیکت</h3>
+        <button class="btn-icon" onclick="closeModal('tkDetailModal')" style="background:none;border:none;font-size:18px;cursor:pointer;">✕</button>
+      </div>
+      <div class="viewer-body">
+        <div class="ticket-meta-row" id="tkDetailMeta"></div>
+        <div class="ticket-thread" id="tkThread"></div>
+        <div class="form-group hidden" id="tkReplyWrap" style="margin-top:14px;">
+          <label class="form-label">پیام جدید</label>
+          <textarea id="tk-reply-body" class="form-control" rows="3" placeholder="پاسخ یا توضیح بیشتر..."></textarea>
+        </div>
+        <div class="hidden" id="tkRateWrap" style="margin-top:14px;text-align:center;">
+          <p style="font-size:13px;color:var(--gray-500);margin-bottom:8px;">با بستن تیکت، رضایت خود را ثبت کنید</p>
+          <div class="ticket-rating-picker" id="tkRatingStars"></div>
+        </div>
+      </div>
+      <div class="viewer-footer" style="justify-content:space-between;">
+        <button class="btn btn-secondary hidden" id="btn-tk-reopen" onclick="MyTicketsPage.reopen()">بازکردن دوباره</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary hidden" id="btn-tk-close" onclick="MyTicketsPage.showRatingPicker()">بستن تیکت</button>
+          <button class="btn btn-primary hidden" id="btn-tk-send" onclick="MyTicketsPage.sendReply()">ارسال پیام</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="../assets/js/config.js?v=20260719a"></script>
+  <script src="../assets/js/auth.js?v=20260719a"></script>
+  <script src="../assets/js/api.js?v=20260719a"></script>
+  <script src="../assets/js/utils.js?v=20260719a"></script>
+  <script src="../assets/js/employee_shell.js?v=20260719a"></script>
+  <script src="../assets/js/command_palette.js?v=20260719a"></script>
+  <script src="../assets/js/tickets.js?v=20260719a"></script>
+  <script>
+    EmployeeShell.init('tickets');
+    MyTicketsPage.load(1);
+  </script>
+</body>
+</html>

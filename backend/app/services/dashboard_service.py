@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content import Content
 from app.models.organization import Organization
 from app.models.quiz import QuizAttempt
+from app.models.ticket import Ticket
 from app.models.user import User
 from app.schemas.dashboard import (
     CompletionStats,
@@ -216,17 +217,32 @@ async def _get_top_users(db: AsyncSession) -> list[TopUserItem]:
 
 # ─── Recent Tickets ───────────────────────────────────────────────────────────
 
-def _get_recent_tickets() -> list[RecentTicket]:
-    """
-    تیکت‌های اخیر — سیستم تیکت هنوز در Backend پیاده نشده (خارج از scope
-    V0/V1 فعلی).
+_TICKET_STATUS_LABEL_FA = {"open": "باز", "answered": "پاسخ داده‌شده", "closed": "بسته‌شده"}
 
-    عمداً به‌جای داده‌ی نمایشی/جعلی، آرایه‌ی خالی برمی‌گردانیم — یک
-    داشبورد مدیریتی نباید داده‌ی ساختگی نشان دهد؛ فرانت باید حالت خالی
-    («تیکتی وجود ندارد») را برای این بخش render کند. کلید recent_tickets
-    در پاسخ باقی می‌ماند تا قرارداد API/فرانت موجود نشکند.
-    """
-    return []
+
+async def _get_recent_tickets(db: AsyncSession, limit: int = 6) -> list[RecentTicket]:
+    """آخرین N تیکت پلتفرم (همه‌ی سازمان‌ها) برای ویجت «آخرین تیکت‌ها»."""
+    try:
+        rows = await db.execute(
+            select(Ticket, User.full_name)
+            .join(User, User.id == Ticket.created_by)
+            .order_by(Ticket.created_at.desc())
+            .limit(limit)
+        )
+        return [
+            RecentTicket(
+                id=str(t.id),
+                subject=t.subject,
+                user_name=user_name,
+                status=_TICKET_STATUS_LABEL_FA.get(t.status, t.status),
+                rating=t.satisfaction_rating or 0,
+            )
+            for t, user_name in rows.all()
+        ]
+    except ProgrammingError:
+        logger.warning("جدول tickets هنوز migrate نشده — آخرین تیکت‌ها خالی برمی‌گردد.", exc_info=True)
+        await db.rollback()
+        return []
 
 
 # ─── Public API ───────────────────────────────────────────────────────────────
@@ -241,7 +257,7 @@ async def get_super_admin_dashboard(db: AsyncSession) -> SuperAdminDashboardResp
     stats = await _get_stats(db)
     user_growth = await _get_user_growth(db)
     top_users = await _get_top_users(db)
-    recent_tickets = _get_recent_tickets()
+    recent_tickets = await _get_recent_tickets(db)
 
     return SuperAdminDashboardResponse(
         stats=stats,
