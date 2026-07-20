@@ -79,6 +79,7 @@ const QuizAdminPage = (() => {
     document.getElementById('qz-pass-score').value = '70';
     document.getElementById('qz-time-limit').value = '';
     document.getElementById('qz-max-attempts').value = '';
+    document.getElementById('qz-points').value = '';
     document.getElementById('qz-shuffle-q').checked = false;
     document.getElementById('qz-shuffle-o').checked = false;
     document.getElementById('qz-onboarding').checked = false;
@@ -96,6 +97,7 @@ const QuizAdminPage = (() => {
     document.getElementById('qz-pass-score').value = q.pass_score;
     document.getElementById('qz-time-limit').value = q.time_limit_min ?? '';
     document.getElementById('qz-max-attempts').value = q.max_attempts ?? '';
+    document.getElementById('qz-points').value = q.points_override ?? '';
     document.getElementById('qz-shuffle-q').checked = !!q.shuffle_questions;
     document.getElementById('qz-shuffle-o').checked = !!q.shuffle_options;
     document.getElementById('qz-onboarding').checked = !!q.is_onboarding;
@@ -113,6 +115,7 @@ const QuizAdminPage = (() => {
 
     const timeLimitRaw = document.getElementById('qz-time-limit').value;
     const maxAttemptsRaw = document.getElementById('qz-max-attempts').value;
+    const pointsRaw = document.getElementById('qz-points').value;
 
     const payload = {
       title,
@@ -120,6 +123,7 @@ const QuizAdminPage = (() => {
       pass_score: passScore,
       time_limit_min: timeLimitRaw ? parseInt(timeLimitRaw, 10) : null,
       max_attempts: maxAttemptsRaw ? parseInt(maxAttemptsRaw, 10) : null,
+      points_override: pointsRaw !== '' ? parseInt(pointsRaw, 10) : null,
       shuffle_questions: document.getElementById('qz-shuffle-q').checked,
       shuffle_options: document.getElementById('qz-shuffle-o').checked,
       is_onboarding: document.getElementById('qz-onboarding').checked,

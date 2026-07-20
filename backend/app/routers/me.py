@@ -48,6 +48,7 @@ from app.schemas.onboarding import (
     StepCompleteRequest,
 )
 from app.schemas.organization import OrganizationResponse
+from app.schemas.points import PointsHistoryResponse, PointsSummaryResponse
 from app.schemas.progress import ItemProgressUpdate
 from app.schemas.quiz import (
     QuizAttemptResult,
@@ -70,6 +71,7 @@ from app.services import (
     document_service,
     onboarding_service,
     org_service,
+    points_service,
     progress_service,
     quiz_service,
     ticket_service,
@@ -475,6 +477,32 @@ async def reopen_my_ticket(
     ticket = await _get_my_ticket_or_404(db, current_user, ticket_id)
     await ticket_service.reopen_ticket(db, ticket)
     return await ticket_service.ticket_to_detail(db, ticket)
+
+
+# ─── Points Routes («امتیازات من») ─────────────────────────────────────────
+
+@router.get("/points/summary", response_model=PointsSummaryResponse, summary="مجموع امتیاز من")
+async def get_my_points_summary(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    total = await points_service.get_total_points_for_user(db, current_user.id)
+    return PointsSummaryResponse(total_points=total)
+
+
+@router.get("/points/history", response_model=PointsHistoryResponse, summary="تاریخچه‌ی امتیازهای من")
+async def get_my_points_history(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    items, total = await points_service.list_history_for_user(db, current_user.id, page=page, page_size=page_size)
+    responses = [await points_service.entry_to_response(db, e) for e in items]
+    return PointsHistoryResponse(
+        items=responses, total=total, page=page, page_size=page_size,
+        total_pages=max(1, math.ceil(total / page_size)),
+    )
 
 
 # ─── Quiz Routes ─────────────────────────────────────────────────────────────

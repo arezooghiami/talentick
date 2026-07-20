@@ -37,7 +37,7 @@ class SuperAdminStats(BaseModel):
     completion: CompletionStats = Field(default_factory=CompletionStats)
     total_reward_points: int = Field(
         0,
-        description="کل پاداش اهدا‌شده — فاز ۲ | V0 همیشه صفر"
+        description="مجموع امتیازهای اهداشده در کل پلتفرم"
     )
 
 

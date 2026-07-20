@@ -283,6 +283,7 @@ const ContentPage = (() => {
       total_duration_min: document.getElementById('c-duration').value ? parseInt(document.getElementById('c-duration').value, 10) : null,
       is_featured: document.getElementById('c-featured').checked,
       sequential_progress: document.getElementById('c-sequential').checked,
+      points_override: document.getElementById('c-points').value !== '' ? parseInt(document.getElementById('c-points').value, 10) : null,
       thumbnail_url: document.getElementById('c-thumb-url').value || null,
       targets: collectTargets(),
     };
@@ -304,6 +305,7 @@ const ContentPage = (() => {
     document.getElementById('c-duration').value = '';
     document.getElementById('c-featured').checked = false;
     document.getElementById('c-sequential').checked = false;
+    document.getElementById('c-points').value = '';
     document.getElementById('c-thumb-url').value = '';
     setUploadName('c-thumb-name', '');
     resetTargetSelections();
@@ -348,6 +350,7 @@ const ContentPage = (() => {
     document.getElementById('c-duration').value = c.total_duration_min ?? '';
     document.getElementById('c-featured').checked = !!c.is_featured;
     document.getElementById('c-sequential').checked = !!c.sequential_progress;
+    document.getElementById('c-points').value = c.points_override ?? '';
     document.getElementById('c-thumb-url').value = c.thumbnail_url || '';
     setUploadName('c-thumb-name', c.thumbnail_url ? 'تصویر فعلی ثبت شده' : '');
     resetTargetSelections();
@@ -641,6 +644,7 @@ const ContentPage = (() => {
     document.getElementById('i-duration').value = '';
     document.getElementById('i-order').value = state.activeItems.length;
     document.getElementById('i-free').checked = true;
+    document.getElementById('i-points').value = '';
     setUploadName('i-upload-name', '');
     toggleItemFields();
     openModal('modal-item');
@@ -659,6 +663,7 @@ const ContentPage = (() => {
     document.getElementById('i-duration').value = it.duration_min ?? '';
     document.getElementById('i-order').value = it.order_index ?? 0;
     document.getElementById('i-free').checked = !!it.is_free;
+    document.getElementById('i-points').value = it.points_override ?? '';
     setUploadName('i-upload-name', it.media_url && it.type !== 'link' ? 'فایل فعلی ثبت شده' : '');
     toggleItemFields();
     if (it.type === 'quiz_ref') populateQuizSelect(it.quiz_id);
@@ -695,6 +700,7 @@ const ContentPage = (() => {
       duration_min: document.getElementById('i-duration').value ? parseInt(document.getElementById('i-duration').value, 10) : null,
       order_index: parseInt(document.getElementById('i-order').value, 10) || 0,
       is_free: document.getElementById('i-free').checked,
+      points_override: document.getElementById('i-points').value !== '' ? parseInt(document.getElementById('i-points').value, 10) : null,
     };
 
     const btn = document.getElementById('btn-save-item');

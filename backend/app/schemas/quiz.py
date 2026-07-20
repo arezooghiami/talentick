@@ -104,6 +104,7 @@ class QuizCreate(BaseModel):
     shuffle_options: bool = False
     is_onboarding: bool = False
     max_attempts: Optional[int] = Field(None, ge=1, description="null یعنی نامحدود")
+    points_override: Optional[int] = Field(None, ge=0, le=1000, description="امتیاز اختصاصی این آزمون — خالی یعنی مقدار سراسری")
     org_id: Optional[str] = None  # فقط super_admin — در router enforce می‌شود
 
 
@@ -117,6 +118,7 @@ class QuizUpdate(BaseModel):
     is_onboarding: Optional[bool] = None
     max_attempts: Optional[int] = Field(None, ge=1)
     is_active: Optional[bool] = None
+    points_override: Optional[int] = Field(None, ge=0, le=1000, description="خالی/null یعنی بازگشت به مقدار سراسری")
 
 
 class QuizResponse(BaseModel):
@@ -131,6 +133,7 @@ class QuizResponse(BaseModel):
     is_onboarding: bool
     max_attempts: Optional[int] = None
     is_active: bool
+    points_override: Optional[int] = None
     question_count: int = 0
     created_by: Optional[str] = None
     created_by_name: Optional[str] = None

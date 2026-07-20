@@ -26,6 +26,7 @@ class ProgramStepCreate(BaseModel):
     quiz_id: Optional[str] = None
     is_required: bool = True
     order_index: int = 0
+    points_override: Optional[int] = Field(None, ge=0, le=1000, description="امتیاز اختصاصی این مرحله — خالی یعنی مقدار سراسری")
 
 
 class ProgramStepUpdate(BaseModel):
@@ -36,6 +37,7 @@ class ProgramStepUpdate(BaseModel):
     quiz_id: Optional[str] = None
     is_required: Optional[bool] = None
     order_index: Optional[int] = None
+    points_override: Optional[int] = Field(None, ge=0, le=1000)
 
 
 class ProgramStepResponse(BaseModel):
@@ -50,6 +52,7 @@ class ProgramStepResponse(BaseModel):
     quiz_title: Optional[str] = None
     is_required: bool
     order_index: int
+    points_override: Optional[int] = None
 
     model_config = {"from_attributes": True}
 
@@ -68,6 +71,7 @@ class OnboardingProgramCreate(BaseModel):
     )
     deadline_days: Optional[int] = Field(None, ge=1, description="مهلت تکمیل به روز از لحظه‌ی ثبت‌نام")
     is_active: bool = True
+    points_override: Optional[int] = Field(None, ge=0, le=1000, description="امتیاز اختصاصی تکمیل کامل این برنامه — خالی یعنی مقدار سراسری")
     org_id: Optional[str] = Field(None, description="فقط super_admin — در router enforce می‌شود")
 
 
@@ -81,6 +85,7 @@ class OnboardingProgramUpdate(BaseModel):
     is_default: Optional[bool] = None
     deadline_days: Optional[int] = Field(None, ge=1)
     is_active: Optional[bool] = None
+    points_override: Optional[int] = Field(None, ge=0, le=1000)
 
 
 class OnboardingProgramResponse(BaseModel):
@@ -95,6 +100,7 @@ class OnboardingProgramResponse(BaseModel):
     is_default: bool
     deadline_days: Optional[int] = None
     is_active: bool
+    points_override: Optional[int] = None
     step_count: int = 0
     enrollment_count: int = 0
     created_by: Optional[str] = None

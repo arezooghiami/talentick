@@ -179,6 +179,7 @@ const OnboardingPage = (() => {
       target_dept_id: document.getElementById('ob-dept-id').value || null,
       is_default: document.getElementById('ob-is-default').checked,
       deadline_days: document.getElementById('ob-deadline').value ? parseInt(document.getElementById('ob-deadline').value, 10) : null,
+      points_override: document.getElementById('ob-points').value !== '' ? parseInt(document.getElementById('ob-points').value, 10) : null,
       is_active: true,
     };
   }
@@ -196,6 +197,7 @@ const OnboardingPage = (() => {
     document.getElementById('ob-id').value = '';
     ['ob-name', 'ob-desc'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('ob-deadline').value = '';
+    document.getElementById('ob-points').value = '';
     document.getElementById('ob-is-default').checked = false;
     document.getElementById('ob-is-active-wrap').classList.add('hidden');
     document.querySelectorAll('#ob-role-checks input').forEach(cb => cb.checked = false);
@@ -224,6 +226,7 @@ const OnboardingPage = (() => {
     document.getElementById('ob-name').value = detail.name || '';
     document.getElementById('ob-desc').value = detail.description || '';
     document.getElementById('ob-deadline').value = detail.deadline_days ?? '';
+    document.getElementById('ob-points').value = detail.points_override ?? '';
     document.getElementById('ob-is-default').checked = !!detail.is_default;
     document.getElementById('ob-is-active').checked = !!detail.is_active;
     document.getElementById('ob-is-active-wrap').classList.remove('hidden');
@@ -351,6 +354,7 @@ const OnboardingPage = (() => {
     document.getElementById('obs-desc').value = '';
     document.getElementById('obs-type').value = 'custom';
     document.getElementById('obs-required').checked = true;
+    document.getElementById('obs-points').value = '';
     document.getElementById('obs-content-id').dataset.loaded = '';
     document.getElementById('obs-quiz-id').dataset.loaded = '';
     refreshStepConditionalFields();
@@ -366,6 +370,7 @@ const OnboardingPage = (() => {
     document.getElementById('obs-desc').value = s.description || '';
     document.getElementById('obs-type').value = s.type;
     document.getElementById('obs-required').checked = !!s.is_required;
+    document.getElementById('obs-points').value = s.points_override ?? '';
     document.getElementById('obs-content-id').dataset.loaded = '';
     document.getElementById('obs-quiz-id').dataset.loaded = '';
     refreshStepConditionalFields();
@@ -386,6 +391,7 @@ const OnboardingPage = (() => {
       content_id: type === 'content' ? (document.getElementById('obs-content-id').value || null) : null,
       quiz_id: type === 'quiz' ? (document.getElementById('obs-quiz-id').value || null) : null,
       is_required: document.getElementById('obs-required').checked,
+      points_override: document.getElementById('obs-points').value !== '' ? parseInt(document.getElementById('obs-points').value, 10) : null,
     };
     const btn = document.getElementById('btn-obs-save');
     setLoading(btn, true);

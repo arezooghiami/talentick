@@ -25,6 +25,7 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import BadRequestError
 from app.models.quiz import Question, QuestionOption, Quiz, QuizAttempt
 from app.models.user import User
+from app.services import points_service
 from app.schemas.quiz import (
     AnswerResult,
     QuestionAdminResponse,
@@ -172,6 +173,7 @@ async def create_quiz(
         shuffle_options=data.shuffle_options,
         is_onboarding=data.is_onboarding,
         max_attempts=data.max_attempts,
+        points_override=data.points_override,
         is_active=True,
         created_by=created_by,
     )
@@ -213,6 +215,7 @@ async def quiz_to_response(db: AsyncSession, quiz: Quiz) -> QuizResponse:
         is_onboarding=quiz.is_onboarding,
         max_attempts=quiz.max_attempts,
         is_active=quiz.is_active,
+        points_override=quiz.points_override,
         question_count=question_count,
         created_by=str(quiz.created_by) if quiz.created_by else None,
         created_by_name=created_by_name,
@@ -458,6 +461,13 @@ async def submit_attempt(
         completed_at=now,
     )
     db.add(attempt)
+    await db.flush()
+
+    if passed:
+        # reference_id = quiz.id (نه attempt.id) — یعنی فقط اولین قبولی
+        # روی این آزمون امتیاز می‌گیرد، نه هر attempt موفق بعدی.
+        await points_service.award_points(db, quiz.org_id, user.id, "quiz_passed", quiz.id)
+
     await db.commit()
     await db.refresh(attempt)
     return attempt

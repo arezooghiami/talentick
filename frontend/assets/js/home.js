@@ -10,6 +10,7 @@ const HomePage = (() => {
 
     loadOrgWidget();
     loadOnboarding();
+    loadPoints();
 
     const inProgressWrap = document.getElementById('homeInProgress');
     const notStartedWrap = document.getElementById('homeNotStarted');
@@ -107,6 +108,13 @@ const HomePage = (() => {
     if (days < 0) return 'مهلت گذشته';
     if (days === 0) return 'امروز آخرین مهلت';
     return `${numFa(days)} روز تا پایان مهلت`;
+  }
+
+  async function loadPoints() {
+    try {
+      const res = await api.get('/me/points/summary');
+      setText('homeStatPoints', numFa(res.total_points));
+    } catch { /* غیرحیاتی */ }
   }
 
   async function loadOrgWidget() {

@@ -6,7 +6,7 @@
   <title>خانه — Talentick</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/employee.css?v=20260719a" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260719b" />
 </head>
 <body>
 
@@ -17,6 +17,7 @@
       <a href="/content/list.html" data-nav="content">📚 محتوای من</a>
       <a href="/organization/index.html" data-nav="organization">🏢 سازمان</a>
       <a href="/tickets/index.html" data-nav="tickets">🎫 تیکت‌های من</a>
+      <a href="/points/index.html" data-nav="points">🏆 امتیازات من</a>
     </div>
     <div class="emp-nav-right">
       <button type="button" class="emp-search-trigger" id="cmdkTrigger">
@@ -52,6 +53,7 @@
         <div><div class="emp-hero-stat-value" id="homeStatTotal">—</div><div class="emp-hero-stat-label">محتوای من</div></div>
         <div><div class="emp-hero-stat-value" id="homeStatInProgress">—</div><div class="emp-hero-stat-label">در حال یادگیری</div></div>
         <div><div class="emp-hero-stat-value" id="homeStatCompleted">—</div><div class="emp-hero-stat-label">تکمیل‌شده</div></div>
+        <a href="/points/index.html" style="text-decoration:none;color:inherit;"><div class="emp-hero-stat-value" id="homeStatPoints">—</div><div class="emp-hero-stat-label">🏆 امتیاز من</div></a>
       </div>
     </div>
 
@@ -121,14 +123,14 @@
     </div>
   </main>
 
-  <script src="../assets/js/config.js?v=20260719a"></script>
-  <script src="../assets/js/auth.js?v=20260719a"></script>
-  <script src="../assets/js/api.js?v=20260719a"></script>
-  <script src="../assets/js/utils.js?v=20260719a"></script>
-  <script src="../assets/js/employee_shell.js?v=20260719a"></script>
-  <script src="../assets/js/content_shared.js?v=20260719a"></script>
-  <script src="../assets/js/command_palette.js?v=20260719a"></script>
-  <script src="../assets/js/home.js?v=20260719a"></script>
+  <script src="../assets/js/config.js?v=20260719b"></script>
+  <script src="../assets/js/auth.js?v=20260719b"></script>
+  <script src="../assets/js/api.js?v=20260719b"></script>
+  <script src="../assets/js/utils.js?v=20260719b"></script>
+  <script src="../assets/js/employee_shell.js?v=20260719b"></script>
+  <script src="../assets/js/content_shared.js?v=20260719b"></script>
+  <script src="../assets/js/command_palette.js?v=20260719b"></script>
+  <script src="../assets/js/home.js?v=20260719b"></script>
   <script>
     EmployeeShell.init('home');
     HomePage.load();

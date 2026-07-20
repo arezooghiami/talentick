@@ -102,6 +102,12 @@
         <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
         پشتیبانی
       </a>
+
+      <!-- فقط super_admin — مقدار امتیاز هر نوع اتفاق تکمیل، سراسری -->
+      <a class="nav-item" data-page="gamification" data-roles="super_admin" onclick="Router.navigate('gamification')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7a2 2 0 012-2h2a2 2 0 012 2v10M5 21V11a2 2 0 012-2h1m9 12V9a2 2 0 012-2h1"/></svg>
+        گیمیفیکیشن
+      </a>
     </nav>
     <div class="sidebar-footer">
       <div class="sidebar-user">
@@ -596,6 +602,62 @@
         </div>
       </div>
 
+      <!-- ═══ VIEW: گیمیفیکیشن (مقدار امتیاز هر نوع اتفاق) ═══ -->
+      <div id="view-gamification" class="view">
+        <div class="view-header">
+          <div><div class="view-title">گیمیفیکیشن</div><div class="view-subtitle">مقدار امتیاز هر نوع اتفاق تکمیل — سراسری، روی همه‌ی سازمان‌ها یکسان اعمال می‌شود</div></div>
+        </div>
+        <div class="data-table-wrap">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>نوع اتفاق</th><th>امتیاز</th><th>فعال</th><th>عملیات</th></tr></thead>
+              <tbody id="gmRulesTableBody"><tr><td colspan="4" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="view-header" style="margin-top:32px;">
+          <div><div class="view-title" style="font-size:18px;">Override های گروهی (نقش / واحد سازمانی)</div><div class="view-subtitle">امتیاز اختصاصی برای یک نقش یا واحد سازمانی، جداگانه برای هر نوع اتفاق — اگر هم‌زمان با امتیاز اختصاصیِ خود آزمون/محتوا/مرحله فعال باشد، مقدار کمتر اعمال می‌شود</div></div>
+        </div>
+        <div class="data-table-wrap" style="padding:16px;margin-bottom:16px;">
+          <div class="form-grid-2">
+            <div class="form-group"><label class="form-label">نوع اتفاق</label><select id="gmOvEventType" class="form-control"></select></div>
+            <div class="form-group"><label class="form-label">نوع گروه</label>
+              <select id="gmOvTargetType" class="form-control">
+                <option value="role">نقش</option>
+                <option value="department">واحد سازمانی</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid-2" id="gmOvRoleWrap">
+            <div class="form-group" style="grid-column:1/-1;"><label class="form-label">نقش</label>
+              <select id="gmOvRole" class="form-control">
+                <option value="employee">کارمند</option>
+                <option value="manager">مدیر منابع انسانی</option>
+                <option value="org_admin">مدیر سازمان</option>
+                <option value="super_admin">مدیر ارشد</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid-2 hidden" id="gmOvDeptWrap">
+            <div class="form-group"><label class="form-label">سازمان</label><select id="gmOvOrg" class="form-control"><option value="">— انتخاب سازمان —</option></select></div>
+            <div class="form-group"><label class="form-label">واحد سازمانی</label><select id="gmOvDept" class="form-control"><option value="">— ابتدا سازمان را انتخاب کنید —</option></select></div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group"><label class="form-label">امتیاز</label><input id="gmOvPoints" class="form-control" type="number" min="0" max="1000" placeholder="مثلا 0"></div>
+            <div class="form-group" style="display:flex;align-items:flex-end;"><button class="btn btn-primary" style="width:100%;" id="btn-gmOvAdd" onclick="GamificationPage.addGroupOverride()">افزودن / به‌روزرسانی override</button></div>
+          </div>
+        </div>
+        <div class="data-table-wrap">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>نوع اتفاق</th><th>گروه</th><th>امتیاز</th><th>عملیات</th></tr></thead>
+              <tbody id="gmOverridesTableBody"><tr><td colspan="4" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 </div>
@@ -871,6 +933,7 @@
           <input type="checkbox" id="ob-is-active" style="width:16px;height:16px;" checked>
           <label class="form-label" for="ob-is-active" style="margin:0;">فعال</label>
         </div>
+        <div class="form-group"><label class="form-label">امتیاز تکمیل کامل این برنامه 🏆</label><input id="ob-points" class="form-control" type="number" min="0" max="1000" placeholder="پیش‌فرض سراسری" style="max-width:220px;"><span class="form-hint">خالی = مقدار سراسری گیمیفیکیشن</span></div>
 
         <hr class="form-divider">
         <div class="form-section-title">مخاطب برنامه (اختیاری)</div>
@@ -938,6 +1001,7 @@
         <input type="checkbox" id="obs-required" style="width:16px;height:16px;" checked>
         <label class="form-label" for="obs-required" style="margin:0;">تکمیل این مرحله اجباری است</label>
       </div>
+      <div class="form-group"><label class="form-label">امتیاز تکمیل این مرحله 🏆</label><input id="obs-points" class="form-control" type="number" min="0" max="1000" placeholder="پیش‌فرض سراسری"><span class="form-hint">خالی = مقدار سراسری گیمیفیکیشن</span></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-primary" id="btn-obs-save" onclick="OnboardingPage.saveStep()">ذخیره مرحله</button>
@@ -1166,6 +1230,8 @@
         </div>
         <span class="form-hint" style="margin-top:-10px;margin-bottom:14px;display:block;">در صورت فعال بودن، کاربر باید آیتم‌ها (ویدیو/PDF/آزمون و ...) را دقیقاً به ترتیب تکمیل کند و نمی‌تواند آیتم بعدی را قبل از تکمیل آیتم قبلی ببیند یا شروع کند.</span>
 
+        <div class="form-group"><label class="form-label">امتیاز تکمیل کامل این محتوا 🏆</label><input id="c-points" class="form-control" type="number" min="0" max="1000" placeholder="پیش‌فرض سراسری" style="max-width:220px;"><span class="form-hint">خالی = مقدار سراسری گیمیفیکیشن — عدد ۰ یعنی این محتوا هیچ امتیازی ندارد</span></div>
+
         <hr class="form-divider">
         <div class="form-section-title">انتشار هدف‌مند (اختیاری)</div>
         <div class="form-section-hint">
@@ -1276,6 +1342,7 @@
           <label class="form-label" for="i-free" style="margin:0;">بدون نیاز به ثبت‌نام (رایگان)</label>
         </div>
       </div>
+      <div class="form-group"><label class="form-label">امتیاز تکمیل این آیتم 🏆</label><input id="i-points" class="form-control" type="number" min="0" max="1000" placeholder="پیش‌فرض سراسری"><span class="form-hint">خالی = مقدار سراسری گیمیفیکیشن — عدد ۰ یعنی این آیتم هیچ امتیازی ندارد</span></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-primary" id="btn-save-item" onclick="ContentPage.saveItem()">ذخیره آیتم</button>
@@ -1296,7 +1363,10 @@
         <div class="form-group"><label class="form-label">نمره قبولی (٪) <span class="required">*</span></label><input id="qz-pass-score" class="form-control" type="number" min="0" max="100" value="70"></div>
         <div class="form-group"><label class="form-label">محدودیت زمانی (دقیقه)</label><input id="qz-time-limit" class="form-control" type="number" min="1" placeholder="نامحدود"></div>
       </div>
-      <div class="form-group"><label class="form-label">حداکثر تعداد تلاش</label><input id="qz-max-attempts" class="form-control" type="number" min="1" placeholder="نامحدود"></div>
+      <div class="form-grid-2">
+        <div class="form-group"><label class="form-label">حداکثر تعداد تلاش</label><input id="qz-max-attempts" class="form-control" type="number" min="1" placeholder="نامحدود"></div>
+        <div class="form-group"><label class="form-label">امتیاز این آزمون 🏆</label><input id="qz-points" class="form-control" type="number" min="0" max="1000" placeholder="پیش‌فرض سراسری"><span class="form-hint">خالی = استفاده از مقدار سراسری در گیمیفیکیشن — عدد ۰ یعنی این آزمون هیچ امتیازی ندارد</span></div>
+      </div>
       <div class="form-group" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="qz-shuffle-q" style="width:16px;height:16px;">
         <label class="form-label" for="qz-shuffle-q" style="margin:0;">ترتیب سوالات تصادفی نمایش داده شود</label>
@@ -1502,6 +1572,7 @@
 <script src="../assets/js/announcements_admin.js?v=20260715"></script>
 <script src="../assets/js/onboarding_admin.js?v=20260718c"></script>
 <script src="../assets/js/tickets_admin.js?v=20260719a"></script>
+<script src="../assets/js/gamification_admin.js?v=20260719c"></script>
 <script src="../assets/js/content.js?v=20260715"></script>
 <script src="../assets/js/quiz_admin.js?v=20260715"></script>
 <script src="../assets/js/reports.js?v=20260715"></script>
@@ -1525,6 +1596,7 @@
   Router.register('onboarding', { title: 'آنبوردینگ',       load: () => OnboardingPage.load(1) });
   Router.register('reports',   { title: 'گزارش‌ها',         load: ReportsPage.load });
   Router.register('support',   { title: 'تیکت‌ها',           load: () => TicketsPage.load(1) });
+  Router.register('gamification', { title: 'گیمیفیکیشن',     load: () => { if (App.isSuperAdmin) GamificationPage.load(); } });
 
   Router.navigate('dashboard');
 </script>

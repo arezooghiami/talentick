@@ -59,6 +59,7 @@ class ContentItemCreate(BaseModel):
     duration_min: Optional[int] = Field(None, ge=0)
     order_index: int = 0
     is_free: bool = True
+    points_override: Optional[int] = Field(None, ge=0, le=1000, description="امتیاز اختصاصی این آیتم — خالی یعنی مقدار سراسری")
 
 
 class ContentItemUpdate(BaseModel):
@@ -70,6 +71,7 @@ class ContentItemUpdate(BaseModel):
     duration_min: Optional[int] = Field(None, ge=0)
     order_index: Optional[int] = None
     is_free: Optional[bool] = None
+    points_override: Optional[int] = Field(None, ge=0, le=1000)
 
 
 class ContentItemResponse(BaseModel):
@@ -83,6 +85,7 @@ class ContentItemResponse(BaseModel):
     duration_min: Optional[int] = None
     order_index: int
     is_free: bool
+    points_override: Optional[int] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -109,6 +112,7 @@ class ContentCreate(BaseModel):
         False,
         description="قفل ترتیبی آیتم‌ها — کاربر باید آیتم‌ها را دقیقاً به ترتیب تکمیل کند",
     )
+    points_override: Optional[int] = Field(None, ge=0, le=1000, description="امتیاز اختصاصی این محتوا (کل) — خالی یعنی مقدار سراسری")
     targets: list[ContentTargetCreate] = Field(
         default_factory=list,
         description="هدف‌های انتشار — خالی یعنی برای کل سازمان",
@@ -129,6 +133,7 @@ class ContentUpdate(BaseModel):
     is_featured: Optional[bool] = None
     meta: Optional[dict] = None
     sequential_progress: Optional[bool] = None
+    points_override: Optional[int] = Field(None, ge=0, le=1000)
     targets: Optional[list[ContentTargetCreate]] = Field(
         None,
         description="اگر ارسال شود، تمام هدف‌های قبلی جایگزین می‌شوند. ارسال‌نشدن = بدون تغییر. آرایه خالی [] = پاک کردن همه هدف‌ها (انتشار برای کل سازمان).",
@@ -153,6 +158,7 @@ class ContentResponse(BaseModel):
     total_items_count: int
     is_featured: bool
     sequential_progress: bool = False
+    points_override: Optional[int] = None
     target_count: int = 0
     created_by: Optional[str] = None
     created_by_name: Optional[str] = None

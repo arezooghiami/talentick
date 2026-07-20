@@ -21,11 +21,14 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models.organization import Organization
 from app.models.user import User
-from app.core.security import hash_password
+from app.core.security import generate_temp_password, hash_password
 
 # ─── تنظیمات سوپر ادمین اولیه ──────────────────────────────────────────────
+# نکته امنیتی: رمز عبور دیگر هاردکد نیست — هر بار اجرای این اسکریپت یک رمز
+# موقت تصادفی (همان generate_temp_password که برای کاربران ساخته‌شده توسط
+# ادمین استفاده می‌شود) تولید می‌کند و must_change_password=True ست می‌شود
+# تا این رمز نتواند بدون تغییر برای همیشه معتبر بماند.
 SUPER_ADMIN_EMAIL = "admin@talentick.ir"
-SUPER_ADMIN_PASSWORD = "Admin@1234"
 SUPER_ADMIN_NAME = "سوپر ادمین"
 
 
@@ -54,16 +57,18 @@ async def seed():
         db.add(org)
         await db.flush()
 
-        # ساخت سوپر ادمین
+        # ساخت سوپر ادمین — رمز موقت تصادفی + اجبار به تغییر در اولین ورود
+        temp_password = generate_temp_password()
         admin = User(
             id=uuid.uuid4(),
             org_id=org.id,
             email=SUPER_ADMIN_EMAIL,
             full_name=SUPER_ADMIN_NAME,
-            hashed_password=hash_password(SUPER_ADMIN_PASSWORD),
+            hashed_password=hash_password(temp_password),
             role="super_admin",
             is_active=True,
             is_email_verified=True,
+            must_change_password=True,
         )
         db.add(admin)
         await db.commit()
@@ -71,9 +76,10 @@ async def seed():
         print("=" * 50)
         print("✅ سوپر ادمین با موفقیت ساخته شد")
         print(f"   ایمیل:  {SUPER_ADMIN_EMAIL}")
-        print(f"   پسورد:  {SUPER_ADMIN_PASSWORD}")
+        print(f"   پسورد موقت:  {temp_password}")
         print("=" * 50)
-        print("⚠️  پسورد را بعد از اولین ورود تغییر دهید!")
+        print("⚠️  این رمز فقط همین یک‌بار نمایش داده می‌شود — جایی امن ذخیره کنید.")
+        print("⚠️  در اولین ورود، سیستم به‌صورت اجباری درخواست تغییر رمز می‌کند.")
 
 
 if __name__ == "__main__":

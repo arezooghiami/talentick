@@ -31,6 +31,7 @@ from app.models.onboarding import (
 from app.models.organization import Department, Organization
 from app.models.quiz import Quiz
 from app.models.user import VALID_ROLES, User
+from app.services import points_service
 from app.schemas.onboarding import (
     EnrollmentResponse,
     MyEnrollmentDetailResponse,
@@ -118,6 +119,7 @@ async def step_to_response(db: AsyncSession, step: ProgramStep) -> ProgramStepRe
         quiz_title=quiz_title,
         is_required=step.is_required,
         order_index=step.order_index,
+        points_override=step.points_override,
     )
 
 
@@ -153,6 +155,7 @@ async def program_to_response(db: AsyncSession, program: OnboardingProgram) -> O
         is_default=program.is_default,
         deadline_days=program.deadline_days,
         is_active=program.is_active,
+        points_override=program.points_override,
         step_count=step_count,
         enrollment_count=enrollment_count,
         created_by=str(program.created_by) if program.created_by else None,
@@ -217,6 +220,7 @@ async def create_program(
         is_default=data.is_default,
         deadline_days=data.deadline_days,
         is_active=data.is_active,
+        points_override=data.points_override,
         created_by=created_by,
     )
     db.add(program)
@@ -239,7 +243,7 @@ async def update_program(
         db, program.org_id, target_roles, str(resolved_dept_id) if resolved_dept_id else None
     )
 
-    for field in ("name", "description", "is_default", "deadline_days", "is_active"):
+    for field in ("name", "description", "is_default", "deadline_days", "is_active", "points_override"):
         if field in payload:
             setattr(program, field, payload[field])
     if "target_roles" in payload:
@@ -275,6 +279,7 @@ async def add_step(db: AsyncSession, program: OnboardingProgram, data: ProgramSt
         quiz_id=uuid.UUID(data.quiz_id) if data.quiz_id else None,
         is_required=data.is_required,
         order_index=data.order_index or next_index,
+        points_override=data.points_override,
     )
     db.add(step)
     await db.commit()
@@ -298,7 +303,7 @@ async def update_step(db: AsyncSession, step: ProgramStep, data: ProgramStepUpda
     if "type" in payload or "content_id" in payload or "quiz_id" in payload:
         await _validate_step_payload(db, step.org_id, new_type, new_content_id, new_quiz_id)
 
-    for field in ("title", "description", "type", "is_required", "order_index"):
+    for field in ("title", "description", "type", "is_required", "order_index", "points_override"):
         if field in payload:
             setattr(step, field, payload[field])
     if "content_id" in payload:
@@ -596,6 +601,11 @@ async def set_step_status(
     step_progress.completed_at = _now() if new_status in ("completed", "skipped") else None
     await db.flush()
 
+    if new_status == "completed":
+        await points_service.award_points(
+            db, step_progress.org_id, step_progress.user_id, "onboarding_step_completed", step_progress.step_id
+        )
+
     await _recalculate_enrollment_progress(db, step_progress.enrollment_id)
     await db.commit()
     await db.refresh(step_progress)
@@ -653,6 +663,9 @@ async def _recalculate_enrollment_progress(db: AsyncSession, enrollment_id: uuid
     if not required_incomplete:
         if enrollment.completed_at is None:
             enrollment.completed_at = _now()
+        await points_service.award_points(
+            db, enrollment.org_id, enrollment.user_id, "onboarding_program_completed", enrollment.program_id
+        )
     else:
         enrollment.completed_at = None
 

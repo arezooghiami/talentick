@@ -44,6 +44,7 @@ def item_to_response(item: ContentItem) -> ContentItemResponse:
         duration_min=item.duration_min,
         order_index=item.order_index,
         is_free=item.is_free,
+        points_override=item.points_override,
         created_at=item.created_at,
     )
 
@@ -75,6 +76,7 @@ async def content_to_response(db: AsyncSession, content: Content) -> ContentResp
         total_items_count=content.total_items_count,
         is_featured=content.is_featured,
         sequential_progress=content.sequential_progress,
+        points_override=content.points_override,
         target_count=target_count,
         created_by=str(content.created_by) if content.created_by else None,
         created_by_name=created_by_name,
@@ -461,6 +463,7 @@ async def create_content(
         total_items_count=0,
         is_featured=data.is_featured,
         sequential_progress=data.sequential_progress,
+        points_override=data.points_override,
         meta=data.meta,
         created_by=created_by,
     )
@@ -530,6 +533,7 @@ async def add_item(
         duration_min=data.duration_min,
         order_index=data.order_index,
         is_free=data.is_free,
+        points_override=data.points_override,
     )
     db.add(item)
     await db.commit()

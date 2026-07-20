@@ -143,6 +143,11 @@ class Content(UUIDMixin, TimestampMixin, Base):
         comment="قفل ترتیبی آیتم‌ها — کاربر باید آیتم‌ها را دقیقاً به ترتیب order_index تکمیل کند"
     )
 
+    points_override: Mapped[int | None] = mapped_column(
+        Integer, nullable=True,
+        comment="امتیاز اختصاصی این محتوا برای رویداد content_completed — null یعنی از مقدار سراسری استفاده شود",
+    )
+
     # ─── Relationships ────────────────────────────────────────────────────
     items: Mapped[list["ContentItem"]] = relationship(
         back_populates="content",
@@ -222,6 +227,11 @@ class ContentItem(UUIDMixin, TimestampMixin, Base):
     is_free: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True,
         comment="آیا بدون ثبت‌نام قابل مشاهده است؟"
+    )
+
+    points_override: Mapped[int | None] = mapped_column(
+        Integer, nullable=True,
+        comment="امتیاز اختصاصی این آیتم برای رویداد content_item_completed — null یعنی از مقدار سراسری استفاده شود",
     )
 
     # ─── Relationships ────────────────────────────────────────────────────

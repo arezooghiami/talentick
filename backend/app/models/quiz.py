@@ -79,6 +79,11 @@ class Quiz(UUIDMixin, TimestampMixin, Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    points_override: Mapped[int | None] = mapped_column(
+        Integer, nullable=True,
+        comment="امتیاز اختصاصی این آزمون برای رویداد quiz_passed — null یعنی از مقدار سراسری استفاده شود",
+    )
+
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
