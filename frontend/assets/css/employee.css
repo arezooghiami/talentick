@@ -251,6 +251,28 @@ select.form-control {
 .points-hero-label { font-size: var(--font-md); color: rgba(255,255,255,.85); margin-top: 2px; }
 .points-hero-desc { font-size: 13px; color: rgba(255,255,255,.75); margin-top: 14px; max-width: 440px; margin-inline: auto; }
 .points-history-points { flex-shrink: 0; font-size: var(--font-md); font-weight: 800; color: var(--success); white-space: nowrap; }
+.points-history-points.negative { color: var(--danger); }
+
+/* ─── باشگاه امتیازات — کیف پول + فروشگاه جایزه + درخواست‌های من ────── */
+.wallet-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.wallet-stat-card { background: #fff; border: 1px solid var(--gray-100); border-radius: var(--radius-lg); padding: 16px; text-align: center; }
+.wallet-stat-value { font-size: 22px; font-weight: 800; color: var(--gray-800); }
+.wallet-stat-label { font-size: var(--font-xs); color: var(--gray-400); margin-top: 4px; }
+
+.reward-card-cost {
+  position: absolute; top: 10px; inset-inline-start: 10px; background: rgba(0,0,0,.55); color: #fff;
+  font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; backdrop-filter: blur(4px);
+}
+.reward-card-thumb { position: relative; }
+.reward-card-actions { margin-top: auto; display: flex; gap: 8px; }
+.reward-card-actions .btn { flex: 1; }
+
+.redemption-status-pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.redemption-status-draft, .redemption-status-cancelled { background: var(--gray-100); color: var(--gray-600); }
+.redemption-status-submitted, .redemption-status-under_review { background: #FEF3C7; color: #B45309; }
+.redemption-status-approved { background: var(--primary-light); color: var(--primary); }
+.redemption-status-delivered { background: #D1FAE5; color: #047857; }
+.redemption-status-rejected { background: #FEE2E2; color: #B91C1C; }
 
 /* ─── Home — Two Column Layout ────────────────────────────────────── */
 .emp-home-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; align-items: start; }

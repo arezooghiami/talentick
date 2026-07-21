@@ -48,8 +48,14 @@ from app.schemas.onboarding import (
     StepCompleteRequest,
 )
 from app.schemas.organization import OrganizationResponse
-from app.schemas.points import PointsHistoryResponse, PointsSummaryResponse
+from app.schemas.points import PointsHistoryResponse, PointsSummaryResponse, WalletResponse
 from app.schemas.progress import ItemProgressUpdate
+from app.schemas.reward import (
+    RedemptionCreate,
+    RedemptionListResponse,
+    RedemptionResponse,
+    RewardListResponse,
+)
 from app.schemas.quiz import (
     QuizAttemptResult,
     QuizAttemptSubmit,
@@ -74,6 +80,8 @@ from app.services import (
     points_service,
     progress_service,
     quiz_service,
+    redemption_service,
+    reward_service,
     ticket_service,
 )
 
@@ -503,6 +511,109 @@ async def get_my_points_history(
         items=responses, total=total, page=page, page_size=page_size,
         total_pages=max(1, math.ceil(total / page_size)),
     )
+
+
+@router.get("/points/wallet", response_model=WalletResponse, summary="کیف‌پول کامل امتیاز من")
+async def get_my_wallet(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    return await points_service.get_wallet_response(db, current_user.id)
+
+
+# ─── Reward Marketplace («فروشگاه جایزه») ──────────────────────────────────
+
+@router.get("/rewards", response_model=RewardListResponse, summary="کاتالوگ جایزه‌های قابل‌دسترس من")
+async def list_my_rewards(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: str | None = Query(None),
+    category: str | None = Query(None),
+):
+    if current_user.org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
+    items, total = await reward_service.list_rewards_for_catalog(
+        db, current_user.org_id, page=page, page_size=page_size, search=search, category=category,
+    )
+    responses = [await reward_service.reward_to_response(db, r) for r in items]
+    return RewardListResponse(
+        items=responses, total=total, page=page, page_size=page_size,
+        total_pages=reward_service.total_pages(total, page_size),
+    )
+
+
+# ─── Redemption Requests («درخواست‌های تبدیل امتیاز من») ───────────────────
+
+async def _get_my_redemption_or_404(db: AsyncSession, current_user, redemption_id: str):
+    redemption = await redemption_service.get_redemption(db, redemption_id)
+    if not redemption or str(redemption.user_id) != str(current_user.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "درخواست یافت نشد")
+    return redemption
+
+
+@router.post(
+    "/redemptions", response_model=RedemptionResponse, status_code=status.HTTP_201_CREATED,
+    summary="ثبت درخواست تبدیل امتیاز به جایزه",
+)
+async def create_my_redemption(
+    body: RedemptionCreate,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    redemption = await redemption_service.create_redemption(db, current_user, body)
+    return await redemption_service.redemption_to_response(db, redemption)
+
+
+@router.get("/redemptions", response_model=RedemptionListResponse, summary="درخواست‌های تبدیل امتیاز من")
+async def list_my_redemptions(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+    status_filter: str | None = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    items, total = await redemption_service.list_redemptions_for_user(
+        db, current_user.id, page=page, page_size=page_size, status_filter=status_filter,
+    )
+    responses = [await redemption_service.redemption_to_response(db, r) for r in items]
+    return RedemptionListResponse(
+        items=responses, total=total, page=page, page_size=page_size,
+        total_pages=redemption_service.total_pages(total, page_size),
+    )
+
+
+@router.get("/redemptions/{redemption_id}", response_model=RedemptionResponse, summary="جزئیات یک درخواست تبدیل من")
+async def get_my_redemption(
+    redemption_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    redemption = await _get_my_redemption_or_404(db, current_user, redemption_id)
+    return await redemption_service.redemption_to_response(db, redemption)
+
+
+@router.patch("/redemptions/{redemption_id}/submit", response_model=RedemptionResponse, summary="ارسال درخواست Draft")
+async def submit_my_redemption(
+    redemption_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    redemption = await _get_my_redemption_or_404(db, current_user, redemption_id)
+    updated = await redemption_service.submit_redemption(db, redemption, current_user)
+    return await redemption_service.redemption_to_response(db, updated)
+
+
+@router.patch("/redemptions/{redemption_id}/cancel", response_model=RedemptionResponse, summary="لغو درخواست تبدیل")
+async def cancel_my_redemption(
+    redemption_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    redemption = await _get_my_redemption_or_404(db, current_user, redemption_id)
+    updated = await redemption_service.cancel_redemption(db, redemption, current_user)
+    return await redemption_service.redemption_to_response(db, updated)
 
 
 # ─── Quiz Routes ─────────────────────────────────────────────────────────────

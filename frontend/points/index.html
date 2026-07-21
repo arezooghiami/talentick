@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>امتیازات من — Talentick</title>
+  <title>باشگاه امتیازات — Talentick</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/employee.css?v=20260719b" />
+  <link rel="stylesheet" href="../assets/css/employee.css?v=20260720a" />
 </head>
 <body>
 
@@ -17,7 +17,7 @@
       <a href="/content/list.html" data-nav="content">📚 محتوای من</a>
       <a href="/organization/index.html" data-nav="organization">🏢 سازمان</a>
       <a href="/tickets/index.html" data-nav="tickets">🎫 تیکت‌های من</a>
-      <a href="/points/index.html" data-nav="points">🏆 امتیازات من</a>
+      <a href="/points/index.html" data-nav="points">🏆 باشگاه امتیازات</a>
     </div>
     <div class="emp-nav-right">
       <button type="button" class="emp-search-trigger" id="cmdkTrigger">
@@ -37,33 +37,60 @@
     </div>
   </nav>
 
-  <main class="emp-page" style="max-width:820px;">
+  <main class="emp-page" style="max-width:1000px;">
     <div class="points-hero">
       <div class="points-hero-icon">🏆</div>
       <div class="points-hero-value" id="ptTotal">—</div>
-      <div class="points-hero-label">مجموع امتیاز شما</div>
-      <p class="points-hero-desc">با تکمیل محتوا، قبولی در آزمون‌ها و پیشرفت در برنامه‌های آشنایی، امتیاز کسب کنید.</p>
+      <div class="points-hero-label">موجودی فعلی امتیاز شما</div>
+      <p class="points-hero-desc">با تکمیل محتوا، قبولی در آزمون‌ها و پیشرفت در برنامه‌های آشنایی، امتیاز کسب کنید و در فروشگاه جایزه خرج کنید.</p>
     </div>
 
-    <div class="emp-section-header"><div class="emp-section-title">تاریخچه‌ی امتیازها</div></div>
-    <div class="item-list" id="ptHistory">
-      <div class="emp-skeleton" style="height:60px;"></div>
-      <div class="emp-skeleton" style="height:60px;"></div>
-      <div class="emp-skeleton" style="height:60px;"></div>
+    <div class="wallet-stats-grid" id="ptWalletStats"></div>
+
+    <div class="org-tabs" id="ptTabs">
+      <button class="org-tab-btn active" data-pt-tab="history" onclick="MyPointsPage.switchTab('history')">📜 تاریخچه</button>
+      <button class="org-tab-btn" data-pt-tab="catalog" onclick="MyPointsPage.switchTab('catalog')">🎁 فروشگاه جایزه</button>
+      <button class="org-tab-btn" data-pt-tab="redemptions" onclick="MyPointsPage.switchTab('redemptions')">📦 درخواست‌های من</button>
     </div>
-    <div class="emp-pagination" id="ptPagination"></div>
+
+    <div class="org-tab-panel active" id="pt-tab-history">
+      <div class="item-list" id="ptHistory">
+        <div class="emp-skeleton" style="height:60px;"></div>
+        <div class="emp-skeleton" style="height:60px;"></div>
+        <div class="emp-skeleton" style="height:60px;"></div>
+      </div>
+      <div class="emp-pagination" id="ptPagination"></div>
+    </div>
+
+    <div class="org-tab-panel" id="pt-tab-catalog">
+      <div class="emp-filters" style="margin-bottom:20px;">
+        <div class="emp-search-box">
+          <input type="text" id="ptCatalogSearch" placeholder="جست‌وجوی جایزه..." oninput="MyPointsPage.debouncedCatalogSearch()">
+        </div>
+      </div>
+      <div class="content-grid" id="ptCatalogGrid"></div>
+      <div class="emp-pagination" id="ptCatalogPagination"></div>
+    </div>
+
+    <div class="org-tab-panel" id="pt-tab-redemptions">
+      <div class="item-list" id="ptRedemptions">
+        <div class="emp-skeleton" style="height:70px;"></div>
+        <div class="emp-skeleton" style="height:70px;"></div>
+      </div>
+      <div class="emp-pagination" id="ptRedemptionsPagination"></div>
+    </div>
   </main>
 
-  <script src="../assets/js/config.js?v=20260719b"></script>
-  <script src="../assets/js/auth.js?v=20260719b"></script>
-  <script src="../assets/js/api.js?v=20260719b"></script>
-  <script src="../assets/js/utils.js?v=20260719b"></script>
-  <script src="../assets/js/employee_shell.js?v=20260719b"></script>
-  <script src="../assets/js/command_palette.js?v=20260719b"></script>
-  <script src="../assets/js/points.js?v=20260719b"></script>
+  <script src="../assets/js/config.js?v=20260720a"></script>
+  <script src="../assets/js/auth.js?v=20260720a"></script>
+  <script src="../assets/js/api.js?v=20260720a"></script>
+  <script src="../assets/js/utils.js?v=20260720a"></script>
+  <script src="../assets/js/employee_shell.js?v=20260720a"></script>
+  <script src="../assets/js/command_palette.js?v=20260720a"></script>
+  <script src="../assets/js/points.js?v=20260720a"></script>
   <script>
     EmployeeShell.init('points');
-    MyPointsPage.load(1);
+    MyPointsPage.load();
   </script>
 </body>
 </html>

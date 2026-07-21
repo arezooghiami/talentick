@@ -23,7 +23,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.core.storage import ensure_bucket
 from app.database import engine
-from app.routers import announcements, auth, content, dashboard, departments, documents, me, onboarding, organizations, points, positions, quizzes, reports, tickets, users
+from app.routers import announcements, auth, content, dashboard, departments, documents, me, onboarding, organizations, points, positions, quizzes, redemptions, reports, rewards, tickets, users
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ app = FastAPI(
 logger.info("CORS allowed_origins=%s", settings.allowed_origins)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -120,7 +120,9 @@ app.include_router(reports.router)        # GET /api/reports/* — BI و گزا�
 app.include_router(announcements.router)  # CRUD /api/announcements — مدیریت اطلاعیه‌ها
 app.include_router(onboarding.router)     # CRUD /api/onboarding — برنامه‌های آشنایی سازمانی
 app.include_router(tickets.router)        # CRUD /api/tickets — تیکتینگ (پشتیبانی/بازخورد)
-app.include_router(points.router)         # GET/PATCH /api/points/rules — گیمیفیکیشن (امتیاز)
+app.include_router(points.router)         # گیمیفیکیشن — Rule Engine + Ledger (بخش‌های ۱ تا ۴ اسپک)
+app.include_router(rewards.router)        # CRUD /api/rewards — فروشگاه جایزه (بخش ۵ اسپک)
+app.include_router(redemptions.router)    # صف بررسی /api/redemptions — گردش تبدیل امتیاز (بخش ۶ اسپک)
 
 # ─── Static Frontend ──────────────────────────────────────────────────────────
 # frontend/ دایرکتوری مجاور backend/ است

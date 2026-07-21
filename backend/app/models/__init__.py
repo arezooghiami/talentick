@@ -24,8 +24,15 @@ from app.models.onboarding import (  # noqa: F401
     UserStepProgress,
 )
 from app.models.organization import Department, Organization, Position  # noqa: F401
-from app.models.points import PointGroupOverride, PointRule, PointsLedgerEntry  # noqa: F401
+from app.models.points import (  # noqa: F401
+    GamificationAuditLog,
+    PointPolicyRule,
+    PointRule,
+    PointsLedgerEntry,
+    PointWallet,
+)
 from app.models.quiz import Quiz, Question, QuestionOption, QuizAttempt  # noqa: F401
+from app.models.reward import Reward, RewardRedemption  # noqa: F401
 from app.models.ticket import (  # noqa: F401
     Ticket,
     TicketAccessGrant,
@@ -73,6 +80,11 @@ __all__ = [
     "TicketAccessGrant",
     # Gamification
     "PointRule",
+    "PointPolicyRule",
     "PointsLedgerEntry",
-    "PointGroupOverride",
+    "PointWallet",
+    "GamificationAuditLog",
+    # Reward Marketplace
+    "Reward",
+    "RewardRedemption",
 ]
