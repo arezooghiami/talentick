@@ -1,0 +1,319 @@
+/* =============================================================================
+   Talentick — Design System
+   =============================================================================
+   منبع واحد رنگ/تایپوگرافی/فاصله/سایه/کامپوننت برای تجربه‌ی مصرف‌کننده:
+   Landing · Welcome (Onboarding) · Login · Forget Password · User Dashboard.
+
+   داشبورد ادمین (assets/css/admin.css) و پرتال داخلی کارمند برای صفحات دیگر
+   (assets/css/employee.css) عمداً به این فایل وابسته نشده‌اند — خارج از
+   محدوده‌ی این بازطراحی هستند و نباید دست بخورند.
+   ============================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  /* ─── Brand — گرادیان بنفش Talentick ───────────────────────────── */
+  --brand-900:      #2E1065;
+  --brand-700:      #4C1D95;
+  --brand:          #6C4CF1;
+  --brand-dark:     #5636D6;
+  --brand-light:    #8B5CF6;
+  --brand-accent:   #A855F7;
+  --brand-gold:     #F5B400;
+  --brand-gold-dark:#D89A00;
+
+  --gradient-brand: linear-gradient(160deg, var(--brand) 0%, var(--brand-light) 55%, var(--brand-accent) 100%);
+  --gradient-brand-deep: linear-gradient(180deg, var(--brand-700) 0%, var(--brand) 55%, var(--brand-light) 100%);
+  --gradient-gold: linear-gradient(135deg, #FFD666 0%, var(--brand-gold) 100%);
+
+  /* ─── Neutrals ──────────────────────────────────────────────────── */
+  --gray-50:  #F9FAFB;
+  --gray-100: #F3F4F6;
+  --gray-200: #E5E7EB;
+  --gray-300: #D1D5DB;
+  --gray-400: #9CA3AF;
+  --gray-500: #6B7280;
+  --gray-600: #4B5563;
+  --gray-700: #374151;
+  --gray-800: #1F2937;
+  --gray-900: #111827;
+
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --danger:  #EF4444;
+  --info:    #3B82F6;
+
+  /* ─── Surfaces ──────────────────────────────────────────────────── */
+  --bg:       #F7F6FD;
+  --surface:  #FFFFFF;
+  --border:   #ECEAFB;
+
+  /* ─── Typography ────────────────────────────────────────────────── */
+  --font-family: 'Vazirmatn', system-ui, sans-serif;
+  --font-xs:   0.75rem;
+  --font-sm:   0.8125rem;
+  --font-base: 0.9375rem;
+  --font-lg:   1.0625rem;
+  --font-xl:   1.25rem;
+  --font-2xl:  1.5rem;
+  --font-3xl:  1.875rem;
+  --font-4xl:  2.375rem;
+
+  /* ─── Radius ────────────────────────────────────────────────────── */
+  --r-sm:   10px;
+  --r-md:   14px;
+  --r-lg:   20px;
+  --r-xl:   28px;
+  --r-2xl:  36px;
+  --r-pill: 999px;
+
+  /* ─── Shadows ───────────────────────────────────────────────────── */
+  --shadow-sm: 0 2px 8px rgba(46, 16, 101, .06);
+  --shadow-md: 0 8px 24px rgba(46, 16, 101, .10);
+  --shadow-lg: 0 16px 48px rgba(46, 16, 101, .16);
+  --shadow-brand: 0 12px 28px rgba(108, 76, 241, .32);
+  --shadow-gold: 0 10px 22px rgba(245, 180, 0, .35);
+
+  /* ─── Motion ────────────────────────────────────────────────────── */
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --t-fast: 150ms var(--ease);
+  --t-base: 250ms var(--ease);
+  --t-slow: 420ms var(--ease);
+
+  /* ─── Spacing scale ─────────────────────────────────────────────── */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px;
+}
+
+/* ─── Reset ───────────────────────────────────────────────────────── */
+.ds *, .ds *::before, .ds *::after { box-sizing: border-box; }
+.ds { font-family: var(--font-family); -webkit-font-smoothing: antialiased; }
+.ds a { text-decoration: none; color: inherit; }
+.ds button { font-family: var(--font-family); cursor: pointer; }
+.ds input, .ds textarea, .ds select { font-family: var(--font-family); }
+.ds img { max-width: 100%; display: block; }
+.ds ul, .ds ol { list-style: none; margin: 0; padding: 0; }
+
+/* =============================================================================
+   Buttons
+   ============================================================================= */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 28px;
+  border: none;
+  border-radius: var(--r-pill);
+  font-family: var(--font-family);
+  font-size: var(--font-base);
+  font-weight: 700;
+  transition: transform var(--t-fast), box-shadow var(--t-fast), background var(--t-fast), opacity var(--t-fast);
+  white-space: nowrap;
+}
+.ds-btn:active { transform: scale(.97); }
+.ds-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+.ds-btn-primary {
+  background: var(--gradient-brand);
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+.ds-btn-primary:hover:not(:disabled) { box-shadow: 0 16px 34px rgba(108, 76, 241, .4); transform: translateY(-1px); }
+
+.ds-btn-gold {
+  background: var(--gradient-gold);
+  color: #3D2900;
+  box-shadow: var(--shadow-gold);
+}
+.ds-btn-gold:hover:not(:disabled) { transform: translateY(-1px); }
+
+.ds-btn-light {
+  background: #fff;
+  color: var(--brand);
+}
+.ds-btn-light:hover:not(:disabled) { background: #FBFAFF; transform: translateY(-1px); }
+
+.ds-btn-ghost {
+  background: transparent;
+  color: var(--gray-600);
+  height: 44px;
+  padding: 0 18px;
+}
+.ds-btn-ghost:hover:not(:disabled) { background: var(--gray-100); }
+
+.ds-btn-outline {
+  background: transparent;
+  border: 1.5px solid rgba(255,255,255,.5);
+  color: #fff;
+}
+.ds-btn-outline:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+
+.ds-btn-block { width: 100%; }
+.ds-btn-sm { height: 40px; padding: 0 18px; font-size: var(--font-sm); }
+
+.ds-btn .ds-spinner { display: none; }
+.ds-btn.loading .ds-spinner { display: inline-block; }
+.ds-btn.loading .ds-btn-text { opacity: .55; }
+
+.ds-spinner {
+  width: 17px; height: 17px;
+  border: 2.5px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: ds-spin .7s linear infinite;
+}
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+
+/* =============================================================================
+   Inputs
+   ============================================================================= */
+.ds-field { display: flex; flex-direction: column; gap: 8px; text-align: right; }
+.ds-label { font-size: var(--font-sm); font-weight: 600; color: var(--gray-700); }
+
+.ds-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ds-input {
+  width: 100%;
+  height: 56px;
+  padding: 0 48px 0 18px;
+  background: var(--gray-50);
+  border: 1.5px solid transparent;
+  border-radius: var(--r-md);
+  font-family: var(--font-family);
+  font-size: var(--font-base);
+  color: var(--gray-900);
+  transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+}
+.ds-input::placeholder { color: var(--gray-400); }
+.ds-input:focus {
+  outline: none;
+  background: #fff;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px rgba(108, 76, 241, .12);
+}
+.ds-input.error { border-color: var(--danger); background: #FEF2F2; }
+
+.ds-input-icon {
+  position: absolute;
+  right: 16px;
+  color: var(--gray-400);
+  display: flex;
+  pointer-events: none;
+}
+.ds-input-wrap:focus-within .ds-input-icon { color: var(--brand); }
+.ds-input-action {
+  position: absolute;
+  left: 16px;
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  display: flex;
+  padding: 4px;
+}
+.ds-input-action:hover { color: var(--gray-600); }
+
+.ds-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-sm);
+  color: var(--gray-600);
+  cursor: pointer;
+  user-select: none;
+}
+.ds-check input {
+  appearance: none;
+  width: 20px; height: 20px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 6px;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast);
+  flex-shrink: 0;
+}
+.ds-check input::before {
+  content: '';
+  width: 10px; height: 10px;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  background: #fff;
+  transform: scale(0);
+  transition: transform var(--t-fast);
+}
+.ds-check input:checked { background: var(--brand); border-color: var(--brand); }
+.ds-check input:checked::before { transform: scale(1); }
+
+/* =============================================================================
+   Cards & surfaces
+   ============================================================================= */
+.ds-card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+.ds-sheet {
+  background: var(--surface);
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  box-shadow: 0 -20px 60px rgba(46, 16, 101, .14);
+}
+
+/* =============================================================================
+   Badges / avatars / rank
+   ============================================================================= */
+.ds-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+.ds-badge-beginner { background: #E9F9EE; color: #16A34A; }
+.ds-badge-intermediate { background: #FFF4E0; color: #D97706; }
+.ds-badge-advanced { background: #FEE9EA; color: #DC2626; }
+
+.ds-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--gradient-brand);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   Pagination dots (Welcome slider)
+   ============================================================================= */
+.ds-dots { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ds-dot {
+  width: 8px; height: 8px;
+  border-radius: var(--r-pill);
+  background: rgba(255,255,255,.35);
+  transition: width var(--t-base) var(--ease), background var(--t-base);
+}
+.ds-dot.active { width: 26px; background: #fff; }
+
+/* =============================================================================
+   Utility
+   ============================================================================= */
+.ds-container { width: 100%; max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+.ds-visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .ds-container { padding: 0 18px; }
+}

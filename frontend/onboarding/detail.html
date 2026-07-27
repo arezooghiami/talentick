@@ -10,34 +10,47 @@
 </head>
 <body>
 
-  <nav class="emp-navbar">
-    <a href="/onboarding/index.html" class="emp-brand"><span class="logo-dot"></span>Talenti<span class="accent">ck</span></a>
-    <div class="emp-nav-links">
-      <a href="/onboarding/index.html" data-nav="home">🏠 خانه</a>
-      <a href="/content/list.html" data-nav="content">📚 محتوای من</a>
-      <a href="/organization/index.html" data-nav="organization">🏢 سازمان</a>
-      <a href="/tickets/index.html" data-nav="tickets">🎫 تیکت‌های من</a>
-      <a href="/points/index.html" data-nav="points">🏆 امتیازات من</a>
+  <div class="emp-shell">
+  <div class="emp-sidebar-backdrop" id="empSidebarBackdrop"></div>
+  <aside class="emp-sidebar" id="empSidebar">
+    <a href="/onboarding/index.html" class="emp-sidebar-brand"><span class="emp-sidebar-logo">ت</span>Talenti<span class="accent">ck</span></a>
+    <nav class="emp-sidebar-nav">
+      <a href="/onboarding/index.html" data-nav="home"><span class="ic">🏠</span><span>خانه</span></a>
+      <a href="/content/list.html" data-nav="content"><span class="ic">📚</span><span>محتوای من</span></a>
+      <a href="/organization/index.html" data-nav="organization"><span class="ic">🏢</span><span>سازمان</span></a>
+      <a href="/tickets/index.html" data-nav="tickets"><span class="ic">🎫</span><span>پشتیبانی</span></a>
+      <a href="/points/index.html" data-nav="points"><span class="ic">🏆</span><span>باشگاه امتیازات</span></a>
+      <a href="/change-password.html" data-nav="settings"><span class="ic">🔒</span><span>تنظیمات</span></a>
+    </nav>
+    <div class="emp-sidebar-points">
+      <div class="emp-sidebar-points-label">🏆 امتیاز من</div>
+      <div class="emp-sidebar-points-value" id="sidebarPointsValue">—</div>
+      <a href="/points/index.html" class="emp-sidebar-points-link">مشاهده باشگاه امتیازات ←</a>
     </div>
-    <div class="emp-nav-right">
+  </aside>
+
+  <div class="emp-main">
+    <header class="emp-topbar">
+      <button type="button" class="emp-sidebar-toggle" id="sidebarToggle" aria-label="منو">☰</button>
       <button type="button" class="emp-search-trigger" id="cmdkTrigger">
         🔍 <span class="label">جست‌وجو یا رفتن به...</span> <kbd>⌘K</kbd>
       </button>
-      <div class="emp-user-menu">
-        <button class="emp-user-btn" id="empUserBtn">
-          <span class="emp-user-avatar" id="empUserAvatar">—</span>
-          <span class="emp-user-name" id="empUserName">—</span>
-        </button>
-        <div class="emp-user-dropdown" id="empUserDropdown">
-          <a href="/change-password.html">🔒 تغییر رمز عبور</a>
-          <hr>
-          <button class="danger" onclick="EmployeeShell.logout()">🚪 خروج از حساب</button>
+      <div class="emp-topbar-right">
+        <div class="emp-user-menu">
+          <button class="emp-user-btn" id="empUserBtn">
+            <span class="emp-user-avatar" id="empUserAvatar">—</span>
+            <span class="emp-user-name" id="empUserName">—</span>
+          </button>
+          <div class="emp-user-dropdown" id="empUserDropdown">
+            <a href="/change-password.html">🔒 تغییر رمز عبور</a>
+            <hr>
+            <button class="danger" onclick="EmployeeShell.logout()">🚪 خروج از حساب</button>
+          </div>
         </div>
       </div>
-    </div>
-  </nav>
+    </header>
 
-  <main class="emp-page" style="max-width:820px;" id="obRoot">
+    <main class="emp-page" style="max-width:820px;" id="obRoot">
     <a href="/onboarding/index.html" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--gray-500);margin-bottom:16px;">→ بازگشت به خانه</a>
 
     <div class="detail-hero">
@@ -62,6 +75,16 @@
       <div class="emp-skeleton" style="height:66px;"></div>
     </div>
   </main>
+  </div>
+
+  <nav class="emp-bottom-tabbar">
+    <a href="/onboarding/index.html" data-nav="home"><span class="ic">🏠</span><span>خانه</span></a>
+    <a href="/content/list.html" data-nav="content"><span class="ic">📚</span><span>محتوا</span></a>
+    <a href="/tickets/index.html" data-nav="tickets"><span class="ic">🎫</span><span>پشتیبانی</span></a>
+    <a href="/points/index.html" data-nav="points"><span class="ic">🏆</span><span>امتیاز</span></a>
+    <a href="/organization/index.html" data-nav="organization"><span class="ic">🏢</span><span>سازمان</span></a>
+  </nav>
+  </div>
 
   <!-- ─── Step Viewer ─────────────────────────────────────────── -->
   <div class="viewer-overlay hidden" id="obViewer">

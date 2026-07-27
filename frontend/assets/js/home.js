@@ -10,7 +10,7 @@ const HomePage = (() => {
 
     loadOrgWidget();
     loadOnboarding();
-    loadPoints();
+    loadHeroCarousel();
 
     const inProgressWrap = document.getElementById('homeInProgress');
     const notStartedWrap = document.getElementById('homeNotStarted');
@@ -49,8 +49,6 @@ const HomePage = (() => {
       toggle('homeSpotlightSection', !!spotlight);
       if (spotlight) {
         document.getElementById('homeSpotlight').innerHTML = renderSpotlightCard(spotlight);
-        const qaContinue = document.getElementById('qaContinue');
-        if (qaContinue) qaContinue.href = `/content/detail.html?id=${spotlight.id}`;
       }
 
       const restInProgress = inProgress.filter(c => c.id !== spotlight?.id);
@@ -110,11 +108,65 @@ const HomePage = (() => {
     return `${numFa(days)} روز تا پایان مهلت`;
   }
 
-  async function loadPoints() {
+  // ─── بنر Hero چرخشی — از اطلاعیه‌های فعال و مجاز کاربر (بدون Mock Data) ───
+  let _heroSlides = [];
+  let _heroIdx = 0;
+  let _heroTimer = null;
+
+  async function loadHeroCarousel() {
     try {
-      const res = await api.get('/me/points/summary');
-      setText('homeStatPoints', numFa(res.total_points));
-    } catch { /* غیرحیاتی */ }
+      const items = await api.get('/me/announcements?limit=8');
+      _heroSlides = items || [];
+      toggle('heroCarouselSection', _heroSlides.length > 0);
+      if (!_heroSlides.length) return;
+
+      const track = document.getElementById('heroTrack');
+      track.innerHTML = _heroSlides.map(renderHeroSlide).join('');
+
+      const dotsWrap = document.getElementById('heroDots');
+      dotsWrap.innerHTML = _heroSlides.map((_, i) => `<span data-idx="${i}"></span>`).join('');
+      dotsWrap.querySelectorAll('span').forEach(dot => {
+        dot.addEventListener('click', () => goToHeroSlide(parseInt(dot.dataset.idx, 10)));
+      });
+
+      const prevBtn = document.getElementById('heroPrev');
+      const nextBtn = document.getElementById('heroNext');
+      const multi = _heroSlides.length > 1;
+      toggle('heroPrev', multi);
+      toggle('heroNext', multi);
+      prevBtn.onclick = () => goToHeroSlide(_heroIdx - 1);
+      nextBtn.onclick = () => goToHeroSlide(_heroIdx + 1);
+
+      goToHeroSlide(0);
+      if (multi) _restartHeroAutoplay();
+    } catch { toggle('heroCarouselSection', false); }
+  }
+
+  function renderHeroSlide(a) {
+    const hasImage = a.media_type === 'image' && a.media_url;
+    const style = hasImage ? ` style="--slide-img:url('${esc(a.media_url)}');"` : '';
+    return `
+      <div class="emp-hero-slide${hasImage ? ' has-image' : ''}"${style}>
+        <div class="emp-hero-slide-body">
+          <div class="emp-hero-slide-title">${esc(a.title)}</div>
+          ${a.description ? `<div class="emp-hero-slide-desc">${esc(a.description)}</div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function goToHeroSlide(i) {
+    if (!_heroSlides.length) return;
+    _heroIdx = (i + _heroSlides.length) % _heroSlides.length;
+    const track = document.getElementById('heroTrack');
+    track.style.transform = `translateX(${-_heroIdx * 100}%)`;
+    document.querySelectorAll('#heroDots span').forEach((dot, idx) => dot.classList.toggle('active', idx === _heroIdx));
+    _restartHeroAutoplay();
+  }
+
+  function _restartHeroAutoplay() {
+    if (_heroTimer) clearInterval(_heroTimer);
+    if (_heroSlides.length <= 1) return;
+    _heroTimer = setInterval(() => goToHeroSlide(_heroIdx + 1), 6000);
   }
 
   async function loadOrgWidget() {

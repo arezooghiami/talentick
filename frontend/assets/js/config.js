@@ -8,4 +8,5 @@ const CONFIG = {
   TOKEN_KEY: 'talentick_token',
   REFRESH_TOKEN_KEY: 'talentick_refresh_token',
   USER_KEY: 'talentick_user',
+  WELCOME_SESSION_KEY: 'talentick_welcome_seen_session',
 };

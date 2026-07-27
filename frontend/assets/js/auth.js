@@ -28,6 +28,16 @@ const Auth = {
       full_name: tokenData.full_name,
       must_change_password: !!tokenData.must_change_password,
     }));
+    // لاگین جدید = باید Welcome دوباره دیده شود (نه فقط بار اول کاربر).
+    sessionStorage.removeItem(CONFIG.WELCOME_SESSION_KEY);
+  },
+
+  /** آیا کاربر در همین session (از آخرین لاگین) صفحه‌ی Welcome را دیده — گیت ترتیب Login → Welcome → Dashboard. */
+  hasSeenWelcomeThisSession() {
+    return sessionStorage.getItem(CONFIG.WELCOME_SESSION_KEY) === '1';
+  },
+  markWelcomeSeenThisSession() {
+    sessionStorage.setItem(CONFIG.WELCOME_SESSION_KEY, '1');
   },
 
   /** بعد از تغییر موفق رمز، فقط پرچم must_change_password را پاک می‌کند. */
@@ -42,6 +52,7 @@ const Auth = {
     localStorage.removeItem(CONFIG.TOKEN_KEY);
     localStorage.removeItem(CONFIG.REFRESH_TOKEN_KEY);
     localStorage.removeItem(CONFIG.USER_KEY);
+    sessionStorage.removeItem(CONFIG.WELCOME_SESSION_KEY);
   },
 
   isLoggedIn() {
@@ -78,9 +89,11 @@ const Auth = {
       window.location.href = '/change-password.html';
     } else if (user.role === 'super_admin' || user.role === 'org_admin' || user.role === 'manager') {
       window.location.href = '/admin/index.html';
+    } else if (!this.hasSeenWelcomeThisSession()) {
+      // کارمند — هر لاگین جدید باید اول از Welcome عبور کند، سپس Dashboard.
+      window.location.href = '/welcome.html';
     } else {
-      // employee — خانه‌ی کارمند («آشنایی با سازمان» / محتواهای من)
-      window.location.href = '/onboarding/index.html';
+      window.location.href = '/dashboard.html';
     }
   },
 

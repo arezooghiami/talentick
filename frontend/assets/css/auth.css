@@ -1,0 +1,162 @@
+/* =============================================================================
+   Talentick — Auth Shell (Login / Forget Password)
+   هدر گرادیان بنفش + Bottom-sheet سفید — دقیقاً هم‌راستا با تصاویر مرجع.
+   ============================================================================= */
+
+body.auth-body {
+  margin: 0;
+  min-height: 100vh;
+  background: #EDEAFB;
+}
+
+.auth-page {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  box-shadow: 0 0 80px rgba(46,16,101,.10);
+}
+
+@media (min-width: 560px) {
+  .auth-page { min-height: 100vh; margin: 0 auto; }
+  body.auth-body { display: flex; }
+}
+
+/* ─── Hero ──────────────────────────────────────────────────────────── */
+.auth-hero {
+  position: relative;
+  flex: 0 0 auto;
+  height: 34vh;
+  min-height: 230px;
+  max-height: 320px;
+  background: var(--gradient-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.auth-hero::before {
+  content: '';
+  position: absolute;
+  inset: -20% -10% auto auto;
+  width: 55%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(255,255,255,.14), transparent 70%);
+}
+.auth-hero::after {
+  content: '';
+  position: absolute;
+  inset: auto auto -35% -15%;
+  width: 60%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(46,16,101,.28), transparent 70%);
+}
+
+.auth-hero-scene {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 60%;
+  opacity: .5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.auth-hero-scene svg { width: 100%; height: auto; }
+
+.auth-logo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+}
+.auth-logo .tk-logo { width: 168px; height: auto; }
+
+/* ─── Sheet ─────────────────────────────────────────────────────────── */
+.auth-sheet {
+  position: relative;
+  flex: 1;
+  background: var(--surface);
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  margin-top: -28px;
+  z-index: 2;
+  box-shadow: 0 -18px 40px rgba(46,16,101,.08);
+}
+
+.auth-sheet-inner {
+  max-width: 380px;
+  margin: 0 auto;
+  padding: 36px 26px 40px;
+}
+
+.auth-heading { text-align: center; margin-bottom: 28px; }
+.auth-heading h1 { font-size: var(--font-xl); font-weight: 800; color: var(--gray-900); margin: 0 0 6px; }
+.auth-heading p { font-size: var(--font-sm); color: var(--gray-500); margin: 0; }
+
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  font-size: var(--font-sm);
+}
+.auth-link { color: var(--brand); font-weight: 600; }
+.auth-link:hover { text-decoration: underline; }
+
+.auth-footer {
+  text-align: center;
+  margin-top: 26px;
+  font-size: var(--font-sm);
+  color: var(--gray-500);
+}
+.auth-footer a { color: var(--brand); font-weight: 700; }
+.auth-footer a:hover { text-decoration: underline; }
+
+.auth-back {
+  position: absolute;
+  z-index: 3;
+  top: max(18px, env(safe-area-inset-top));
+  left: 18px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: background var(--t-fast);
+}
+.auth-back:hover { background: rgba(255,255,255,.28); }
+
+/* ─── Alert ─────────────────────────────────────────────────────────── */
+.alert-error {
+  background: #FEF2F2; border: 1px solid #FECACA; border-radius: var(--r-md);
+  padding: 12px 14px; font-size: var(--font-sm); color: #DC2626; margin-bottom: 18px;
+  display: none; align-items: center; gap: 8px;
+}
+.alert-error.show { display: flex; }
+
+/* ─── Forget-password specific ─────────────────────────────────────── */
+.fp-hero {
+  height: 26vh;
+  min-height: 190px;
+  max-height: 240px;
+  background: var(--surface);
+}
+.fp-hero .auth-hero-scene { opacity: 1; height: 100%; }
+.fp-hero .tk-illustration { width: min(52vw, 190px); height: auto; }
+
+.fp-success {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+.fp-success-icon {
+  width: 84px; height: 84px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #DCFCE7, #BBF7D0);
+  display: flex; align-items: center; justify-content: center;
+  color: #16A34A;
+}

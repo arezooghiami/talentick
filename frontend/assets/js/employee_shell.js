@@ -1,10 +1,9 @@
 // ════════════════════════════════════════════════════════════════════
-// Talentick — Shell مشترک صفحات پرتال کارمند (navbar + auth guard)
+// Talentick — Shell مشترک صفحات پرتال کارمند (سایدبار + نوار بالا + auth guard)
 // ════════════════════════════════════════════════════════════════════
-// هر صفحه‌ی کارمند (onboarding/index.html، content/list.html،
-// content/detail.html، quiz/index.html) این فایل را بعد از
-// config.js/auth.js/api.js/utils.js لود می‌کند و EmployeeShell.init()
-// را صدا می‌زند.
+// هر صفحه‌ی کارمند (خانه، محتوا، سازمان، تیکت‌ها، امتیازات، آزمون) این
+// فایل را بعد از config.js/auth.js/api.js/utils.js لود می‌کند و
+// EmployeeShell.init() را صدا می‌زند.
 
 const EmployeeShell = {
   init(activePage) {
@@ -12,6 +11,8 @@ const EmployeeShell = {
     this._fillUser();
     this._highlightNav(activePage);
     this._wireDropdown();
+    this._wireSidebarToggle();
+    this._loadSidebarPoints();
     this._checkMustChangePassword();
   },
 
@@ -25,7 +26,7 @@ const EmployeeShell = {
   },
 
   _highlightNav(activePage) {
-    document.querySelectorAll('.emp-nav-links [data-nav]').forEach(el => {
+    document.querySelectorAll('[data-nav]').forEach(el => {
       el.classList.toggle('active', el.dataset.nav === activePage);
     });
   },
@@ -39,6 +40,37 @@ const EmployeeShell = {
       dropdown.classList.toggle('open');
     });
     document.addEventListener('click', () => dropdown.classList.remove('open'));
+  },
+
+  // سایدبار در موبایل/تبلت به‌صورت Drawer باز/بسته می‌شود (دکمه‌ی ☰ در نوار بالا).
+  _wireSidebarToggle() {
+    const toggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('empSidebar');
+    const backdrop = document.getElementById('empSidebarBackdrop');
+    if (!toggle || !sidebar) return;
+    const close = () => {
+      sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('open');
+    };
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sidebar.classList.toggle('open');
+      if (backdrop) backdrop.classList.toggle('open');
+    });
+    if (backdrop) backdrop.addEventListener('click', close);
+    sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', close));
+  },
+
+  // کارت امتیاز پایین سایدبار — در همه‌ی صفحات پرتال کارمند نمایش داده می‌شود.
+  async _loadSidebarPoints() {
+    const el = document.getElementById('sidebarPointsValue');
+    if (!el) return;
+    try {
+      const res = await api.get('/me/points/summary');
+      el.textContent = numFa(res.total_points);
+    } catch {
+      el.textContent = '—';
+    }
   },
 
   // اگر با وجود گذر از Auth.requireAuth کاربر همچنان وضعیتش قدیمی مانده
