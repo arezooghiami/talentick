@@ -1,16 +1,16 @@
 # =============================================================================
-# Talentick Alembic Configuration
+# Talentick Alembic Configuration — نمونه (بدون secret واقعی)
 # =============================================================================
+# این فایل را کپی کنید به alembic.ini و در صورت نیاز به override محلی
+# ویرایش کنید. مقدار sqlalchemy.url در عمل توسط migrations/env.py از
+# متغیر محیطی DATABASE_URL خوانده می‌شود — مقدار زیر فقط placeholder است.
 
 [alembic]
 script_location = migrations
 
 file_template = %%(rev)s_%%(slug)s
 
-# ⚠️ مقدار واقعی اینجا نگه‌داری نمی‌شود — migrations/env.py آن را از متغیر
-# محیطی DATABASE_URL می‌خواند و override می‌کند. این placeholder فقط برای
-# معتبر ماندن فرمت فایل است.
-sqlalchemy.url = postgresql+psycopg://user:pass@localhost/talentick
+sqlalchemy.url = postgresql+psycopg://<DB_USER>:<DB_PASSWORD>@<DB_HOST>/<DB_NAME>
 
 timezone = UTC
 

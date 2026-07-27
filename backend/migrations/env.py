@@ -30,6 +30,20 @@ from app.models.quiz import *
 
 config = context.config
 
+# آدرس دیتابیس همیشه از متغیر محیطی DATABASE_URL خوانده می‌شود، نه از
+# alembic.ini — چون alembic.ini در گیت commit می‌شود و نباید پسورد واقعی
+# دیتابیس را در خود نگه دارد. مقدار داخل alembic.ini صرفاً یک placeholder
+# است و در صورت نبود DATABASE_URL استفاده می‌شود (که در عمل باعث خطای
+# اتصال می‌شود — عمداً، تا استفاده‌ی تصادفی از مقدار واقعی رخ ندهد).
+# alembic از driver همزمان (sync) استفاده می‌کند؛ DATABASE_URL برنامه
+# async است (postgresql+asyncpg) پس اینجا به psycopg (v3, sync) تبدیل می‌شود.
+_database_url = os.environ.get("DATABASE_URL")
+if _database_url:
+    config.set_main_option(
+        "sqlalchemy.url",
+        _database_url.replace("postgresql+asyncpg://", "postgresql+psycopg://"),
+    )
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:

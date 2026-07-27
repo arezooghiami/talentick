@@ -1,0 +1,103 @@
+# =============================================================================
+# Talentick — Production Override
+# =============================================================================
+# استفاده (کنار docker-compose.yml، نه به‌جای آن):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# این فایل docker-compose.yml (dev) را دست‌نخورده می‌گذارد. تفاوت‌ها:
+#   - پورت‌های db/minio/app به بیرون expose نمی‌شوند (فقط nginx 80 عمومی است)
+#   - بدون --reload و بدون bind-mount کد بک‌اند (hot-reload dev)
+#   - پسوردهای پیش‌فرض ضعیف حذف شده‌اند — بدون env واقعی اصلاً بالا نمی‌آید
+#   - healthcheck وابستگی app به db و minio هر دو (نه فقط db)
+#
+# متغیرهای الزامی که باید در محیط/`.env` واقعی ست شوند (نگاه کنید به
+# .env.example در ریشه‌ی پروژه):
+#   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+#   MINIO_ROOT_USER, MINIO_ROOT_PASSWORD
+#   SECRET_KEY, ALLOWED_ORIGINS
+
+services:
+  db:
+    ports: !reset []   # postgres فقط از شبکه‌ی داخلی compose در دسترس است
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+  minio:
+    ports: !reset []   # S3 API و کنسول MinIO فقط از شبکه‌ی داخلی — دسترسی از بیرون فقط از طریق GET /api/files (routers/files.py)
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+
+  app:
+    ports: !reset []   # فقط nginx (80/443) به بیرون expose می‌شود — app از طریق شبکه‌ی داخلی (app:8000) در دسترس nginx است
+    env_file: !reset []   # در production به .env نمونه‌ی dev تکیه نمی‌کنیم — همه چیز صراحتاً پایین ست می‌شود
+    environment:
+      DATABASE_URL: >-
+        postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      APP_ENV: production
+      DEBUG: "false"
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required — دامنه(های) واقعی فرانت را با کاما جدا از هم بدهید، مثل https://app.example.com}
+    # main.py یک fallback static mount از "../frontend" (نسبت به WORKDIR=/app)
+    # دارد — بدون این mount، کانتینر در همان لحظه‌ی import با RuntimeError از
+    # کار می‌افتد. read-only است و هیچ hot-reloadای نیست (برخلاف dev که
+    # ./backend:/app کد را هم mount می‌کند).
+    # ⚠️ نکته فنی: کامنت نباید بین `!reset` و اولین آیتم لیست بیاید — این کار
+    # باعث می‌شود docker compose کل کلید volumes را نادیده بگیرد (تست‌شده).
+    volumes: !reset
+      - ./frontend:/frontend:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: >
+      uvicorn app.main:app
+        --host 0.0.0.0
+        --port 8000
+        --log-level info
+    # ⚠️ Rate limiting فعلی (core/rate_limit.py) in-memory و per-process
+    # است. با بیش از ۱ replica/worker، هر instance شمارنده‌ی brute-force
+    # جدا دارد و محدودیت واقعی دور زده می‌شود. `deploy.replicas` در
+    # `docker compose` معمولی (غیر Swarm) اجرایی نیست؛ این فقط یک
+    # یادداشت صریح است — عملاً هر جا این سرویس را اجرا می‌کنید
+    # (docker compose scale, Swarm, Kubernetes و ...) باید ۱ instance
+    # باشد مگر rate limiter به Redis منتقل شود.
+    deploy:
+      replicas: 1
+
+  # ⚠️ TLS (Let's Encrypt/certbot) — غیرفعال به‌صورت پیش‌فرض، چون بدون
+  # دامنه‌ی واقعی نمی‌شود گواهی صادر کرد. وقتی دامنه آماده شد:
+  #   1. بخش‌های کامنت‌شده‌ی زیر را uncomment کنید (پورت ۴۴۳ + volume های certbot).
+  #   2. سرویس nginx را یک‌بار فقط با پورت ۸۰ بالا بیاورید تا ACME
+  #      challenge (nginx/nginx.conf) در دسترس باشد.
+  #   3. certbot را یک‌بار اجرا کنید تا گواهی صادر شود:
+  #        docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm certbot
+  #   4. server block پورت ۴۴۳ در nginx/nginx.conf را uncomment کنید و nginx را reload کنید.
+  # nginx:
+  #   ports: !reset
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes: !reset
+  #     - ./frontend:/usr/share/nginx/html:ro
+  #     - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  #     - certbot_webroot:/var/www/certbot:ro
+  #     - certbot_certs:/etc/letsencrypt:ro
+  #
+  # certbot:
+  #   image: certbot/certbot
+  #   volumes:
+  #     - certbot_webroot:/var/www/certbot
+  #     - certbot_certs:/etc/letsencrypt
+  #   entrypoint: >
+  #     certbot certonly --webroot -w /var/www/certbot
+  #       -d your-domain.com --email you@example.com --agree-tos --no-eff-email
+
+# volumes:
+#   certbot_webroot:
+#   certbot_certs:

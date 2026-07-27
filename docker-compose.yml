@@ -48,8 +48,8 @@ services:
   # ─── FastAPI backend ────────────────────────────────────────────────────────
   app:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     env_file: backend/.env
     environment:
@@ -64,6 +64,10 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app    # hot reload در dev
+      # main.py استاتیک فرانت را از "../frontend" (نسبت به WORKDIR=/app) mount
+      # می‌کند — بدون این mount، کانتینر همان لحظه‌ی import با
+      # RuntimeError: Directory '../frontend' does not exist از کار می‌افتد.
+      - ./frontend:/frontend:ro
     command: >
       uvicorn app.main:app
         --host 0.0.0.0

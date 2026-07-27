@@ -157,6 +157,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Alembic config (contains DB connection string) — از alembic.ini.example کپی کنید
+alembic.ini
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -216,3 +219,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node / Next.js (frontend)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/*.tsbuildinfo
+frontend/npm-debug.log*
+
+# Claude Code local tool config (machine-specific, not part of the app)
+.claude/
+
+# JetBrains — local SDK/interpreter path, not shared project config
+.idea/misc.xml
