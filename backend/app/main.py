@@ -23,7 +23,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.core.storage import ensure_bucket
 from app.database import engine
-from app.routers import announcements, auth, content, dashboard, departments, documents, me, onboarding, organizations, points, positions, quizzes, redemptions, reports, rewards, tickets, users
+from app.routers import announcements, auth, content, dashboard, departments, documents, files, me, onboarding, organizations, points, positions, quizzes, redemptions, reports, rewards, tickets, users
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +63,13 @@ app = FastAPI(
 # ⚠️ نکته امنیتی مهم: origin=["*"] به‌همراه allow_credentials=True طبق
 # مشخصات CORS نامعتبر است (مرورگرها آن را رد می‌کنند) و در صورت کارکرد
 # هم یعنی هر وب‌سایتی می‌تواند با اعتبار (کوکی/Authorization) کاربر
-# درخواست بزند — ریسک امنیتی جدی. به‌همین دلیل از allowed_origins در
-# .env استفاده می‌شود؛ در Production باید فقط دامنه(های) واقعی فرانت
-# در ALLOWED_ORIGINS باشد.
+# درخواست بزند — ریسک امنیتی جدی. به‌همین دلیل از settings.allowed_origins
+# (که از .env خوانده می‌شود) استفاده می‌شود؛ در Production باید فقط
+# دامنه(های) واقعی فرانت در ALLOWED_ORIGINS باشد.
 logger.info("CORS allowed_origins=%s", settings.allowed_origins)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -123,6 +123,7 @@ app.include_router(tickets.router)        # CRUD /api/tickets — تیکتینگ
 app.include_router(points.router)         # گیمیفیکیشن — Rule Engine + Ledger (بخش‌های ۱ تا ۴ اسپک)
 app.include_router(rewards.router)        # CRUD /api/rewards — فروشگاه جایزه (بخش ۵ اسپک)
 app.include_router(redemptions.router)    # صف بررسی /api/redemptions — گردش تبدیل امتیاز (بخش ۶ اسپک)
+app.include_router(files.router)          # GET /api/files/{object_path} — پراکسی احراز هویت‌شده به MinIO private
 
 # ─── Static Frontend ──────────────────────────────────────────────────────────
 # frontend/ دایرکتوری مجاور backend/ است

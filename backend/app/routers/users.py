@@ -324,7 +324,8 @@ async def get_user(
     **دسترسی:** super_admin، org_admin (manager اجازه ساخت کاربر ندارد).
 
     - super_admin: می‌تواند در هر سازمانی، با هر نقشی کاربر بسازد.
-    - org_admin: فقط در سازمان خودش، و نمی‌تواند نقش super_admin بسازد.
+    - org_admin: فقط در سازمان خودش، و فقط با نقشی **پایین‌تر** از سطح خودش
+      (manager/employee) — نمی‌تواند org_admin یا super_admin بسازد.
     """,
 )
 async def create_user(
@@ -333,18 +334,18 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
 ) -> UserDetail:
     if current_user.role != "super_admin":
-        # org_admin: فقط در سازمان خودش، فقط نقش‌های غیر super_admin
+        # org_admin: فقط در سازمان خودش — سلسله‌مراتب نقش در service layer چک می‌شود
         if body.org_id != str(current_user.org_id):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط می‌توانید در سازمان خودتان کاربر بسازید")
-        if body.role == "super_admin":
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "اجازه ساخت کاربر با نقش super_admin را ندارید")
 
     await _validate_org_refs(db, body.org_id, body.dept_id, body.position_id, body.manager_id)
 
     try:
-        user = await user_service.create_user(db, body)
+        user = await user_service.create_user(db, body, actor=current_user)
     except user_service.EmailAlreadyExistsError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "این ایمیل قبلاً ثبت شده است")
+    except user_service.RoleEscalationError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
 
     return await _to_detail(db, user)
 
@@ -364,18 +365,17 @@ async def update_user(
 
     _enforce_org_scope(current_user, user.org_id)
 
-    if current_user.role != "super_admin" and body.role == "super_admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "اجازه تنظیم نقش super_admin را ندارید")
-
     if str(user.id) == body.manager_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر نمی‌تواند مدیر مستقیم خودش باشد")
 
     await _validate_org_refs(db, user.org_id, body.dept_id, body.position_id, body.manager_id)
 
     try:
-        updated = await user_service.update_user(db, user, body)
+        updated = await user_service.update_user(db, user, body, actor=current_user)
     except user_service.EmailAlreadyExistsError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "این ایمیل قبلاً ثبت شده است")
+    except user_service.RoleEscalationError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
 
     return await _to_detail(db, updated)
 

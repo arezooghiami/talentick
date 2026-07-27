@@ -1,19 +1,32 @@
 """
 Talentick — Storage Utilities (MinIO)
 =======================================
-آپلود فایل/تصویر/ویدیو محتوا به MinIO (سازگار با S3).
+آپلود فایل/تصویر/ویدیو محتوا به MinIO (سازگار با S3) + سرو امن آن‌ها.
+
+معماری امنیتی:
+    باکت MinIO **private** است (بدون هیچ policy عمومی). upload_file دیگر
+    URL مستقیم MinIO را برنمی‌گرداند، بلکه یک مسیر پایدار داخلی برمی‌گرداند:
+        /api/files/{object_name}
+    که توسط routers/files.py سرو می‌شود — آن endpoint احراز هویت + org
+    isolation را چک می‌کند و بایت‌های فایل را مستقیماً از MinIO stream
+    می‌کند (بدون افشای هرگز یک presigned URL به مرورگر، که چون هاست
+    داخلی docker یعنی `minio:9000` است، از بیرون هم قابل resolve نبود).
+
+    این مقدار (`/api/files/...`) همان چیزی است که در دیتابیس
+    (content.media_url، documents.file_url، announcements.media_url و...)
+    ذخیره می‌شود — چون هرگز منقضی نمی‌شود (برخلاف presigned URL که اگر
+    داخل دیتابیس ذخیره شود، بعد از انقضا دیگر کار نمی‌کند).
 
 استفاده:
     from app.core.storage import upload_file
-    url = await upload_file(file, org_id, subfolder="contents")
+    result = await upload_file(file, org_id, subfolder="contents")
+    # result["url"] == "/api/files/<org_id>/contents/<uuid>.<ext>"
 """
 
 from __future__ import annotations
 
 import io
-import json
 import uuid
-from datetime import timedelta
 from functools import lru_cache
 
 from fastapi import HTTPException, UploadFile, status
@@ -39,6 +52,8 @@ ALLOWED_EXTENSIONS = {
 
 MAX_FILE_SIZE_MB = 200
 
+FILES_URL_PREFIX = "/api/files/"
+
 
 @lru_cache
 def get_minio_client() -> Minio:
@@ -51,45 +66,35 @@ def get_minio_client() -> Minio:
     )
 
 
-def _public_read_policy(bucket_name: str) -> str:
-    return json.dumps({
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Effect": "Allow",
-            "Principal": {"AWS": ["*"]},
-            "Action": ["s3:GetObject"],
-            "Resource": [f"arn:aws:s3:::{bucket_name}/*"],
-        }],
-    })
-
-
 @lru_cache
 def ensure_bucket() -> None:
     """
-    در صورت نبودن bucket، آن را می‌سازد؛ در هر دو حالت (جدید/موجود) سیاست
-    public-read روی آبجکت‌ها را اعمال می‌کند.
+    در صورت نبودن bucket، آن را می‌سازد و هر policy عمومی قبلی را (اگر از
+    نسخه‌های قدیمی‌تر باقی مانده باشد) صراحتاً حذف می‌کند تا باکت private
+    بماند — صرفاً «هیچ policy جدیدی تنظیم نکردن» کافی نیست، چون اگر این
+    باکت قبلاً توسط نسخه‌ی قدیمی این تابع public-read شده باشد، آن policy
+    در سمت سرور MinIO باقی می‌ماند تا صراحتاً پاک شود.
 
-    نکته: قبلاً این تابع فقط bucket را می‌ساخت و هیچ policy‌ای تنظیم
-    نمی‌کرد — در نتیجه آبجکت‌های آپلودشده با «Access Denied» مواجه
-    می‌شدند چون MinIO به‌صورت پیش‌فرض bucket را private می‌سازد.
-    با lru_cache این تابع فقط یک‌بار در طول عمر پروسه اجرا می‌شود.
+    دسترسی به فایل‌ها فقط از طریق routers/files.py (احراز هویت‌شده،
+    org-scoped) ممکن است، نه با URL مستقیم عمومی.
     """
     client = get_minio_client()
     if not client.bucket_exists(settings.minio_bucket_name):
         client.make_bucket(settings.minio_bucket_name)
-    client.set_bucket_policy(settings.minio_bucket_name, _public_read_policy(settings.minio_bucket_name))
+        return
 
-
-def _public_url(object_name: str) -> str:
-    scheme = "https" if settings.minio_use_ssl else "http"
-    return f"{scheme}://{settings.minio_endpoint}/{settings.minio_bucket_name}/{object_name}"
+    try:
+        client.delete_bucket_policy(settings.minio_bucket_name)
+    except S3Error:
+        pass  # از قبل policy‌ای وجود نداشت
 
 
 async def upload_file(file: UploadFile, org_id: uuid.UUID, subfolder: str = "contents") -> dict:
     """
-    فایل آپلودی را در MinIO ذخیره می‌کند — مسیر جداگانه به ازای هر سازمان.
+    فایل آپلودی را در MinIO (private) ذخیره می‌کند — مسیر جداگانه به ازای هر سازمان.
 
-    خروجی: {"url": ..., "filename": ..., "size": ..., "content_type": ...}
+    خروجی: {"url": "/api/files/<object_name>", "filename": ..., "size": ..., "content_type": ...}
+    مقدار "url" داخلی و پایدار است (هرگز منقضی نمی‌شود) — نه یک presigned URL.
     """
     ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
     if ext not in ALLOWED_EXTENSIONS:
@@ -125,19 +130,13 @@ async def upload_file(file: UploadFile, org_id: uuid.UUID, subfolder: str = "con
         )
 
     return {
-        "url": _public_url(object_name),
+        "url": f"{FILES_URL_PREFIX}{object_name}",
         "filename": file.filename,
         "size": len(data),
         "content_type": file.content_type,
     }
 
 
-def presigned_url(object_path: str, expires_minutes: int = 60) -> str:
-    """
-    آدرس موقت امضاشده برای دسترسی به فایل private (در صورت نیاز در آینده).
-    در V0 از bucket عمومی استفاده می‌شود و این تابع استفاده نمی‌شود.
-    """
-    client = get_minio_client()
-    return client.presigned_get_object(
-        settings.minio_bucket_name, object_path, expires=timedelta(minutes=expires_minutes)
-    )
+def object_org_id(object_name: str) -> str | None:
+    """اولین بخش object_name (قبل از اولین «/») همیشه org_id است — نگاه کنید به upload_file."""
+    return object_name.split("/", 1)[0] if "/" in object_name else None

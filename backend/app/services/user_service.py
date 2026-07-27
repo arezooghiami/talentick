@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.security import hash_password
+from app.dependencies import ROLE_HIERARCHY
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.user import (
@@ -170,13 +171,48 @@ class EmailAlreadyExistsError(Exception):
     """ایمیل از قبل در سیستم ثبت شده — یکتا در کل پلتفرم است."""
 
 
-async def create_user(db: AsyncSession, data: UserCreateRequest) -> User:
+class RoleEscalationError(Exception):
+    """
+    عامل درخواست (actor) تلاش کرده نقشی در سطح خودش یا بالاتر تنظیم کند.
+
+    این چک عمداً در service layer است (نه فقط router/dependency) تا هیچ
+    مسیر یا نسخه‌ی آینده‌ی API نتواند به‌طور تصادفی از کنار آن رد شود —
+    قبلاً این چک فقط در router بود و فقط escalation به super_admin را
+    بلاک می‌کرد؛ در نتیجه یک manager می‌توانست نقش کاربر دیگری را به
+    org_admin تغییر دهد (باگ privilege escalation).
+    """
+
+    def __init__(self, target_role: str):
+        self.target_role = target_role
+        super().__init__(f"اجازه تنظیم نقش «{target_role}» را ندارید")
+
+
+def _assert_role_assignable(actor: User, target_role: str) -> None:
+    """
+    قانون سلسله‌مراتب نقش: هر کاربر فقط می‌تواند نقشی **پایین‌تر** از سطح
+    خودش (هرگز مساوی یا بالاتر) تنظیم کند — به‌جز super_admin که می‌تواند
+    هر نقشی (از جمله super_admin) تنظیم کند.
+
+    مثال: manager (level 30) فقط می‌تواند employee (level 10) بسازد/تنظیم
+    کند؛ org_admin (level 50) می‌تواند manager/employee تنظیم کند اما نه
+    org_admin یا super_admin؛ فقط super_admin می‌تواند org_admin بسازد.
+    """
+    if actor.role == "super_admin":
+        return
+    if ROLE_HIERARCHY.get(target_role, 0) >= ROLE_HIERARCHY.get(actor.role, 0):
+        raise RoleEscalationError(target_role)
+
+
+async def create_user(db: AsyncSession, data: UserCreateRequest, actor: User) -> User:
     """
     کاربر جدید می‌سازد.
 
-    org_id و role قبل از رسیدن به این تابع باید توسط router اعتبارسنجی
-    شده باشند (مثلاً org_admin فقط در org خودش بسازد).
+    org_id قبل از رسیدن به این تابع باید توسط router اعتبارسنجی شده باشد
+    (مثلاً org_admin فقط در org خودش بسازد) — اما اعتبارسنجی role در خود
+    این تابع انجام می‌شود (_assert_role_assignable).
     """
+    _assert_role_assignable(actor, data.role)
+
     existing = await get_user_by_email(db, data.email)
     if existing:
         raise EmailAlreadyExistsError(data.email)
@@ -227,18 +263,23 @@ async def create_user(db: AsyncSession, data: UserCreateRequest) -> User:
 
 # ─── Update ────────────────────────────────────────────────────────────────────
 
-async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest) -> User:
+async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, actor: User) -> User:
     """
     ویرایش partial کاربر.
 
-    اعتبارسنجی role/org (مثلاً org_admin نمی‌تواند role را super_admin کند)
-    در router انجام می‌شود — این تابع فقط مقادیر را اعمال می‌کند.
+    اعتبارسنجی org (مثلاً org_admin نمی‌تواند کاربر سازمان دیگر را ویرایش
+    کند) در router انجام می‌شود؛ اعتبارسنجی role (سلسله‌مراتب نقش) اینجا
+    در service layer انجام می‌شود (_assert_role_assignable) — قبلاً این چک
+    فقط در router بود و فقط escalation به super_admin را بلاک می‌کرد.
 
     فیلدهای UUID (dept_id/position_id/manager_id) دستی پردازش می‌شوند:
     - رشته خالی "" → پاک کردن (NULL)
     - رشته UUID معتبر → تنظیم
     - ارسال‌نشدن (unset) → بدون تغییر
     """
+    if data.role is not None and data.role != user.role:
+        _assert_role_assignable(actor, data.role)
+
     if data.email is not None and data.email != user.email:
         existing = await get_user_by_email(db, data.email)
         if existing and str(existing.id) != str(user.id):
