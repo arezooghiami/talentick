@@ -1,7 +1,7 @@
 """
 Talentick — User Models
 ========================
-جداول: users, refresh_tokens, invitations
+جداول: users, refresh_tokens, otp_codes, invitations
 
 نقش‌ها (role enum):
   super_admin — دسترسی کامل به همه سازمان‌ها (برای خود Talentick)
@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,19 +33,29 @@ class User(UUIDMixin, TimestampMixin, Base):
     """
     کاربران سیستم.
 
-    قانون مهم: هر کاربر به یک org تعلق دارد.
-    هرگز org_id را بدون بررسی رد نکنید.
+    قانون: هر کاربر یا به یک org تعلق دارد (org_id ست است)، یا کاربر
+    General/Public است (org_id=NULL) — کاربر General همیشه role="employee"
+    است (در DB با CheckConstraint اجرا می‌شود؛ محدودیت dept_id/position_id/
+    manager_id=NULL برای این کاربران عمداً فقط در لایه سرویس اعمال می‌شود،
+    نه Constraint، تا برای نیازهای آینده انعطاف‌پذیرتر بماند).
     """
 
     __tablename__ = "users"
 
+    __table_args__ = (
+        CheckConstraint(
+            "org_id IS NOT NULL OR role = 'employee'",
+            name="ck_users_general_user_is_employee",
+        ),
+    )
+
     # ─── سازمان ───────────────────────────────────────────────────────────
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
-        comment="سازمان کاربر — Row-Level Security"
+        comment="سازمان کاربر — Row-Level Security. NULL یعنی کاربر General/Public (بدون سازمان)"
     )
     manager_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -55,12 +65,12 @@ class User(UUIDMixin, TimestampMixin, Base):
         comment="مدیر مستقیم کاربر"
     )
     # ─── اطلاعات اصلی ─────────────────────────────────────────────────────
-    email: Mapped[str] = mapped_column(
+    email: Mapped[str | None] = mapped_column(
         String(320),
-        nullable=False,
+        nullable=True,
         unique=True,
         index=True,
-        comment="ایمیل یکتا در سطح سیستم (نه فقط سازمان) — یکتایی در DB اجرا می‌شود"
+        comment="ایمیل یکتا در سطح سیستم (اختیاری — لاگین اصلی از طریق phone است؛ Postgres به چند NULL در ایندکس یکتا اجازه می‌دهد)"
     )
     full_name: Mapped[str] = mapped_column(
         String(255), nullable=False,
@@ -94,7 +104,13 @@ class User(UUIDMixin, TimestampMixin, Base):
         String(500), nullable=True,
         comment="آدرس تصویر پروفایل در MinIO"
     )
-    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    phone: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        unique=True,
+        index=True,
+        comment="شماره موبایل نرمالایز‌شده (+98XXXXXXXXXX) — شناسه‌ی اصلی لاگین، یکتا در سطح سیستم"
+    )
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # ─── وضعیت ────────────────────────────────────────────────────────────
@@ -118,7 +134,7 @@ class User(UUIDMixin, TimestampMixin, Base):
     )
 
     # ─── Relationships ────────────────────────────────────────────────────
-    organization: Mapped["Organization"] = relationship(back_populates="users")
+    organization: Mapped["Organization | None"] = relationship(back_populates="users")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
@@ -153,11 +169,11 @@ class RefreshToken(UUIDMixin, Base):
         nullable=False,
         index=True,
     )
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        nullable=False,
+        nullable=True,
         index=True,
-        comment="برای جداسازی سریع‌تر query"
+        comment="برای جداسازی سریع‌تر query — NULL برای کاربر General/Public"
     )
 
     # token را hash شده ذخیره می‌کنیم — نه plain text
@@ -189,6 +205,55 @@ class RefreshToken(UUIDMixin, Base):
             self.revoked_at is None
             and self.expires_at > dt.now(timezone.utc)
         )
+
+
+class OtpCode(UUIDMixin, Base):
+    """
+    کدهای یک‌بارمصرف پیامکی (OTP) — فعلاً فقط برای فراموشی رمز عبور
+    (purpose="password_reset")، اما ساختار عمومی است تا در آینده برای
+    مصارف دیگر (مثلاً تایید موبایل، لاگین با OTP) بدون migration جدید
+    قابل استفاده باشد.
+
+    مثل refresh_tokens، خودِ کد هرگز ذخیره نمی‌شود — فقط hash آن.
+    """
+
+    __tablename__ = "otp_codes"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    phone: Mapped[str] = mapped_column(
+        String(20), nullable=False,
+        comment="شماره موبایل در لحظه‌ی درخواست (snapshot)"
+    )
+    purpose: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="password_reset", index=True,
+        comment="مصرف این کد — فعلاً فقط password_reset"
+    )
+    code_hash: Mapped[str] = mapped_column(
+        String(255), nullable=False,
+        comment="SHA256 hash از کد OTP — خودِ کد هرگز ذخیره نمی‌شود"
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0,
+        comment="تعداد تلاش‌های ناموفق verify — برای جلوگیری از brute-force روی همین ردیف"
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+        comment="زمان مصرف موفق — NULL یعنی هنوز استفاده نشده"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<OtpCode phone={self.phone!r} purpose={self.purpose!r}>"
 
 
 class Invitation(UUIDMixin, TimestampMixin, Base):

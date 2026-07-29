@@ -35,11 +35,12 @@ class Quiz(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "quizzes"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
+        comment="NULL یعنی آزمون Public/General (فقط super_admin می‌سازد)"
     )
 
     title: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -117,8 +118,8 @@ class Question(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "questions"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
     )
     quiz_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -212,8 +213,8 @@ class QuizAttempt(UUIDMixin, Base):
 
     __tablename__ = "quiz_attempts"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

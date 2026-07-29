@@ -37,11 +37,12 @@ class OnboardingProgram(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "onboarding_programs"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
+        comment="NULL یعنی برنامه‌ی Public/General (فقط super_admin می‌سازد، بدون target_dept_id)"
     )
 
     name: Mapped[str] = mapped_column(
@@ -113,8 +114,8 @@ class ProgramStep(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "program_steps"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
     )
     program_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -172,8 +173,8 @@ class UserProgramEnrollment(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "user_program_enrollments"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -227,8 +228,8 @@ class UserStepProgress(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "user_step_progress"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

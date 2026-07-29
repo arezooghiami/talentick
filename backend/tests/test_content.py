@@ -90,6 +90,7 @@ async def test_org_isolation_on_content(
         id=uuid.uuid4(),
         org_id=other_org.id,
         email="admin@other-org.local",
+        phone="+989120000099",
         full_name="ادمین سازمان دیگر",
         hashed_password=hash_password("Password@123"),
         role="org_admin",

@@ -30,11 +30,12 @@ class DocumentCategory(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "document_categories"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
+        comment="NULL یعنی دسته‌بندی Public/General"
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -52,11 +53,12 @@ class Document(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "documents"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
+        comment="NULL یعنی سند Public/General (فقط super_admin می‌سازد، بدون targets)"
     )
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

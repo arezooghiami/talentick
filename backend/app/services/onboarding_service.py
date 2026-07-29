@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content import Content
@@ -81,12 +81,14 @@ async def _validate_step_payload(
 
 
 async def _validate_program_payload(
-    db: AsyncSession, org_id: uuid.UUID, target_roles: list[str] | None, target_dept_id: str | None
+    db: AsyncSession, org_id: uuid.UUID | None, target_roles: list[str] | None, target_dept_id: str | None
 ) -> None:
     if target_roles:
         invalid = [r for r in target_roles if r not in VALID_ROLES]
         if invalid:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"نقش نامعتبر: {', '.join(invalid)}")
+    if org_id is None and target_dept_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "برنامه‌ی Public نمی‌تواند واحد سازمانی هدف داشته باشد")
     if target_dept_id:
         try:
             dept = await db.get(Department, uuid.UUID(target_dept_id))
@@ -124,7 +126,7 @@ async def step_to_response(db: AsyncSession, step: ProgramStep) -> ProgramStepRe
 
 
 async def program_to_response(db: AsyncSession, program: OnboardingProgram) -> OnboardingProgramResponse:
-    org = await db.get(Organization, program.org_id)
+    org = await db.get(Organization, program.org_id) if program.org_id else None
     dept_name = None
     if program.target_dept_id:
         dept = await db.get(Department, program.target_dept_id)
@@ -145,7 +147,7 @@ async def program_to_response(db: AsyncSession, program: OnboardingProgram) -> O
 
     return OnboardingProgramResponse(
         id=str(program.id),
-        org_id=str(program.org_id),
+        org_id=str(program.org_id) if program.org_id else None,
         org_name=org.name if org else None,
         name=program.name,
         description=program.description,
@@ -207,7 +209,7 @@ async def get_program(db: AsyncSession, program_id: str) -> OnboardingProgram | 
 
 
 async def create_program(
-    db: AsyncSession, org_id: uuid.UUID, created_by: uuid.UUID, data: OnboardingProgramCreate
+    db: AsyncSession, org_id: uuid.UUID | None, created_by: uuid.UUID, data: OnboardingProgramCreate
 ) -> OnboardingProgram:
     await _validate_program_payload(db, org_id, data.target_roles, data.target_dept_id)
     program = OnboardingProgram(
@@ -340,16 +342,21 @@ def is_program_visible_to_user(program: OnboardingProgram, user: User) -> bool:
 async def auto_enroll_new_user(db: AsyncSession, user: User) -> None:
     """
     وقتی کاربر جدید ساخته می‌شود، در تمام برنامه‌های is_default و فعال
-    سازمانش که برایش قابل‌مشاهده‌اند (نقش/واحد) خودکار ثبت‌نام می‌شود.
+    که برایش قابل‌مشاهده‌اند (نقش/واحد) خودکار ثبت‌نام می‌شود:
+    - کاربر سازمانی: برنامه‌های سازمان خودش + برنامه‌های Public (org_id=NULL)
+    - کاربر General (user.org_id=None): فقط برنامه‌های Public
 
     غیرحیاتی است — اگر خطا بدهد نباید ساخت کاربر را متوقف کند (به همین
     دلیل در router با try/except فراخوانی می‌شود).
     """
-    if user.org_id is None:
-        return
+    if user.org_id is not None:
+        org_clause = or_(OnboardingProgram.org_id == user.org_id, OnboardingProgram.org_id.is_(None))
+    else:
+        org_clause = OnboardingProgram.org_id.is_(None)
+
     result = await db.execute(
         select(OnboardingProgram).where(
-            OnboardingProgram.org_id == user.org_id,
+            org_clause,
             OnboardingProgram.is_active.is_(True),
             OnboardingProgram.is_default.is_(True),
         )
@@ -601,7 +608,10 @@ async def set_step_status(
     step_progress.completed_at = _now() if new_status in ("completed", "skipped") else None
     await db.flush()
 
-    if new_status == "completed":
+    # برنامه‌ی Public (org_id=None) فعلاً امتیاز نمی‌دهد — گیمیفیکیشن برای
+    # کاربران/برنامه‌های General در فاز جداگانه‌ای طراحی می‌شود
+    # (points_ledger.org_id هنوز NOT NULL است).
+    if new_status == "completed" and step_progress.org_id is not None:
         await points_service.award_points(
             db, step_progress.org_id, step_progress.user_id, "onboarding_step_completed", step_progress.step_id
         )
@@ -663,9 +673,10 @@ async def _recalculate_enrollment_progress(db: AsyncSession, enrollment_id: uuid
     if not required_incomplete:
         if enrollment.completed_at is None:
             enrollment.completed_at = _now()
-        await points_service.award_points(
-            db, enrollment.org_id, enrollment.user_id, "onboarding_program_completed", enrollment.program_id
-        )
+        if enrollment.org_id is not None:
+            await points_service.award_points(
+                db, enrollment.org_id, enrollment.user_id, "onboarding_program_completed", enrollment.program_id
+            )
     else:
         enrollment.completed_at = None
 

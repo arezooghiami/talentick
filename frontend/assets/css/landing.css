@@ -4,6 +4,32 @@
    دارایی‌های تصویری اختصاصی برند (assets/img/landing/*).
    ============================================================================= */
 
+/* مرجع از فونت Vazir (self-hosted) استفاده می‌کند، نه Vazirmatn — بارگذاری
+   محلی همان سه وزنی که واقعاً روی صفحه استفاده می‌شود (400/500/700)، فقط
+   برای صفحه‌ی لندینگ (سایر صفحات به design-system.css/Vazirmatn وابسته‌اند). */
+@font-face {
+  font-family: 'Vazir';
+  src: url('../fonts/Vazir/Vazir-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazir';
+  src: url('../fonts/Vazir/Vazir-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazir';
+  src: url('../fonts/Vazir/Vazir-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+body.lp-body { font-family: 'Vazir', sans-serif; }
+
 :root {
   --lp-navy:        #1F206A;  /* رنگ متن/هدینگ روی زمینه‌ی روشن — نمونه‌برداری از سایت مرجع */
   --lp-violet:       #6245FF; /* رنگ دکمه‌ی CTA اصلی — نمونه‌برداری از سایت مرجع */
@@ -206,37 +232,55 @@ body.lp-body { margin: 0; background: #fff; color: var(--lp-navy); overflow-x: h
 .lp-app-inner { position: relative; z-index: 1; max-width: 780px; margin: 0 auto; padding: 0 24px; }
 .lp-app h2 { font-size: 20px; font-weight: 400; line-height: 1.85; color: #fff; margin: 0; }
 
-/* ─── Portfolio / gallery ────────────────────────────────────────────── */
-.lp-portfolio { background: #fff; padding: 100px 0; }
+/* ─── Portfolio / carousel — عیناً مطابق مرجع: نوار افقی اسکرول‌شونده با
+   snap، ۴ کارت در هر ردیف در دسکتاپ، دکمه‌های فلش دایره‌ای بنفش. مقادیر از
+   getComputedStyle روی talentick.ir استخراج شده‌اند. ─────────────────── */
+.lp-portfolio { background: #fff; padding: 70px 0; }
 .lp-section-head { text-align: center; max-width: 640px; margin: 0 auto 8px; }
-.lp-eyebrow { display: inline-block; font-size: var(--font-xs); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .lp-portfolio h2 { font-size: 22px; font-weight: 700; color: var(--lp-navy); margin: 8px 0 0; }
 
-.lp-filters { display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap; margin: 36px 0 40px; }
+.lp-filters { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 0 0 24px; }
 .lp-filter {
-  border: none; background: none; color: var(--gray-500);
-  padding: 4px 2px; font-size: 14px; font-weight: 500; transition: color var(--t-fast);
+  border: none; background: none; color: #3089ED;
+  padding: 8px 12px; font-size: 13px; font-weight: 400;
+  border-bottom: 2px solid transparent; transition: border-color var(--t-fast);
 }
-.lp-filter:hover { color: var(--lp-navy); }
-.lp-filter.active { color: var(--lp-violet); font-weight: 700; }
+.lp-filter.active { border-bottom: 3px solid #3089ED; }
 
-.lp-gallery { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.lp-carousel-shell { position: relative; width: 100%; margin-top: 24px; padding: 0 46px; }
+.lp-carousel-arrow {
+  position: absolute; top: 50%; z-index: 10; width: 38px; height: 38px; margin-top: -19px;
+  border: 2px solid #6f36ff; border-radius: 50%; background: #6f36ff; color: #102A43;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;
+  font-size: 30px; cursor: pointer; box-shadow: 0 8px 22px rgba(77,35,177,.25);
+  transition: transform var(--t-fast), background var(--t-fast), border-color var(--t-fast);
+}
+.lp-carousel-arrow:hover { transform: translateY(-50%) scale(1.06); background: #5b25e6; border-color: #5b25e6; }
+.lp-carousel-prev { right: 0; }
+.lp-carousel-next { left: 0; }
+
+.lp-gallery {
+  display: flex; flex-wrap: nowrap; align-items: stretch; gap: 14px;
+  width: 100%; max-width: 100%; overflow-x: auto; overflow-y: hidden;
+  scroll-behavior: smooth; scroll-snap-type: x mandatory;
+  scrollbar-width: none; -ms-overflow-style: none; direction: rtl; padding: 2px 0 10px;
+}
+.lp-gallery::-webkit-scrollbar { display: none; }
 .lp-gallery-item {
-  position: relative; border-radius: var(--r-md); overflow: hidden; aspect-ratio: 6/5;
-  box-shadow: var(--shadow-sm); transition: transform var(--t-base), box-shadow var(--t-base);
+  position: relative; flex: 0 0 calc((100% - 42px) / 4); width: calc((100% - 42px) / 4);
+  min-width: calc((100% - 42px) / 4); scroll-snap-align: start;
+  border-radius: 14px; overflow: hidden; aspect-ratio: 16/9;
 }
-.lp-gallery-item:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
-.lp-gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform var(--t-slow); }
-.lp-gallery-item:hover img { transform: scale(1.08); }
+.lp-gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .lp-gallery-caption {
-  position: absolute; inset: auto 0 0 0; padding: 18px 14px 14px;
-  background: linear-gradient(0deg, rgba(10,13,44,.92), transparent);
-  color: #fff; opacity: 0; transform: translateY(8px);
-  transition: opacity var(--t-fast), transform var(--t-fast);
+  position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center;
+  padding: 14px 12px; text-align: center;
+  background: linear-gradient(180deg, rgba(255,255,255,0) 45%, rgba(255,255,255,.96) 100%);
+  color: #102A43; opacity: 0; transition: opacity var(--t-fast);
 }
-.lp-gallery-item:hover .lp-gallery-caption { opacity: 1; transform: translateY(0); }
-.lp-gallery-caption strong { display: block; font-size: 17px; font-weight: 500; }
-.lp-gallery-caption span { display: block; font-size: 11px; color: rgba(255,255,255,.75); margin-top: 2px; }
+.lp-gallery-item:hover .lp-gallery-caption { opacity: 1; }
+.lp-gallery-caption strong { display: block; width: 100%; font-size: 17px; font-weight: 500; }
+.lp-gallery-caption span { display: block; width: 100%; font-size: 12px; line-height: 1.6; color: #102A43; margin-top: 2px; }
 .lp-gallery-item[hidden] { display: none; }
 
 /* ─── Contact / footer (dark) ────────────────────────────────────────── */
@@ -246,6 +290,7 @@ body.lp-body { margin: 0; background: #fff; color: var(--lp-navy); overflow-x: h
 }
 .lp-contact::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(36,16,68,.92), rgba(10,13,44,.97)); }
 .lp-contact-inner { position: relative; z-index: 1; padding: 100px 0 40px; text-align: center; }
+
 .lp-contact h2 { font-size: 26px; font-weight: 800; margin: 0 0 44px; }
 
 .lp-contact-grid { display: flex; align-items: center; justify-content: center; gap: 48px; flex-wrap: wrap; margin-bottom: 56px; }
@@ -274,7 +319,8 @@ body.lp-body { margin: 0; background: #fff; color: var(--lp-navy); overflow-x: h
   .lp-about-row { grid-template-columns: 1fr; gap: 40px; }
   .lp-about-row.pad-bottom { margin-bottom: 48px; }
   .lp-about-row.pad-top { margin-top: 48px; }
-  .lp-gallery { grid-template-columns: repeat(3, 1fr); }
+  .lp-portfolio { padding: 64px 0; }
+  .lp-gallery-item { flex-basis: calc((100% - 14px) / 2); width: calc((100% - 14px) / 2); min-width: calc((100% - 14px) / 2); }
 }
 
 @media (max-width: 640px) {
@@ -284,11 +330,15 @@ body.lp-body { margin: 0; background: #fff; color: var(--lp-navy); overflow-x: h
   .lp-hero-inner { padding: 100px 16px 80px; }
   .lp-hero-float { position: static; opacity: 1 !important; transform: none !important; animation: none !important; margin: 0 auto 14px; width: fit-content; }
   .lp-hero-wordmark { width: 160px; }
-  .lp-about, .lp-portfolio { padding: 64px 0; }
+  .lp-about { padding: 54px 0; }
+  .lp-portfolio { padding: 52px 0; }
   .lp-app { min-height: 360px; padding: 60px 0; }
   .lp-app h2 { font-size: var(--font-lg); }
   .lp-portfolio h2, .lp-contact h2 { font-size: var(--font-2xl); }
-  .lp-gallery { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .lp-carousel-shell { padding: 0 34px; }
+  .lp-gallery { gap: 12px; }
+  .lp-gallery-item { flex-basis: 82%; width: 82%; min-width: 82%; }
+  .lp-carousel-arrow { width: 30px; height: 30px; margin-top: -15px; font-size: 24px; }
   .lp-contact-grid { flex-direction: column; gap: 18px; }
   .lp-social { display: none; }
 }

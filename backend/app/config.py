@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     # ─── Organization (V0 single-tenant) ──────────────────────────────────
     default_org_slug: str = "my-company"
 
+    # ─── OTP (فراموشی رمز عبور) ─────────────────────────────────────────────
+    # ارسال واقعی پیامک هنوز به provider ای وصل نیست (app/services/sms_service.py)
+    otp_length: int = 6
+    otp_expire_minutes: int = 5
+    otp_max_attempts: int = 5
+
     @field_validator("allowed_origins", mode="before")
     @classmethod
     def parse_origins(cls, v: str | list) -> list[str]:

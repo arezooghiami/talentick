@@ -25,10 +25,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.phone import normalize_phone
 from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
+    generate_otp_code,
     generate_temp_password,
     hash_password,
     hash_token,
@@ -36,14 +38,27 @@ from app.core.security import (
 )
 from app.core.exceptions import BadRequestError, UnauthorizedError
 from app.models.organization import Organization
-from app.models.user import RefreshToken, User
+from app.models.user import OtpCode, RefreshToken, User
+from app.services import sms_service
 
 
 # ─── Authentication ───────────────────────────────────────────────────────
 
-async def authenticate_user(db: AsyncSession, email: str, password: str) -> User | None:
-    """ایمیل و پسورد را بررسی می‌کند — None اگر نامعتبر یا کاربر غیرفعال باشد."""
-    result = await db.execute(select(User).where(User.email == email))
+async def authenticate_user(db: AsyncSession, identifier: str, password: str) -> User | None:
+    """
+    شماره موبایل یا ایمیل + پسورد را بررسی می‌کند — None اگر نامعتبر یا
+    کاربر غیرفعال باشد.
+
+    identifier ابتدا به‌عنوان شماره موبایل تست می‌شود (نرمال‌سازی)؛ اگر
+    فرمت موبایل نبود (مثلاً ایمیل بود)، به‌عنوان ایمیل جستجو می‌شود.
+    """
+    try:
+        phone = normalize_phone(identifier)
+    except ValueError:
+        result = await db.execute(select(User).where(User.email == identifier))
+    else:
+        result = await db.execute(select(User).where(User.phone == phone))
+
     user = result.scalar_one_or_none()
 
     if not user:
@@ -58,7 +73,11 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
 # ─── Session (Access + Refresh Token) ──────────────────────────────────────
 
 def _token_payload(user: User) -> dict:
-    return {"sub": str(user.id), "org_id": str(user.org_id), "role": user.role}
+    return {
+        "sub": str(user.id),
+        "org_id": str(user.org_id) if user.org_id else None,
+        "role": user.role,
+    }
 
 
 async def create_session(db: AsyncSession, user: User) -> dict:
@@ -175,7 +194,7 @@ def _build_token_response(user: User, access_token: str, refresh_token: str) -> 
         "token_type": "bearer",
         "expires_in": settings.access_token_expire_minutes * 60,
         "user_id": str(user.id),
-        "org_id": str(user.org_id),
+        "org_id": str(user.org_id) if user.org_id else None,
         "role": user.role,
         "full_name": user.full_name,
         "must_change_password": user.must_change_password,
@@ -258,6 +277,105 @@ async def admin_reset_password(db: AsyncSession, user: User) -> str:
     return temp_password
 
 
+# ─── Forgot Password (OTP پیامکی — خودسرویس) ───────────────────────────────
+# برخلاف admin_reset_password (که نیازمند دخالت ادمین است)، این جریان کاملاً
+# خودسرویس است: کاربر با موبایلش کد OTP می‌گیرد و مستقیماً رمز را عوض می‌کند.
+
+_OTP_PURPOSE_PASSWORD_RESET = "password_reset"
+
+
+async def request_password_reset_otp(db: AsyncSession, phone: str) -> None:
+    """
+    یک کد OTP برای reset رمز تولید و پیامک می‌کند.
+
+    phone باید از قبل نرمال‌سازی شده باشد. اگر شماره در سیستم ثبت نباشد،
+    **بدون خطا** برمی‌گردد (نه اینکه بگوید "شماره یافت نشد") — دقیقاً
+    همان فلسفه‌ی ضدِ User Enumeration که در پیام یکسان خطای لاگین اعمال
+    شده (routers/auth.py).
+    """
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        return
+
+    code = generate_otp_code(settings.otp_length)
+    now = datetime.now(timezone.utc)
+    db.add(
+        OtpCode(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            phone=phone,
+            purpose=_OTP_PURPOSE_PASSWORD_RESET,
+            code_hash=hash_token(code),
+            expires_at=now + timedelta(minutes=settings.otp_expire_minutes),
+            created_at=now,
+        )
+    )
+    await db.commit()
+
+    await sms_service.send_sms(phone, f"کد تایید شما: {code}")
+
+
+async def reset_password_with_otp(
+    db: AsyncSession, phone: str, code: str, new_password: str
+) -> dict:
+    """
+    کد OTP را تایید و رمز جدید را ست می‌کند — با موفقیت، کاربر را مستقیماً
+    لاگین می‌کند (مثل change_password).
+
+    خطاها: BadRequestError اگر شماره ناشناخته باشد، کد اشتباه/منقضی‌شده
+    باشد، یا تعداد تلاش‌های ناموفق از حد مجاز گذشته باشد.
+    """
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise BadRequestError("کد وارد شده نامعتبر است")
+
+    now = datetime.now(timezone.utc)
+    otp_result = await db.execute(
+        select(OtpCode)
+        .where(
+            OtpCode.user_id == user.id,
+            OtpCode.purpose == _OTP_PURPOSE_PASSWORD_RESET,
+            OtpCode.consumed_at.is_(None),
+            OtpCode.expires_at > now,
+        )
+        .order_by(OtpCode.created_at.desc())
+    )
+    otp = otp_result.scalars().first()
+
+    if not otp:
+        raise BadRequestError("کد وارد شده نامعتبر یا منقضی‌شده است")
+    if otp.attempts >= settings.otp_max_attempts:
+        raise BadRequestError("تعداد تلاش‌های شما بیش از حد مجاز است — یک کد جدید درخواست کنید")
+
+    if hash_token(code) != otp.code_hash:
+        otp.attempts += 1
+        await db.commit()
+        raise BadRequestError("کد وارد شده نامعتبر است")
+
+    otp.consumed_at = now
+    user.hashed_password = hash_password(new_password)
+    user.must_change_password = False
+    await _revoke_all_sessions(db, user)
+    await db.flush()
+
+    access_token = create_access_token(_token_payload(user))
+    refresh_token = create_refresh_token(_token_payload(user))
+    db.add(
+        RefreshToken(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            org_id=user.org_id,
+            token_hash=hash_token(refresh_token),
+            expires_at=now + timedelta(days=settings.refresh_token_expire_days),
+            created_at=now,
+        )
+    )
+    await db.commit()
+    return _build_token_response(user, access_token, refresh_token)
+
+
 # ─── Profile (GET /me) ──────────────────────────────────────────────────────
 
 async def get_me(db: AsyncSession, user: User) -> dict:
@@ -270,11 +388,11 @@ async def get_me(db: AsyncSession, user: User) -> dict:
         .options(joinedload(User.department), joinedload(User.position))
     )
     user = result.scalar_one()
-    org = await db.get(Organization, user.org_id)
+    org = await db.get(Organization, user.org_id) if user.org_id else None
     return {
         "id": str(user.id),
-        "org_id": str(user.org_id),
-        "org_name": org.name if org else "—",
+        "org_id": str(user.org_id) if user.org_id else None,
+        "org_name": org.name if org else ("—" if user.org_id else None),
         "email": user.email,
         "full_name": user.full_name,
         "role": user.role,

@@ -62,12 +62,12 @@ class Content(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "contents"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
-        comment="کلید اصلی جداسازی سازمان‌ها"
+        comment="کلید اصلی جداسازی سازمان‌ها — NULL یعنی محتوای Public/General (فقط super_admin می‌سازد، بدون targets)"
     )
 
     # ─── محتوا ────────────────────────────────────────────────────────────
@@ -178,11 +178,12 @@ class ContentItem(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "content_items"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
+        comment="از content.org_id مشتق می‌شود — NULL یعنی آیتم محتوای Public"
     )
     content_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -309,8 +310,9 @@ class UserContentProgress(UUIDMixin, TimestampMixin, Base):
         UniqueConstraint("user_id", "content_id", name="uq_user_content"),
     )
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True,
+        comment="از content.org_id مشتق می‌شود — NULL برای محتوای Public یا کاربر General"
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -380,8 +382,8 @@ class UserItemProgress(UUIDMixin, TimestampMixin, Base):
         UniqueConstraint("user_id", "item_id", name="uq_user_item"),
     )
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

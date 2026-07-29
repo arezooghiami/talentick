@@ -7,7 +7,7 @@ JWT token ساخت/اعتبارسنجی و hash کردن پسورد.
 - هرگز پسورد plain text ذخیره نکنید
 - Access token کوتاه‌مدت (60 دقیقه)
 - Refresh token بلندمدت (30 روز) — در DB ذخیره می‌شود
-- org_id همیشه در JWT payload است
+- org_id در JWT payload است (null برای کاربر General/Public بدون سازمان)
 """
 
 import secrets
@@ -51,6 +51,20 @@ def generate_temp_password(length: int = 14) -> str:
     (~83 بیت) برای یک رمز یک‌بارمصرف که بلافاصله باید عوض شود، تأمین می‌کند.
     """
     return "".join(secrets.choice(_TEMP_PASSWORD_ALPHABET) for _ in range(length))
+
+
+_OTP_ALPHABET = string.digits
+
+
+def generate_otp_code(length: int = 6) -> str:
+    """
+    کد یک‌بارمصرف عددی برای ارسال پیامکی (مثلاً فراموشی رمز عبور) می‌سازد.
+
+    مثل generate_temp_password از secrets.choice (CSPRNG) استفاده می‌شود؛
+    فقط رقم است (نه حروف) چون قرار است از طریق پیامک/تایپ سریع توسط
+    کاربر وارد شود.
+    """
+    return "".join(secrets.choice(_OTP_ALPHABET) for _ in range(length))
 
 
 def hash_token(token: str) -> str:

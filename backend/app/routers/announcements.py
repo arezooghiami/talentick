@@ -127,7 +127,12 @@ async def create_announcement(
     current_user: OrgAdmin,
     db: AsyncSession = Depends(get_db),
 ):
-    org_id = _resolve_required_org_id(current_user, body.org_id)
+    if body.is_public:
+        if current_user.role != "super_admin":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند اطلاعیه Public بسازد")
+        org_id = None
+    else:
+        org_id = _resolve_required_org_id(current_user, body.org_id)
     announcement = await announcement_service.create_announcement(db, org_id, current_user.id, body)
     return await announcement_service.announcement_to_detail(db, announcement)
 

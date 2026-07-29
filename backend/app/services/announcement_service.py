@@ -151,7 +151,7 @@ def _active_window_clause():
 # ─── Mappers ────────────────────────────────────────────────────────────────
 
 async def announcement_to_response(db: AsyncSession, announcement: Announcement) -> AnnouncementResponse:
-    org = await db.get(Organization, announcement.org_id)
+    org = await db.get(Organization, announcement.org_id) if announcement.org_id else None
     creator_name = None
     if announcement.created_by:
         creator = await db.get(User, announcement.created_by)
@@ -163,7 +163,7 @@ async def announcement_to_response(db: AsyncSession, announcement: Announcement)
     )).scalar_one()
     return AnnouncementResponse(
         id=str(announcement.id),
-        org_id=str(announcement.org_id),
+        org_id=str(announcement.org_id) if announcement.org_id else None,
         org_name=org.name if org else None,
         title=announcement.title,
         description=announcement.description,
@@ -205,7 +205,12 @@ async def list_announcements(
     active_only: bool = False,
 ) -> tuple[list[Announcement], int]:
     q = select(Announcement)
-    if org_id is not None:
+    if viewer is not None:
+        if org_id is not None:
+            q = q.where(or_(Announcement.org_id == org_id, Announcement.org_id.is_(None)))
+        else:
+            q = q.where(Announcement.org_id.is_(None))
+    elif org_id is not None:
         q = q.where(Announcement.org_id == org_id)
     if search:
         like = f"%{search.strip()}%"
@@ -232,10 +237,12 @@ async def get_announcement(db: AsyncSession, announcement_id: str) -> Announceme
 
 
 async def create_announcement(
-    db: AsyncSession, org_id: uuid.UUID, created_by: uuid.UUID, data: AnnouncementCreate
+    db: AsyncSession, org_id: uuid.UUID | None, created_by: uuid.UUID, data: AnnouncementCreate
 ) -> Announcement:
     if data.media_type not in ("image", "video"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "نوع فایل باید image یا video باشد")
+    if org_id is None and data.targets:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "اطلاعیه‌ی Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
     if data.targets:
         await _validate_targets(db, org_id, data.targets)
 
@@ -265,6 +272,9 @@ async def create_announcement(
 async def update_announcement(
     db: AsyncSession, announcement: Announcement, data: AnnouncementUpdate
 ) -> Announcement:
+    if announcement.org_id is None and data.targets:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "اطلاعیه‌ی Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
+
     payload = data.model_dump(exclude_unset=True, exclude={"targets"})
     if "media_type" in payload and payload["media_type"] not in ("image", "video"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "نوع فایل باید image یا video باشد")

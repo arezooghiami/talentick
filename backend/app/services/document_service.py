@@ -220,7 +220,7 @@ async def document_to_response(db: AsyncSession, document: Document) -> Document
     )).scalar_one()
     return DocumentResponse(
         id=str(document.id),
-        org_id=str(document.org_id),
+        org_id=str(document.org_id) if document.org_id else None,
         title=document.title,
         description=document.description,
         category_id=str(document.category_id) if document.category_id else None,
@@ -250,7 +250,7 @@ async def document_to_detail(db: AsyncSession, document: Document) -> DocumentDe
 
 async def list_documents(
     db: AsyncSession,
-    org_id: uuid.UUID,
+    org_id: uuid.UUID | None,
     *,
     page: int = 1,
     page_size: int = 20,
@@ -259,7 +259,21 @@ async def list_documents(
     viewer: User | None = None,
     apply_visibility: bool = False,
 ) -> tuple[list[Document], int]:
-    q = select(Document).where(Document.org_id == org_id)
+    """
+    - viewer داده شود (مصرف شخصی — «کتابخانه‌ی من») → علاوه بر سازمان خودِ
+      viewer، سند Public (org_id=NULL) هم همیشه دیده می‌شود؛ کاربر General
+      (viewer.org_id=None) فقط سند Public می‌بیند.
+    - viewer=None (پنل مدیریت) → فقط org_id دقیق (بدون Public) — مدیریت
+      کتابخانه‌ی هر سازمان مستقل می‌ماند.
+    """
+    q = select(Document)
+    if viewer is not None:
+        if org_id is not None:
+            q = q.where(or_(Document.org_id == org_id, Document.org_id.is_(None)))
+        else:
+            q = q.where(Document.org_id.is_(None))
+    elif org_id is not None:
+        q = q.where(Document.org_id == org_id)
     if search:
         like = f"%{search.strip()}%"
         q = q.where(or_(Document.title.ilike(like), Document.description.ilike(like)))
@@ -288,8 +302,13 @@ async def get_document(db: AsyncSession, document_id: str) -> Document | None:
 
 
 async def create_document(
-    db: AsyncSession, org_id: uuid.UUID, uploaded_by: uuid.UUID, data: DocumentCreate
+    db: AsyncSession, org_id: uuid.UUID | None, uploaded_by: uuid.UUID, data: DocumentCreate
 ) -> Document:
+    if org_id is None:
+        if data.targets:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "سند Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
+        if data.category_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "سند Public نمی‌تواند دسته‌بندی سازمانی داشته باشد")
     if data.targets:
         await _validate_targets(db, org_id, data.targets)
     if data.category_id:
@@ -319,6 +338,12 @@ async def create_document(
 
 
 async def update_document(db: AsyncSession, document: Document, data: DocumentUpdate) -> Document:
+    if document.org_id is None:
+        if data.targets:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "سند Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
+        if data.category_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "سند Public نمی‌تواند دسته‌بندی سازمانی داشته باشد")
+
     payload = data.model_dump(exclude_unset=True, exclude={"targets"})
     if "category_id" in payload:
         cid = payload["category_id"]

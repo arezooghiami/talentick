@@ -54,13 +54,13 @@ async def content_to_response(db: AsyncSession, content: Content) -> ContentResp
     if content.created_by:
         creator = await db.get(User, content.created_by)
         created_by_name = creator.full_name if creator else None
-    org = await db.get(Organization, content.org_id)
+    org = await db.get(Organization, content.org_id) if content.org_id else None
     target_count = (await db.execute(
         select(func.count()).select_from(ContentTarget).where(ContentTarget.content_id == content.id)
     )).scalar_one()
     return ContentResponse(
         id=str(content.id),
-        org_id=str(content.org_id),
+        org_id=str(content.org_id) if content.org_id else None,
         org_name=org.name if org else None,
         title=content.title,
         type=content.type,
@@ -401,14 +401,23 @@ async def list_contents(
     """
     لیست محتوا با فیلتر/جستجو/صفحه‌بندی/مرتب‌سازی.
 
-    - org_id=None → همه سازمان‌ها (فقط برای super_admin در مدیریت کلی)
-    - viewer داده شود و role او employee باشد (یا apply_visibility=True — برای
-      endpointهای «محتواهای من») → علاوه بر status=published، فقط محتوایی که
-      مطابق Permission Engine (department/position/user) برای او مجاز است
-      نمایش داده می‌شود.
+    - org_id=None و viewer=None → همه سازمان‌ها (فقط برای super_admin در مدیریت کلی)
+    - viewer داده شود (مصرف شخصی — «محتواهای من») → علاوه بر سازمان خودِ
+      viewer (اگر عضو سازمانی باشد)، محتوای Public (org_id=NULL) هم همیشه
+      دیده می‌شود؛ کاربر General (viewer.org_id=None) فقط محتوای Public
+      می‌بیند.
+    - role او employee باشد (یا apply_visibility=True) → علاوه بر
+      status=published، فقط محتوایی که مطابق Permission Engine
+      (department/position/user) برای او مجاز است نمایش داده می‌شود —
+      محتوای Public چون هرگز target ندارد همیشه از این فیلتر عبور می‌کند.
     """
     q = select(Content)
-    if org_id is not None:
+    if viewer is not None:
+        if org_id is not None:
+            q = q.where(or_(Content.org_id == org_id, Content.org_id.is_(None)))
+        else:
+            q = q.where(Content.org_id.is_(None))
+    elif org_id is not None:
         q = q.where(Content.org_id == org_id)
     if search:
         like = f"%{search.strip()}%"
@@ -441,8 +450,10 @@ async def get_content(db: AsyncSession, content_id: str) -> Content | None:
 
 
 async def create_content(
-    db: AsyncSession, org_id: uuid.UUID, created_by: uuid.UUID, data: ContentCreate
+    db: AsyncSession, org_id: uuid.UUID | None, created_by: uuid.UUID, data: ContentCreate
 ) -> Content:
+    if org_id is None and data.targets:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
     if data.targets:
         await _validate_targets(db, org_id, data.targets)
 
@@ -479,6 +490,9 @@ async def create_content(
 
 
 async def update_content(db: AsyncSession, content: Content, data: ContentUpdate) -> Content:
+    if content.org_id is None and data.targets:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
+
     payload = data.model_dump(exclude_unset=True, exclude={"targets"})
     for field, value in payload.items():
         setattr(content, field, value)

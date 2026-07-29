@@ -73,9 +73,13 @@ class DocumentCreate(BaseModel):
     file_size: Optional[int] = None
     file_type: Optional[str] = None
     org_id: Optional[str] = Field(None, description="فقط super_admin — در router enforce می‌شود")
+    is_public: bool = Field(
+        False,
+        description="سند Public/General (بدون سازمان) — فقط super_admin مجاز است؛ در این حالت category_id و targets باید خالی باشند",
+    )
     targets: list[DocumentTargetCreate] = Field(
         default_factory=list,
-        description="قوانین دسترسی — خالی یعنی برای کل سازمان",
+        description="قوانین دسترسی — خالی یعنی برای کل سازمان (یا بدون قید برای سند Public)",
     )
 
 
@@ -95,7 +99,7 @@ class DocumentUpdate(BaseModel):
 
 class DocumentResponse(BaseModel):
     id: str
-    org_id: str
+    org_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     category_id: Optional[str] = None

@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core.exceptions import BadRequestError, ForbiddenError
 from app.core.security import hash_password
 from app.dependencies import ROLE_HIERARCHY
 from app.models.organization import Organization
@@ -35,17 +36,18 @@ from app.schemas.user import (
 from app.services import onboarding_service
 
 
-def _to_list_item(user: User, org_name: str) -> UserListItem:
+def _to_list_item(user: User, org_name: str | None) -> UserListItem:
     """User ORM → UserListItem — department/position را از relationship می‌خواند (نه ستون مستقیم)."""
     return UserListItem(
         id=str(user.id),
         full_name=user.full_name,
         email=user.email,
+        phone=user.phone,
         role=user.role,
         department=user.department.name if user.department else None,
         position=user.position.name if user.position else None,
-        org_id=str(user.org_id),
-        org_name=org_name,
+        org_id=str(user.org_id) if user.org_id else None,
+        org_name=org_name if user.org_id else None,
         is_active=user.is_active,
         created_at=user.created_at,
     )
@@ -80,14 +82,14 @@ async def list_users(
 
     base_q = (
         select(User, Organization.name.label("org_name"))
-        .join(Organization, User.org_id == Organization.id)
+        .outerjoin(Organization, User.org_id == Organization.id)
         .options(joinedload(User.department), joinedload(User.position))
     )
 
     if search:
         like = f"%{search}%"
         base_q = base_q.where(
-            (User.full_name.ilike(like)) | (User.email.ilike(like))
+            (User.full_name.ilike(like)) | (User.email.ilike(like)) | (User.phone.ilike(like))
         )
     if role:
         base_q = base_q.where(User.role == role)
@@ -151,11 +153,13 @@ async def get_user(db: AsyncSession, user_id: str) -> User | None:
     return result.scalar_one_or_none()
 
 
-async def get_user_with_org(db: AsyncSession, user_id: str) -> tuple[User, str] | None:
-    """کاربر به‌همراه نام سازمانش — برای ساخت UserDetail/UserListItem کامل."""
+async def get_user_with_org(db: AsyncSession, user_id: str) -> tuple[User, str | None] | None:
+    """کاربر به‌همراه نام سازمانش — برای ساخت UserDetail/UserListItem کامل. کاربر General سازمان None دارد."""
     user = await get_user(db, user_id)
     if not user:
         return None
+    if user.org_id is None:
+        return user, None
     org = await db.get(Organization, user.org_id)
     return user, (org.name if org else "—")
 
@@ -165,10 +169,20 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     return result.scalar_one_or_none()
 
 
+async def get_user_by_phone(db: AsyncSession, phone: str) -> User | None:
+    """phone باید از قبل نرمالایز شده باشد (+98XXXXXXXXXX) — از app.core.phone.normalize_phone."""
+    result = await db.execute(select(User).where(User.phone == phone))
+    return result.scalar_one_or_none()
+
+
 # ─── Create ────────────────────────────────────────────────────────────────────
 
 class EmailAlreadyExistsError(Exception):
     """ایمیل از قبل در سیستم ثبت شده — یکتا در کل پلتفرم است."""
+
+
+class PhoneAlreadyExistsError(Exception):
+    """شماره موبایل از قبل در سیستم ثبت شده — یکتا در کل پلتفرم است (شناسه‌ی اصلی لاگین)."""
 
 
 class RoleEscalationError(Exception):
@@ -203,23 +217,58 @@ def _assert_role_assignable(actor: User, target_role: str) -> None:
         raise RoleEscalationError(target_role)
 
 
+def _assert_general_user_allowed(
+    actor: User,
+    org_id: uuid.UUID | None,
+    role: str,
+    dept_id: str | None,
+    position_id: str | None,
+    manager_id: str | None,
+) -> None:
+    """
+    قوانین کاربر General/Public (org_id=None):
+    - فقط super_admin مجاز است چنین کاربری بسازد/تنظیم کند.
+    - role اجباراً باید employee باشد (نقش مدیریتی بدون سازمان بی‌معناست —
+      همچنین در DB با CheckConstraint اجرا می‌شود).
+    - dept_id/position_id/manager_id نباید ست شوند (این محدودیت عمداً فقط
+      در همین لایه‌ی سرویس اعمال می‌شود، نه Constraint سطح DB).
+    """
+    if org_id is not None:
+        return
+    if actor.role != "super_admin":
+        raise ForbiddenError("فقط super_admin می‌تواند کاربر General (بدون سازمان) بسازد یا تنظیم کند")
+    if role != "employee":
+        raise BadRequestError("کاربر General (بدون سازمان) فقط می‌تواند نقش employee داشته باشد")
+    if dept_id or position_id or manager_id:
+        raise BadRequestError("کاربر General (بدون سازمان) نمی‌تواند واحد/پست/مدیر سازمانی داشته باشد")
+
+
 async def create_user(db: AsyncSession, data: UserCreateRequest, actor: User) -> User:
     """
     کاربر جدید می‌سازد.
 
     org_id قبل از رسیدن به این تابع باید توسط router اعتبارسنجی شده باشد
     (مثلاً org_admin فقط در org خودش بسازد) — اما اعتبارسنجی role در خود
-    این تابع انجام می‌شود (_assert_role_assignable).
+    این تابع انجام می‌شود (_assert_role_assignable)، و همچنین قوانین
+    کاربر General (_assert_general_user_allowed).
     """
     _assert_role_assignable(actor, data.role)
 
-    existing = await get_user_by_email(db, data.email)
-    if existing:
-        raise EmailAlreadyExistsError(data.email)
+    org_id = uuid.UUID(data.org_id) if data.org_id else None
+    _assert_general_user_allowed(actor, org_id, data.role, data.dept_id, data.position_id, data.manager_id)
+
+    existing_phone = await get_user_by_phone(db, data.phone)
+    if existing_phone:
+        raise PhoneAlreadyExistsError(data.phone)
+
+    if data.email:
+        existing_email = await get_user_by_email(db, data.email)
+        if existing_email:
+            raise EmailAlreadyExistsError(data.email)
 
     user = User(
         id=uuid.uuid4(),
-        org_id=uuid.UUID(data.org_id),
+        org_id=org_id,
         email=data.email,
         full_name=data.full_name,
         hashed_password=hash_password(data.password),
@@ -238,6 +287,8 @@ async def create_user(db: AsyncSession, data: UserCreateRequest, actor: User) ->
         await db.flush()
     except IntegrityError as exc:
         await db.rollback()
+        if "phone" in str(exc.orig).lower():
+            raise PhoneAlreadyExistsError(data.phone) from exc
         raise EmailAlreadyExistsError(data.email) from exc
     await db.commit()
 
@@ -280,10 +331,21 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
     if data.role is not None and data.role != user.role:
         _assert_role_assignable(actor, data.role)
 
+    if user.org_id is None:
+        target_role = data.role if data.role is not None else user.role
+        _assert_general_user_allowed(
+            actor, None, target_role, data.dept_id, data.position_id, data.manager_id
+        )
+
     if data.email is not None and data.email != user.email:
-        existing = await get_user_by_email(db, data.email)
-        if existing and str(existing.id) != str(user.id):
+        existing_email = await get_user_by_email(db, data.email)
+        if existing_email and str(existing_email.id) != str(user.id):
             raise EmailAlreadyExistsError(data.email)
+
+    if data.phone is not None and data.phone != user.phone:
+        existing_phone = await get_user_by_phone(db, data.phone)
+        if existing_phone and str(existing_phone.id) != str(user.id):
+            raise PhoneAlreadyExistsError(data.phone)
 
     payload = data.model_dump(exclude_unset=True)
     uuid_fields = {"dept_id", "position_id", "manager_id"}

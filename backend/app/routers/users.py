@@ -80,7 +80,7 @@ async def _to_detail(db: AsyncSession, user: User) -> UserDetail:
         manager_id=str(user.manager_id) if user.manager_id else None,
         manager_name=manager_name,
         phone=user.phone,
-        org_id=str(user.org_id),
+        org_id=str(user.org_id) if user.org_id else None,
         is_active=user.is_active,
         must_change_password=user.must_change_password,
         created_at=user.created_at,
@@ -223,7 +223,7 @@ async def export_users_excel(
 
     q = (
         select(User)
-        .join(Organization, User.org_id == Organization.id)
+        .outerjoin(Organization, User.org_id == Organization.id)
         .options(joinedload(User.department), joinedload(User.position))
     )
     if search:
@@ -335,6 +335,8 @@ async def create_user(
 ) -> UserDetail:
     if current_user.role != "super_admin":
         # org_admin: فقط در سازمان خودش — سلسله‌مراتب نقش در service layer چک می‌شود
+        if body.org_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند کاربر General (بدون سازمان) بسازد")
         if body.org_id != str(current_user.org_id):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط می‌توانید در سازمان خودتان کاربر بسازید")
 
@@ -344,6 +346,8 @@ async def create_user(
         user = await user_service.create_user(db, body, actor=current_user)
     except user_service.EmailAlreadyExistsError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "این ایمیل قبلاً ثبت شده است")
+    except user_service.PhoneAlreadyExistsError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "این شماره موبایل قبلاً ثبت شده است")
     except user_service.RoleEscalationError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
 
@@ -374,6 +378,8 @@ async def update_user(
         updated = await user_service.update_user(db, user, body, actor=current_user)
     except user_service.EmailAlreadyExistsError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "این ایمیل قبلاً ثبت شده است")
+    except user_service.PhoneAlreadyExistsError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "این شماره موبایل قبلاً ثبت شده است")
     except user_service.RoleEscalationError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc))
 

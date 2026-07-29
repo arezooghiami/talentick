@@ -60,7 +60,9 @@ def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID | None:
     """
     super_admin: با org_id فیلتر می‌کند، یا اگر ندهد None برمی‌گردد (یعنی
     مشاهده محتوای همه سازمان‌ها — برای مدیریت کلی پلتفرم).
-    سایر نقش‌ها همیشه محدود به سازمان خودشان هستند.
+    سایر نقش‌ها همیشه محدود به سازمان خودشان هستند — کاربر General
+    (org_id=None) هم مجاز است؛ در list_contents ترکیب با viewer باعث
+    می‌شود فقط محتوای Public ببیند (نه «همه سازمان‌ها»).
     """
     if current_user.role == "super_admin":
         if org_id:
@@ -69,8 +71,6 @@ def _resolve_org_id(current_user: User, org_id: str | None) -> uuid.UUID | None:
             except ValueError:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id نامعتبر است")
         return None
-    if current_user.org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
     return current_user.org_id
 
 
@@ -160,11 +160,16 @@ async def create_content(
     _validate_type(body.type)
     _validate_status(body.status)
 
-    org_id = current_user.org_id
-    if current_user.role == "super_admin" and body.org_id:
-        org_id = uuid.UUID(body.org_id)
-    if org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    if body.is_public:
+        if current_user.role != "super_admin":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند محتوای Public بسازد")
+        org_id = None
+    else:
+        org_id = current_user.org_id
+        if current_user.role == "super_admin" and body.org_id:
+            org_id = uuid.UUID(body.org_id)
+        if org_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است — یا is_public=true بفرستید")
 
     content = await content_service.create_content(db, org_id, current_user.id, body)
     return await content_service.content_to_detail(db, content)
@@ -177,7 +182,9 @@ async def get_content(
     db: AsyncSession = Depends(get_db),
 ):
     content = await _get_content_or_404(db, content_id)
-    _enforce_org_scope(current_user, content.org_id)
+    if content.org_id is not None:
+        # محتوای Public (org_id=None) برای همه‌ی کاربران (هر سازمانی + General) قابل مشاهده است
+        _enforce_org_scope(current_user, content.org_id)
     if current_user.role == "employee":
         if content.status != "published":
             raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")

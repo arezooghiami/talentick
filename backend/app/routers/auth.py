@@ -4,17 +4,20 @@ Talentick — Auth Router
 احراز هویت کامل مبتنی بر JWT با Access + Refresh Token (Rotation).
 
 Routes:
-    POST /api/auth/login    → ورود با ایمیل/پسورد → access_token + refresh_token
-    POST /api/auth/refresh  → صدور access_token جدید با refresh_token معتبر
-    POST /api/auth/logout   → باطل کردن session فعلی یا همه‌ی session ها
-    GET  /api/auth/me       → پروفایل کامل کاربر لاگین‌شده
+    POST /api/auth/login            → ورود با موبایل/ایمیل + پسورد → access_token + refresh_token
+    POST /api/auth/refresh          → صدور access_token جدید با refresh_token معتبر
+    POST /api/auth/logout           → باطل کردن session فعلی یا همه‌ی session ها
+    GET  /api/auth/me               → پروفایل کامل کاربر لاگین‌شده
+    POST /api/auth/forgot-password  → درخواست کد OTP پیامکی برای reset رمز
+    POST /api/auth/reset-password   → تایید کد OTP + تنظیم رمز جدید (لاگین خودکار)
 
 امنیت:
-    - حداکثر ۵ تلاش ورود ناموفق در هر ۵ دقیقه به ازای (IP + ایمیل) —
+    - حداکثر ۵ تلاش ورود ناموفق در هر ۵ دقیقه به ازای (IP + شناسه) —
       جلوگیری از Brute Force (core/rate_limit.py).
-    - پیام خطای ورود ناموفق عمداً یکسان است («ایمیل یا رمز عبور اشتباه
-      است») تا مهاجم نتواند تشخیص دهد ایمیل موجود است یا نه (جلوگیری
-      از User Enumeration).
+    - پیام خطای ورود ناموفق عمداً یکسان است («موبایل/ایمیل یا رمز عبور
+      اشتباه است») تا مهاجم نتواند تشخیص دهد حساب موجود است یا نه
+      (جلوگیری از User Enumeration) — همین فلسفه برای forgot-password هم
+      اعمال شده (پاسخ همیشه یکسان است).
     - Refresh Token Rotation: هر استفاده از refresh_token، آن را باطل و
       یک توکن جدید صادر می‌کند.
 """
@@ -25,28 +28,32 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import UnauthorizedError
-from app.core.rate_limit import login_rate_limiter
+from app.config import settings
+from app.core.exceptions import BadRequestError, UnauthorizedError
+from app.core.rate_limit import login_rate_limiter, otp_request_rate_limiter, otp_verify_rate_limiter
 from app.database import get_db
 from app.dependencies import CurrentUser
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LogoutRequest,
     MeResponse,
     RefreshRequest,
     TokenResponse,
+    VerifyOtpAndResetPasswordRequest,
 )
 from app.services import auth_service
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
-_INVALID_CREDENTIALS_MSG = "ایمیل یا رمز عبور اشتباه است"
+_INVALID_CREDENTIALS_MSG = "شماره موبایل/ایمیل یا رمز عبور اشتباه است"
 
 
-def _client_key(request: Request, username: str) -> str:
-    """کلید Rate Limit: ترکیب IP و ایمیل — هم جلوی brute-force روی یک اکانت را می‌گیرد هم روی یک IP."""
+def _client_key(request: Request, identifier: str) -> str:
+    """کلید Rate Limit: ترکیب IP و شناسه (موبایل/ایمیل) — هم جلوی brute-force روی یک اکانت را می‌گیرد هم روی یک IP."""
     client_host = request.client.host if request.client else "unknown"
-    return f"{client_host}:{username.lower()}"
+    return f"{client_host}:{identifier.lower()}"
 
 
 @router.post(
@@ -54,21 +61,22 @@ def _client_key(request: Request, username: str) -> str:
     response_model=TokenResponse,
     summary="ورود به سیستم",
     description="""
-    ورود با ایمیل (فیلد `username` در فرم) و پسورد — استاندارد OAuth2
-    Password Flow، یعنی بدنه‌ی درخواست باید
+    ورود با شماره موبایل یا ایمیل (فیلد `username` در فرم) و پسورد —
+    استاندارد OAuth2 Password Flow، یعنی بدنه‌ی درخواست باید
     `application/x-www-form-urlencoded` با فیلدهای `username` و
-    `password` باشد (نه JSON).
+    `password` باشد (نه JSON). `username` می‌تواند شماره موبایل
+    (۰۹xxxxxxxxx) یا ایمیل ثبت‌شده‌ی کاربر باشد.
 
     **پاسخ موفق:** `access_token` (۶۰ دقیقه اعتبار) و `refresh_token`
     (۳۰ روز اعتبار). `access_token` را در هدر
     `Authorization: Bearer <token>` تمام درخواست‌های بعدی قرار دهید.
 
     **خطاها:**
-    - `401` — ایمیل یا پسورد اشتباه، یا حساب غیرفعال است.
+    - `401` — موبایل/ایمیل یا پسورد اشتباه، یا حساب غیرفعال است.
     - `429` — بیش از ۵ تلاش ناموفق در ۵ دقیقه اخیر (Rate Limit).
     """,
     responses={
-        401: {"description": "ایمیل یا پسورد اشتباه است، یا حساب غیرفعال است"},
+        401: {"description": "موبایل/ایمیل یا پسورد اشتباه است، یا حساب غیرفعال است"},
         429: {"description": "تعداد تلاش‌های ورود بیش از حد مجاز — کمی صبر کنید"},
     },
 )
@@ -187,3 +195,62 @@ async def me(
     db: AsyncSession = Depends(get_db),
 ) -> MeResponse:
     return await auth_service.get_me(db, current_user)
+
+
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    summary="درخواست کد OTP برای فراموشی رمز عبور",
+    description="""
+    یک کد تایید ۶ رقمی به شماره موبایل داده‌شده پیامک می‌شود (اعتبار
+    چند دقیقه‌ای — `otp_expire_minutes` در تنظیمات).
+
+    **توجه امنیتی:** پاسخ همیشه یکسان است، چه شماره در سیستم ثبت باشد
+    چه نباشد — تا مهاجم نتواند وجود یک شماره را در سیستم تشخیص دهد.
+
+    **خطاها:**
+    - `429` — درخواست بیش از حد مجاز برای همین شماره/IP (Rate Limit).
+    """,
+    responses={429: {"description": "تعداد درخواست‌های کد بیش از حد مجاز — کمی صبر کنید"}},
+)
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ForgotPasswordResponse:
+    otp_request_rate_limiter.check(_client_key(request, body.phone))
+    await auth_service.request_password_reset_otp(db, body.phone)
+    return ForgotPasswordResponse(expires_in_seconds=settings.otp_expire_minutes * 60)
+
+
+@router.post(
+    "/reset-password",
+    response_model=TokenResponse,
+    summary="تایید کد OTP و تنظیم رمز جدید",
+    description="""
+    کد ارسال‌شده از `POST /api/auth/forgot-password` را تایید و رمز جدید
+    را ست می‌کند. در صورت موفقیت، مثل لاگین معمولی `access_token` و
+    `refresh_token` بازمی‌گردد (نیازی به لاگین دوباره نیست) و همه‌ی
+    session های قبلی کاربر باطل می‌شوند.
+
+    **خطاها:**
+    - `400` — کد اشتباه، منقضی‌شده، یا تعداد تلاش‌ها بیش از حد مجاز.
+    - `429` — درخواست بیش از حد مجاز برای همین شماره (Rate Limit).
+    """,
+    responses={
+        400: {"description": "کد نامعتبر/منقضی‌شده یا تعداد تلاش بیش از حد"},
+        429: {"description": "تعداد تلاش‌های تایید کد بیش از حد مجاز — کمی صبر کنید"},
+    },
+)
+async def reset_password(
+    request: Request,
+    body: VerifyOtpAndResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    otp_verify_rate_limiter.check(_client_key(request, body.phone))
+    try:
+        return await auth_service.reset_password_with_otp(
+            db, body.phone, body.code, body.new_password
+        )
+    except BadRequestError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.detail)

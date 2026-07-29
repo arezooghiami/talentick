@@ -15,7 +15,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from app.core.phone import normalize_phone
 
 
 class LoginRequest(BaseModel):
@@ -25,10 +27,50 @@ class LoginRequest(BaseModel):
     توجه: endpoint واقعی `/api/auth/login` از فرم OAuth2 استاندارد
     (application/x-www-form-urlencoded با فیلدهای username/password)
     استفاده می‌کند — این اسکیمای JSON صرفاً برای مستندسازی قرارداد
-    منطقی (ایمیل + پسورد) نگه‌داشته شده و در کلاینت‌های غیر-فرم مفید است.
+    منطقی نگه‌داشته شده و در کلاینت‌های غیر-فرم مفید است. فیلد `username`
+    می‌تواند شماره موبایل (09xxxxxxxxx) یا ایمیل کاربر باشد.
     """
-    email: EmailStr
+    username: str = Field(..., description="شماره موبایل یا ایمیل کاربر")
     password: str = Field(..., min_length=1)
+
+
+class ForgotPasswordRequest(BaseModel):
+    """بدنه‌ی POST /api/auth/forgot-password — درخواست کد OTP برای reset رمز."""
+    phone: str = Field(..., description="شماره موبایل ثبت‌شده — 09xxxxxxxxx")
+
+    @field_validator("phone")
+    @classmethod
+    def _normalize(cls, v: str) -> str:
+        try:
+            return normalize_phone(v)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+
+
+class ForgotPasswordResponse(BaseModel):
+    """
+    پاسخ POST /api/auth/forgot-password.
+
+    پیام همیشه یکسان است — چه شماره ثبت‌شده باشد چه نه — تا مهاجم نتواند
+    وجود/عدم‌وجود یک شماره را در سیستم تشخیص دهد (User Enumeration).
+    """
+    message: str = "در صورت ثبت بودن این شماره، کد تایید برای آن پیامک شد"
+    expires_in_seconds: int
+
+
+class VerifyOtpAndResetPasswordRequest(BaseModel):
+    """بدنه‌ی POST /api/auth/reset-password — تایید کد OTP + تنظیم رمز جدید."""
+    phone: str = Field(..., description="شماره موبایلی که کد برایش ارسال شده")
+    code: str = Field(..., min_length=4, max_length=8, description="کد تایید پیامکی")
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("phone")
+    @classmethod
+    def _normalize(cls, v: str) -> str:
+        try:
+            return normalize_phone(v)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 class TokenResponse(BaseModel):
@@ -38,7 +80,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int = Field(..., description="مدت اعتبار access_token به ثانیه")
     user_id: str
-    org_id: str
+    org_id: str | None = Field(None, description="null یعنی کاربر General/Public (بدون سازمان)")
     role: str
     full_name: str
     must_change_password: bool = Field(
@@ -72,14 +114,14 @@ class LogoutRequest(BaseModel):
 class MeResponse(BaseModel):
     """پاسخ GET /api/auth/me — پروفایل کاربر لاگین‌شده."""
     id: str
-    org_id: str
-    org_name: str
-    email: str
+    org_id: str | None = None
+    org_name: str | None = None
+    email: str | None = None
     full_name: str
     role: str
     is_active: bool
     avatar_url: str | None = None
-    phone: str | None = None
+    phone: str
     department: str | None = None
     position: str | None = None
     last_login_at: datetime | None = None

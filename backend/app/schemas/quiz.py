@@ -106,6 +106,10 @@ class QuizCreate(BaseModel):
     max_attempts: Optional[int] = Field(None, ge=1, description="null یعنی نامحدود")
     points_override: Optional[int] = Field(None, ge=0, le=1000, description="امتیاز اختصاصی این آزمون — خالی یعنی مقدار سراسری")
     org_id: Optional[str] = None  # فقط super_admin — در router enforce می‌شود
+    is_public: bool = Field(
+        False,
+        description="آزمون Public/General (بدون سازمان) — فقط super_admin مجاز است",
+    )
 
 
 class QuizUpdate(BaseModel):
@@ -123,7 +127,7 @@ class QuizUpdate(BaseModel):
 
 class QuizResponse(BaseModel):
     id: str
-    org_id: str
+    org_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     pass_score: int

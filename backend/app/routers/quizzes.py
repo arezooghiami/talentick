@@ -124,11 +124,16 @@ async def create_quiz(
     current_user: OrgAdmin,
     db: AsyncSession = Depends(get_db),
 ) -> QuizDetailResponse:
-    org_id = current_user.org_id
-    if current_user.role == "super_admin" and body.org_id:
-        org_id = uuid.UUID(body.org_id)
-    if org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    if body.is_public:
+        if current_user.role != "super_admin":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند آزمون Public بسازد")
+        org_id = None
+    else:
+        org_id = current_user.org_id
+        if current_user.role == "super_admin" and body.org_id:
+            org_id = uuid.UUID(body.org_id)
+        if org_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است — یا is_public=true بفرستید")
 
     quiz = await quiz_service.create_quiz(db, org_id, current_user.id, body)
     return await quiz_service.quiz_to_detail(db, quiz)

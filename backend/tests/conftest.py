@@ -135,11 +135,14 @@ async def other_org(db_session: AsyncSession) -> Organization:
     return organization
 
 
-async def _create_user(db_session: AsyncSession, org: Organization, role: str, email: str) -> User:
+async def _create_user(
+    db_session: AsyncSession, org: Organization, role: str, email: str, phone: str
+) -> User:
     user = User(
         id=uuid.uuid4(),
         org_id=org.id,
         email=email,
+        phone=phone,
         full_name=f"کاربر {role}",
         hashed_password=hash_password("Password@123"),
         role=role,
@@ -154,17 +157,17 @@ async def _create_user(db_session: AsyncSession, org: Organization, role: str, e
 
 @pytest_asyncio.fixture
 async def org_admin_user(db_session: AsyncSession, org: Organization) -> User:
-    return await _create_user(db_session, org, "org_admin", "org_admin@test.local")
+    return await _create_user(db_session, org, "org_admin", "org_admin@test.local", "+989120000001")
 
 
 @pytest_asyncio.fixture
 async def employee_user(db_session: AsyncSession, org: Organization) -> User:
-    return await _create_user(db_session, org, "employee", "employee@test.local")
+    return await _create_user(db_session, org, "employee", "employee@test.local", "+989120000002")
 
 
 @pytest_asyncio.fixture
 async def super_admin_user(db_session: AsyncSession, org: Organization) -> User:
-    return await _create_user(db_session, org, "super_admin", "super_admin@test.local")
+    return await _create_user(db_session, org, "super_admin", "super_admin@test.local", "+989120000003")
 
 
 async def _login(client: AsyncClient, email: str, password: str = "Password@123") -> str:

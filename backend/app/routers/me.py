@@ -97,7 +97,10 @@ async def _get_content_or_404(db: AsyncSession, content_id: str) -> Content:
 
 async def _get_active_quiz_or_404(db: AsyncSession, quiz_id: str, org_id) -> Quiz:
     quiz = await quiz_service.get_quiz(db, quiz_id)
-    if not quiz or str(quiz.org_id) != str(org_id) or not quiz.is_active:
+    if not quiz or not quiz.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "آزمون یافت نشد")
+    # آزمون Public (org_id=None) برای همه‌ی کاربران (هر سازمانی + General) مجاز است
+    if quiz.org_id is not None and str(quiz.org_id) != str(org_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "آزمون یافت نشد")
     return quiz
 
@@ -113,7 +116,9 @@ async def _enforce_quiz_item_lock(
     if not content_id or not item_id:
         return
     content = await content_service.get_content(db, content_id)
-    if not content or str(content.org_id) != str(current_user.org_id):
+    if not content:
+        return
+    if content.org_id is not None and str(content.org_id) != str(current_user.org_id):
         return
     item = await content_service.get_item(db, item_id)
     if not item or str(item.content_id) != str(content.id) or str(item.quiz_id) != str(quiz_id):
@@ -131,8 +136,6 @@ async def list_my_contents(
     search: str | None = Query(None),
     type: str | None = Query(None, description="course | article | podcast | book"),
 ):
-    if current_user.org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
     if type and type not in CONTENT_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"نوع محتوا نامعتبر — مقادیر مجاز: {', '.join(CONTENT_TYPES)}")
 
@@ -168,7 +171,8 @@ async def get_my_content(
     db: AsyncSession = Depends(get_db),
 ):
     content = await _get_content_or_404(db, content_id)
-    if str(content.org_id) != str(current_user.org_id):
+    # محتوای Public (org_id=None) برای همه‌ی کاربران مجاز است
+    if content.org_id is not None and str(content.org_id) != str(current_user.org_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     if content.status != "published":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
@@ -207,7 +211,9 @@ async def start_my_content(
     db: AsyncSession = Depends(get_db),
 ):
     content = await _get_content_or_404(db, content_id)
-    if str(content.org_id) != str(current_user.org_id) or content.status != "published":
+    if content.org_id is not None and str(content.org_id) != str(current_user.org_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
+    if content.status != "published":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     if not await content_service.is_visible_to_user(db, content, current_user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
@@ -227,7 +233,9 @@ async def update_item_progress(
     db: AsyncSession = Depends(get_db),
 ):
     content = await _get_content_or_404(db, content_id)
-    if str(content.org_id) != str(current_user.org_id) or content.status != "published":
+    if content.org_id is not None and str(content.org_id) != str(current_user.org_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
+    if content.status != "published":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     if not await content_service.is_visible_to_user(db, content, current_user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
@@ -278,8 +286,9 @@ async def list_my_document_categories(
     current_user: Employee,
     db: AsyncSession = Depends(get_db),
 ):
+    # اسناد Public دسته‌بندی ندارند — کاربر General (بدون سازمان) لیست خالی می‌گیرد
     if current_user.org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
+        return []
     return await document_service.list_categories(db, current_user.org_id)
 
 
@@ -292,8 +301,6 @@ async def list_my_documents(
     search: str | None = Query(None),
     category_id: str | None = Query(None),
 ):
-    if current_user.org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
     items, total = await document_service.list_documents(
         db, current_user.org_id, page=page, page_size=page_size,
         search=search, category_id=category_id,
@@ -316,8 +323,6 @@ async def list_my_announcements(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(10, ge=1, le=50),
 ):
-    if current_user.org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر به هیچ سازمانی متصل نیست")
     items, _ = await announcement_service.list_announcements(
         db, current_user.org_id, page=1, page_size=limit,
         viewer=current_user, apply_visibility=True, active_only=True,

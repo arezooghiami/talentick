@@ -26,11 +26,12 @@ MEDIA_TYPES = ("image", "video")
 class Announcement(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "announcements"
 
-    org_id: Mapped[uuid.UUID] = mapped_column(
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
+        comment="NULL یعنی اطلاعیه Public/General (فقط super_admin می‌سازد، بدون targets)"
     )
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

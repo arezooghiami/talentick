@@ -213,12 +213,15 @@ async def update_item_progress(
 
     await db.flush()
 
-    if item_progress.status == "completed":
+    # محتوای Public (org_id=None) فعلاً امتیاز نمی‌دهد — گیمیفیکیشن برای
+    # محتوای/کاربران General در فاز جداگانه‌ای طراحی می‌شود
+    # (points_ledger.org_id هنوز NOT NULL است).
+    if item_progress.status == "completed" and content.org_id is not None:
         await points_service.award_points(db, content.org_id, user.id, "content_item_completed", item.id)
 
     content_progress = await _recalculate_content_progress(db, user, content, last_item_id=item.id)
 
-    if content_progress.status == "completed":
+    if content_progress.status == "completed" and content.org_id is not None:
         await points_service.award_points(db, content.org_id, user.id, "content_completed", content.id)
 
     await db.commit()

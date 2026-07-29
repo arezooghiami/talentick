@@ -160,7 +160,7 @@ async def get_quiz(db: AsyncSession, quiz_id: str) -> Quiz | None:
 
 
 async def create_quiz(
-    db: AsyncSession, org_id: uuid.UUID, created_by: uuid.UUID, data: QuizCreate
+    db: AsyncSession, org_id: uuid.UUID | None, created_by: uuid.UUID, data: QuizCreate
 ) -> Quiz:
     quiz = Quiz(
         id=uuid.uuid4(),
@@ -205,7 +205,7 @@ async def quiz_to_response(db: AsyncSession, quiz: Quiz) -> QuizResponse:
     question_count = await _question_count(db, quiz.id)
     return QuizResponse(
         id=str(quiz.id),
-        org_id=str(quiz.org_id),
+        org_id=str(quiz.org_id) if quiz.org_id else None,
         title=quiz.title,
         description=quiz.description,
         pass_score=quiz.pass_score,
@@ -463,9 +463,12 @@ async def submit_attempt(
     db.add(attempt)
     await db.flush()
 
-    if passed:
+    if passed and quiz.org_id is not None:
         # reference_id = quiz.id (نه attempt.id) — یعنی فقط اولین قبولی
         # روی این آزمون امتیاز می‌گیرد، نه هر attempt موفق بعدی.
+        # آزمون Public (org_id=None) فعلاً امتیاز نمی‌دهد — گیمیفیکیشن
+        # برای کاربران/محتوای General در فاز جداگانه‌ای طراحی می‌شود
+        # (points_ledger.org_id هنوز NOT NULL است).
         await points_service.award_points(db, quiz.org_id, user.id, "quiz_passed", quiz.id)
 
     await db.commit()
@@ -587,7 +590,7 @@ async def list_quiz_attempts_admin(
             id=str(a.id),
             user_id=str(a.user_id),
             user_full_name=users_map[a.user_id].full_name if a.user_id in users_map else "—",
-            user_email=users_map[a.user_id].email if a.user_id in users_map else "—",
+            user_email=(users_map[a.user_id].email or "—") if a.user_id in users_map else "—",
             score=a.score,
             max_score=a.max_score,
             percentage=float(a.percentage),

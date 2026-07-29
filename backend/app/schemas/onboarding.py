@@ -73,6 +73,10 @@ class OnboardingProgramCreate(BaseModel):
     is_active: bool = True
     points_override: Optional[int] = Field(None, ge=0, le=1000, description="امتیاز اختصاصی تکمیل کامل این برنامه — خالی یعنی مقدار سراسری")
     org_id: Optional[str] = Field(None, description="فقط super_admin — در router enforce می‌شود")
+    is_public: bool = Field(
+        False,
+        description="برنامه‌ی Public/General (بدون سازمان) — فقط super_admin مجاز است؛ در این حالت target_dept_id باید خالی باشد",
+    )
 
 
 class OnboardingProgramUpdate(BaseModel):
@@ -90,7 +94,7 @@ class OnboardingProgramUpdate(BaseModel):
 
 class OnboardingProgramResponse(BaseModel):
     id: str
-    org_id: str
+    org_id: Optional[str] = None
     org_name: Optional[str] = None
     name: str
     description: Optional[str] = None

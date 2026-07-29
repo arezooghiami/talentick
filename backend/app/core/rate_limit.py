@@ -56,3 +56,9 @@ class InMemoryRateLimiter:
 
 # ─── نمونه‌ی مشترک برای Login — حداکثر ۵ تلاش در هر ۵ دقیقه به ازای هر کلید ────
 login_rate_limiter = InMemoryRateLimiter(max_attempts=5, window_seconds=300)
+
+# ─── درخواست OTP (فراموشی رمز) — حداکثر ۳ درخواست کد در هر ۱۰ دقیقه به ازای شماره/IP ──
+otp_request_rate_limiter = InMemoryRateLimiter(max_attempts=3, window_seconds=600)
+
+# ─── تایید OTP — حداکثر ۵ تلاش کد در هر ۵ دقیقه به ازای شماره (برابر login) ──
+otp_verify_rate_limiter = InMemoryRateLimiter(max_attempts=5, window_seconds=300)

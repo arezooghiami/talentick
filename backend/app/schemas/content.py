@@ -108,6 +108,10 @@ class ContentCreate(BaseModel):
     is_featured: bool = False
     meta: dict = Field(default_factory=dict)
     org_id: Optional[str] = None  # فقط super_admin — در router enforce می‌شود
+    is_public: bool = Field(
+        False,
+        description="محتوای Public/General (بدون سازمان) — فقط super_admin مجاز است؛ در این حالت targets باید خالی باشد",
+    )
     sequential_progress: bool = Field(
         False,
         description="قفل ترتیبی آیتم‌ها — کاربر باید آیتم‌ها را دقیقاً به ترتیب تکمیل کند",
@@ -115,7 +119,7 @@ class ContentCreate(BaseModel):
     points_override: Optional[int] = Field(None, ge=0, le=1000, description="امتیاز اختصاصی این محتوا (کل) — خالی یعنی مقدار سراسری")
     targets: list[ContentTargetCreate] = Field(
         default_factory=list,
-        description="هدف‌های انتشار — خالی یعنی برای کل سازمان",
+        description="هدف‌های انتشار — خالی یعنی برای کل سازمان (یا بدون قید برای محتوای Public)",
     )
 
 
@@ -142,7 +146,7 @@ class ContentUpdate(BaseModel):
 
 class ContentResponse(BaseModel):
     id: str
-    org_id: str
+    org_id: Optional[str] = None
     org_name: Optional[str] = None
     title: str
     type: str

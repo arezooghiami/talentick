@@ -35,7 +35,7 @@ class ContentReportRow(BaseModel):
 class ContentReportUserRow(BaseModel):
     user_id: str
     full_name: str
-    email: str
+    email: Optional[str] = None
     department: Optional[str] = None
     position: Optional[str] = None
     status: str
@@ -67,7 +67,7 @@ class OrganizationReportRow(BaseModel):
 class UserReportRow(BaseModel):
     user_id: str
     full_name: str
-    email: str
+    email: Optional[str] = None
     department: Optional[str] = None
     position: Optional[str] = None
     eligible_count: int

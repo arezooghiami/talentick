@@ -49,9 +49,13 @@ class AnnouncementCreate(BaseModel):
     ends_at: Optional[datetime] = None
     is_active: bool = True
     org_id: Optional[str] = Field(None, description="فقط super_admin — در router enforce می‌شود")
+    is_public: bool = Field(
+        False,
+        description="اطلاعیه Public/General (بدون سازمان) — فقط super_admin مجاز است؛ در این حالت targets باید خالی باشد",
+    )
     targets: list[AnnouncementTargetCreate] = Field(
         default_factory=list,
-        description="قوانین دسترسی — خالی یعنی برای کل سازمان",
+        description="قوانین دسترسی — خالی یعنی برای کل سازمان (یا بدون قید برای اطلاعیه‌ی Public)",
     )
 
 
@@ -73,7 +77,7 @@ class AnnouncementUpdate(BaseModel):
 
 class AnnouncementResponse(BaseModel):
     id: str
-    org_id: str
+    org_id: Optional[str] = None
     org_name: Optional[str] = None
     title: str
     description: Optional[str] = None

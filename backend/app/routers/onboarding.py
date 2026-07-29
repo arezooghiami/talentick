@@ -120,7 +120,12 @@ async def create_program(
     current_user: OrgAdmin,
     db: AsyncSession = Depends(get_db),
 ):
-    org_id = _resolve_required_org_id(current_user, body.org_id)
+    if body.is_public:
+        if current_user.role != "super_admin":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند برنامه‌ی Public بسازد")
+        org_id = None
+    else:
+        org_id = _resolve_required_org_id(current_user, body.org_id)
     program = await onboarding_service.create_program(db, org_id, current_user.id, body)
     return await onboarding_service.program_to_detail(db, program)
 
@@ -244,7 +249,10 @@ async def enroll_users(
         except ValueError:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"شناسه کاربر نامعتبر: {raw_id}")
         user = await db.get(User, user_uuid)
-        if not user or str(user.org_id) != str(program.org_id):
+        if not user:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"کاربر یافت نشد: {raw_id}")
+        # برنامه‌ی Public (org_id=None) برای همه‌ی کاربران (هر سازمانی + General) باز است
+        if program.org_id is not None and str(user.org_id) != str(program.org_id):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"کاربر یافت نشد یا متعلق به این سازمان نیست: {raw_id}")
         await onboarding_service.enroll_user(db, program, user, enrolled_by=current_user.id)
 

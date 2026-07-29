@@ -179,11 +179,16 @@ async def create_document(
     current_user: Manager,
     db: AsyncSession = Depends(get_db),
 ):
-    org_id = current_user.org_id
-    if current_user.role == "super_admin" and body.org_id:
-        org_id = uuid.UUID(body.org_id)
-    if org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    if body.is_public:
+        if current_user.role != "super_admin":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند سند Public بسازد")
+        org_id = None
+    else:
+        org_id = current_user.org_id
+        if current_user.role == "super_admin" and body.org_id:
+            org_id = uuid.UUID(body.org_id)
+        if org_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است — یا is_public=true بفرستید")
     document = await document_service.create_document(db, org_id, current_user.id, body)
     return await document_service.document_to_detail(db, document)
 
