@@ -29,6 +29,7 @@ from app.core.security import hash_password
 # تغییر در اولین ورود قابل استفاده بماند. قبل از هر deploy واقعی/عمومی این
 # مقدار باید عوض شود.
 SUPER_ADMIN_EMAIL = "admin@talentick.ir"
+SUPER_ADMIN_PHONE = "+989120000000"
 SUPER_ADMIN_NAME = "سوپر ادمین"
 SUPER_ADMIN_PASSWORD = "Admin@1234"
 
@@ -63,6 +64,7 @@ async def seed():
             id=uuid.uuid4(),
             org_id=org.id,
             email=SUPER_ADMIN_EMAIL,
+            phone=SUPER_ADMIN_PHONE,
             full_name=SUPER_ADMIN_NAME,
             hashed_password=hash_password(SUPER_ADMIN_PASSWORD),
             role="super_admin",
