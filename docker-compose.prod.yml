@@ -43,8 +43,13 @@ services:
       APP_ENV: production
       DEBUG: "false"
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required — دامنه(های) واقعی فرانت را با کاما جدا از هم بدهید، مثل https://app.example.com}
-    volumes: !reset
-      - ./frontend:/frontend:ro  # fallback static mount مورد نیاز main.py (read-only، بدون hot-reload) — ⚠️ کامنتِ چندخطی قبل از این کلید باعث می‌شد docker compose کل volumes را حذف کند (تست‌شده روی Compose v2.35.1)؛ به همین دلیل این توضیح inline نگه داشته شده
+    # !reset فقط برای پاک‌کردن یک فیلد (مقدار همیشه نادیده گرفته می‌شود و
+    # فیلد null/خالی می‌ماند) است — برای جایگزینیِ کامل با یک لیست غیرخالی
+    # (که اینجا هدف است: بدون بایند کد بک‌اند، فقط frontend read-only)
+    # باید !override به‌کار برود، وگرنه کل کلید volumes حذف می‌شود
+    # (تست‌شده روی Compose v2.35.1).
+    volumes: !override
+      - ./frontend:/frontend:ro
     depends_on:
       db:
         condition: service_healthy
@@ -74,10 +79,10 @@ services:
   #        docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm certbot
   #   4. server block پورت ۴۴۳ در nginx/nginx.conf را uncomment کنید و nginx را reload کنید.
   # nginx:
-  #   ports: !reset
+  #   ports: !override
   #     - "80:80"
   #     - "443:443"
-  #   volumes: !reset
+  #   volumes: !override
   #     - ./frontend:/usr/share/nginx/html:ro
   #     - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
   #     - certbot_webroot:/var/www/certbot:ro
