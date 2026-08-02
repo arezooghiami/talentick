@@ -138,16 +138,17 @@ const UsersPage = (() => {
       <tr>
         <td style="color:var(--gray-400);">${numFa(idx)}</td>
         <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar">${initials(u.full_name)}</div><span style="font-weight:500;">${esc(u.full_name)}</span></div></td>
-        <td style="direction:ltr;text-align:right;color:var(--gray-500);">${esc(u.email)}</td>
+        <td style="direction:ltr;text-align:right;color:var(--gray-500);">${u.email ? esc(u.email) : '—'}</td>
         <td>${roleBadge(u.role)}</td>
         <td style="color:var(--gray-500);">${u.department ? esc(u.department) : '—'}</td>
         <td style="color:var(--gray-500);">${u.position ? esc(u.position) : '—'}</td>
-        ${App.isSuperAdmin ? `<td>${esc(u.org_name)}</td>` : ''}
+        ${App.isSuperAdmin ? `<td>${u.org_name ? esc(u.org_name) : '<span style="color:var(--gray-400);">عمومی</span>'}</td>` : ''}
         <td>${statusBadge(u.is_active)}</td>
         <td style="color:var(--gray-500);">${fmtDate(u.created_at)}</td>
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="UsersPage.openEdit('${u.id}')">ویرایش</button>
+            ${u.org_id ? `<button class="btn-action" style="background:#EFF6FF;color:#2563EB;" onclick="EmployeeOnboardingPage.viewDetail('${u.id}')" title="مسیر Employee Onboarding و مدارک این کاربر">مدارک</button>` : ''}
             <button class="btn-action" style="background:#FFF7ED;color:#D97706;" data-role="reset-password" data-id="${u.id}" data-title="${esc(u.full_name)}" title="یک رمز موقت تصادفی می‌سازد — سرویس ایمیل وجود ندارد، رمز را باید دستی به کاربر بدهید">Reset رمز</button>
             <button class="btn-action ${u.is_active ? 'btn-toggle-on' : 'btn-toggle-off'}" onclick="UsersPage.toggleActive('${u.id}')">${u.is_active ? 'غیرفعال کن' : 'فعال کن'}</button>
             <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-user" data-id="${u.id}" data-title="${esc(u.full_name)}">حذف</button>
@@ -206,10 +207,18 @@ const UsersPage = (() => {
     document.getElementById('un-id').value = '';
     ['un-name', 'un-email', 'un-phone', 'un-password'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('un-role').value = 'employee';
+    document.getElementById('un-role').disabled = false;
     document.getElementById('un-password-wrap').classList.remove('hidden');
+    document.getElementById('un-is-new-employee').checked = false;
+    document.getElementById('un-eo-program-wrap').classList.add('hidden');
+    document.getElementById('un-eo-program').innerHTML = '<option value="">— انتخاب مسیر —</option>';
+    document.getElementById('un-eo-program').dataset.loadedOrg = '';
+    document.getElementById('un-general-user').checked = false;
 
     if (App.isSuperAdmin) {
       document.getElementById('un-org-wrap').classList.remove('hidden');
+      document.getElementById('un-dept-position-wrap').classList.remove('hidden');
+      document.getElementById('un-eo-toggle-wrap').classList.remove('hidden');
       await populateOrgSelect();
       await populateDeptPositionSelects(document.getElementById('un-org').value, '', '');
     } else {
@@ -225,21 +234,86 @@ const UsersPage = (() => {
     document.getElementById('userModalTitle').textContent = 'ویرایش کاربر';
     document.getElementById('un-id').value = u.id;
     document.getElementById('un-name').value = u.full_name;
-    document.getElementById('un-email').value = u.email;
+    document.getElementById('un-email').value = u.email || '';
     document.getElementById('un-phone').value = '';
     document.getElementById('un-password').value = '';
     document.getElementById('un-role').value = u.role;
+    document.getElementById('un-role').disabled = false;
     document.getElementById('un-password-wrap').classList.add('hidden'); // تغییر پسورد جزو این فرم نیست
+    document.getElementById('un-is-new-employee').checked = false;
+    document.getElementById('un-eo-program-wrap').classList.add('hidden');
+    document.getElementById('un-eo-program').innerHTML = '<option value="">— انتخاب مسیر —</option>';
+    document.getElementById('un-eo-program').dataset.loadedOrg = '';
+    document.getElementById('un-general-user').checked = !u.org_id;
 
     const orgId = App.isSuperAdmin ? u.org_id : App.currentUser.org_id;
-    if (App.isSuperAdmin) {
+    if (App.isSuperAdmin && u.org_id) {
       document.getElementById('un-org-wrap').classList.remove('hidden');
+      document.getElementById('un-dept-position-wrap').classList.remove('hidden');
+      document.getElementById('un-eo-toggle-wrap').classList.remove('hidden');
       await populateOrgSelect(orgId);
     } else {
       document.getElementById('un-org-wrap').classList.add('hidden');
     }
-    await populateDeptPositionSelects(orgId, u.dept_id, u.position_id);
+
+    if (u.org_id) {
+      await populateDeptPositionSelects(orgId, u.dept_id, u.position_id);
+
+      // وضعیت فعلی Employee Onboarding این کاربر — غیرحیاتی (اگر خطا داد، فرم بدون پیش‌فرض باز می‌شود)
+      try {
+        const status = await api.get(`/employee-onboarding/monitoring/${u.id}`);
+        const current = (status.enrollments || [])[0];
+        if (current) {
+          document.getElementById('un-is-new-employee').checked = true;
+          await onNewEmployeeToggle();
+          document.getElementById('un-eo-program').value = current.program_id;
+        }
+      } catch { /* کاربر هنوز در هیچ مسیری ثبت‌نام نشده یا خطای شبکه — نادیده گرفته می‌شود */ }
+    } else {
+      // کاربر عمومی (بدون سازمان) — واحد/پست/Employee Onboarding معنا ندارد
+      document.getElementById('un-dept-position-wrap').classList.add('hidden');
+      document.getElementById('un-eo-toggle-wrap').classList.add('hidden');
+      document.getElementById('un-role').disabled = true;
+    }
+
     openModal('modal-user');
+  }
+
+  // ─── کاربر عمومی (بدون سازمان) — فقط super_admin ──────────────────
+  function onGeneralUserToggle() {
+    const checked = document.getElementById('un-general-user').checked;
+    document.getElementById('un-org-wrap').classList.toggle('hidden', checked);
+    document.getElementById('un-dept-position-wrap').classList.toggle('hidden', checked);
+    document.getElementById('un-eo-toggle-wrap').classList.toggle('hidden', checked);
+    document.getElementById('un-role').disabled = checked;
+
+    if (checked) {
+      document.getElementById('un-role').value = 'employee';
+      document.getElementById('un-dept').value = '';
+      document.getElementById('un-position').value = '';
+      document.getElementById('un-is-new-employee').checked = false;
+      document.getElementById('un-eo-program-wrap').classList.add('hidden');
+    } else {
+      populateDeptPositionSelects(document.getElementById('un-org').value, '', '');
+    }
+  }
+
+  async function onNewEmployeeToggle() {
+    const checked = document.getElementById('un-is-new-employee').checked;
+    document.getElementById('un-eo-program-wrap').classList.toggle('hidden', !checked);
+    if (!checked) return;
+    const orgId = App.isSuperAdmin ? document.getElementById('un-org').value : App.currentUser.org_id;
+    if (!orgId) { toastError('ابتدا سازمان را انتخاب کنید'); document.getElementById('un-is-new-employee').checked = false; document.getElementById('un-eo-program-wrap').classList.add('hidden'); return; }
+    const sel = document.getElementById('un-eo-program');
+    if (sel.dataset.loadedOrg === orgId) return;
+    try {
+      const res = await api.get(`/onboarding/programs?org_id=${orgId}&purpose=employee_onboarding&page_size=100`);
+      const items = (res.items || []).filter(p => p.is_active);
+      sel.innerHTML = '<option value="">— انتخاب مسیر —</option>' +
+        items.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+      sel.dataset.loadedOrg = orgId;
+      if (!items.length) toastError('این سازمان هنوز مسیر Employee Onboarding فعالی ندارد — ابتدا از صفحه‌ی «ورود کارمند جدید» یکی بسازید');
+    } catch (e) { toastError(e.message); }
   }
 
   async function populateOrgSelect(selectedOrgId) {
@@ -247,7 +321,12 @@ const UsersPage = (() => {
     const sel = document.getElementById('un-org');
     sel.innerHTML = state.orgs.map(o =>
       `<option value="${o.id}" ${o.id === selectedOrgId ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
-    sel.onchange = () => populateDeptPositionSelects(sel.value, '', '');
+    sel.onchange = () => {
+      populateDeptPositionSelects(sel.value, '', '');
+      // تغییر سازمان یعنی مسیر Employee Onboarding قبلی دیگر معتبر نیست — دوباره بارگذاری می‌شود
+      document.getElementById('un-eo-program').dataset.loadedOrg = '';
+      if (document.getElementById('un-is-new-employee').checked) onNewEmployeeToggle();
+    };
   }
 
   async function populateDeptPositionSelects(orgId, selectedDeptId, selectedPosId) {
@@ -282,21 +361,33 @@ const UsersPage = (() => {
     const phone = document.getElementById('un-phone').value.trim();
     const role = document.getElementById('un-role').value;
     const password = document.getElementById('un-password').value;
-    const dept_id = document.getElementById('un-dept').value || null;
-    const position_id = document.getElementById('un-position').value || null;
-    const org_id = App.isSuperAdmin ? document.getElementById('un-org').value : App.currentUser.org_id;
+    const isGeneralUser = App.isSuperAdmin && document.getElementById('un-general-user').checked;
+    const dept_id = isGeneralUser ? null : (document.getElementById('un-dept').value || null);
+    const position_id = isGeneralUser ? null : (document.getElementById('un-position').value || null);
+    const org_id = isGeneralUser ? null : (App.isSuperAdmin ? document.getElementById('un-org').value : App.currentUser.org_id);
+    const isNewEmployee = !isGeneralUser && document.getElementById('un-is-new-employee').checked;
+    const employee_onboarding_program_id = isNewEmployee ? (document.getElementById('un-eo-program').value || null) : null;
 
-    if (!full_name || !email || !org_id) { toastError('نام، ایمیل و سازمان اجباری هستند'); return; }
+    if (!full_name) { toastError('نام اجباری است'); return; }
+    if (!id && !phone) { toastError('شماره تماس اجباری است'); return; }
+    if (!isGeneralUser && !org_id) { toastError('سازمان اجباری است'); return; }
     if (!id && (!password || password.length < 8)) { toastError('پسورد باید حداقل ۸ کاراکتر باشد'); return; }
+    if (isNewEmployee && !employee_onboarding_program_id) { toastError('برای «کارمند جدید» انتخاب مسیر Employee Onboarding اجباری است'); return; }
 
     const btn = document.getElementById('btn-save-user');
     setLoading(btn, true);
     try {
       if (id) {
-        await api.patch(`/users/${id}`, { full_name, email, role, phone: phone || null, dept_id, position_id });
+        await api.patch(`/users/${id}`, {
+          full_name, email: email || null, role, phone: phone || null, dept_id, position_id,
+          employee_onboarding_program_id,
+        });
         toastSuccess('کاربر با موفقیت ویرایش شد');
       } else {
-        await api.post('/users/', { full_name, email, role, org_id, phone: phone || null, password, dept_id, position_id });
+        await api.post('/users/', {
+          full_name, email: email || null, role, org_id, phone, password, dept_id, position_id,
+          employee_onboarding_program_id,
+        });
         toastSuccess('کاربر با موفقیت ایجاد شد');
       }
       closeModal('modal-user');
@@ -457,7 +548,7 @@ const UsersPage = (() => {
 
   return {
     init, load, openCreate, openEdit, save, toggleActive, remove, searchDebounced, resetPassword, copyTempPassword,
-    onOrgFilterChange, onDeptFilterChange,
+    onOrgFilterChange, onDeptFilterChange, onNewEmployeeToggle, onGeneralUserToggle,
     downloadTemplate, exportExcel, openImport, onImportFileChange, submitImport, copyCred, closeImportResult,
   };
 })();

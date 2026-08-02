@@ -46,9 +46,9 @@
         اطلاعیه‌ها
       </a>
 
-      <!-- برنامه‌ی آشنایی سازمانی (Onboarding Journey) — فقط org_admin به بالا -->
-      <a class="nav-item" data-page="onboarding" data-roles="super_admin,org_admin" onclick="Router.navigate('onboarding')">
-        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+      <!-- فرآیند ورود کارمند جدید (قبل از Dashboard) — مستقل از «مسیر یادگیری» زیرمجموعه‌ی محتوا — فقط org_admin به بالا -->
+      <a class="nav-item" data-page="employee-onboarding" data-roles="super_admin,org_admin" onclick="Router.navigate('employee-onboarding')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM20 8v6M23 11h-6"/></svg>
         آنبوردینگ
       </a>
 
@@ -62,6 +62,8 @@
         <a class="nav-sub-item" onclick="ContentPage.goto('article')">مقاله</a>
         <a class="nav-sub-item" onclick="ContentPage.goto('podcast')">پادکست</a>
         <a class="nav-sub-item" onclick="ContentPage.goto('book')">کتاب</a>
+        <!-- برنامه‌ی آشنایی سازمانی (Onboarding Journey) — فقط org_admin به بالا -->
+        <a class="nav-sub-item" data-page="onboarding" data-roles="super_admin,org_admin" onclick="Router.navigate('onboarding')">مسیر یادگیری</a>
       </div>
 
       <div class="nav-item" id="navReport" data-page="reports" data-roles="super_admin,org_admin" onclick="Router.navigate('reports')">
@@ -499,7 +501,7 @@
       <!-- ═══ VIEW: آنبوردینگ (برنامه‌های آشنایی سازمانی) ═══ -->
       <div id="view-onboarding" class="view">
         <div class="view-header">
-          <div><div class="view-title">آنبوردینگ</div><div class="view-subtitle" id="obTotalLabel">در حال بارگذاری...</div></div>
+          <div><div class="view-title">مسیر یادگیری</div><div class="view-subtitle" id="obTotalLabel">در حال بارگذاری...</div></div>
           <button class="btn btn-primary" onclick="OnboardingPage.openCreate()">➕ برنامه‌ی جدید</button>
         </div>
         <div class="data-table-wrap">
@@ -519,6 +521,82 @@
             </table>
           </div>
           <div class="pagination" id="obPagination"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: ورود کارمند جدید (Employee Onboarding) ═══ -->
+      <!-- مستقل از «آنبوردینگ» (Learning Journey) بالا — این صفحه فرآیند قبل از Dashboard است -->
+      <div id="view-employee-onboarding" class="view">
+        <div class="view-header">
+          <div><div class="view-title">آنبوردینگ</div><div class="view-subtitle">پیکربندی سازمان + کاتالوگ مدارک + پیگیری وضعیت کارکنان — قبل از مشاهده‌ی Dashboard</div></div>
+          <select class="filter-select" id="eoOrgFilter" data-roles="super_admin" onchange="EmployeeOnboardingPage.onOrgChange()">
+            <option value="">— انتخاب سازمان —</option>
+          </select>
+        </div>
+
+        <div class="tab-bar" style="margin-bottom:16px;">
+          <button class="tab-btn active" id="eoTabBtnPrograms" onclick="EmployeeOnboardingPage.showTab('tab-eo-programs', this)">مسیرها</button>
+          <button class="tab-btn" id="eoTabBtnDocs" onclick="EmployeeOnboardingPage.showTab('tab-eo-doctypes', this)">کاتالوگ مدارک</button>
+          <button class="tab-btn" id="eoTabBtnMonitoring" onclick="EmployeeOnboardingPage.showTab('tab-eo-monitoring', this)">پیشرفت کارکنان</button>
+        </div>
+
+        <!-- ─── تب: مسیرها (OnboardingProgram با purpose=employee_onboarding) ─── -->
+        <div id="tab-eo-programs" class="tab-content active">
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <div class="search-box">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                <input type="text" id="eoProgSearch" placeholder="جستجو در نام مسیر..." oninput="EmployeeOnboardingPage.searchProgramsDebounced()" />
+              </div>
+              <span class="view-subtitle" id="eoProgTotalLabel" style="margin-inline-start:auto;">در حال بارگذاری...</span>
+              <button class="btn btn-primary" onclick="EmployeeOnboardingPage.openCreateProgram()">➕ مسیر جدید</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table>
+                <thead><tr><th>نام مسیر</th><th>مراحل</th><th>ثبت‌نام‌شده</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <tbody id="eoProgTableBody"><tr><td colspan="5" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="eoProgPagination"></div>
+          </div>
+        </div>
+
+        <!-- ─── تب: کاتالوگ مدارک (Document Types) ─── -->
+        <div id="tab-eo-doctypes" class="tab-content">
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <span class="struct-section-title">مدارک موردنیاز این سازمان</span>
+              <button class="btn btn-primary" onclick="EmployeeOnboardingPage.openCreateDocType()">➕ قلم جدید</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table>
+                <thead><tr><th>نام</th><th>نوع</th><th>اجباری</th><th>فرمت/جزئیات</th><th>تعداد ثبت‌شده</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <tbody id="eoDocTypesTableBody"><tr><td colspan="7" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── تب: پیشرفت کارکنان (Monitoring) ─── -->
+        <div id="tab-eo-monitoring" class="tab-content">
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <div class="search-box">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                <input type="text" id="eoMonSearch" placeholder="جستجو در نام کارمند..." oninput="EmployeeOnboardingPage.searchDebounced()" />
+              </div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--gray-600);">
+                <input type="checkbox" id="eoMonBlockedOnly" onchange="EmployeeOnboardingPage.loadMonitoring(1)"> فقط مسدودها
+              </label>
+            </div>
+            <div style="overflow-x:auto;">
+              <table>
+                <thead><tr><th>کارمند</th><th>معرفی سازمان</th><th>آپلود مدارک</th><th>وضعیت کلی</th><th>آخرین فعالیت</th><th>عملیات</th></tr></thead>
+                <tbody id="eoMonTableBody"><tr><td colspan="6" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="pagination" id="eoMonPagination"></div>
         </div>
       </div>
 
@@ -752,11 +830,20 @@
       <input type="hidden" id="un-id">
       <div class="form-grid-2">
         <div class="form-group"><label class="form-label">نام و نام خانوادگی <span class="required">*</span></label><input id="un-name" class="form-control" placeholder="علی محمدی"></div>
-        <div class="form-group"><label class="form-label">ایمیل <span class="required">*</span></label><input id="un-email" class="form-control" type="email" dir="ltr" placeholder="user@company.com"></div>
+        <div class="form-group"><label class="form-label">شماره تماس <span class="required">*</span></label><input id="un-phone" class="form-control" dir="ltr" placeholder="09xxxxxxxxx">
+          <span class="form-hint">شناسه‌ی اصلی ورود کاربر — در حالت ویرایش، خالی‌گذاشتن یعنی بدون تغییر</span>
+        </div>
       </div>
       <div class="form-grid-2">
         <div class="form-group" id="un-password-wrap"><label class="form-label">پسورد <span class="required">*</span></label><input id="un-password" class="form-control" type="password" dir="ltr" placeholder="حداقل ۸ کاراکتر"></div>
-        <div class="form-group"><label class="form-label">شماره تماس</label><input id="un-phone" class="form-control" dir="ltr" placeholder="09..."></div>
+        <div class="form-group"><label class="form-label">ایمیل</label><input id="un-email" class="form-control" type="email" dir="ltr" placeholder="user@company.com">
+          <span class="form-hint">اختیاری</span>
+        </div>
+      </div>
+      <!-- فقط super_admin می‌تواند کاربر عمومی (بدون سازمان) بسازد -->
+      <div class="form-group hidden" id="un-general-wrap" data-roles="super_admin">
+        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="un-general-user" onchange="UsersPage.onGeneralUserToggle()"> کاربر عمومی است (بدون سازمان مشخص)</label>
+        <span class="form-hint">کاربر عمومی به هیچ سازمانی تعلق ندارد، نقش او همیشه «کارمند» است و واحد/پست/مدیر یا Employee Onboarding ندارد</span>
       </div>
       <!-- فقط super_admin سازمان را انتخاب می‌کند؛ org_admin همیشه در سازمان خودش می‌سازد -->
       <div class="form-grid-2" id="un-org-wrap">
@@ -770,9 +857,18 @@
           </select>
         </div>
       </div>
-      <div class="form-grid-2">
+      <div class="form-grid-2" id="un-dept-position-wrap">
         <div class="form-group"><label class="form-label">واحد سازمانی</label><select id="un-dept" class="form-control"><option value="">— ابتدا سازمان را انتخاب کنید —</option></select></div>
         <div class="form-group"><label class="form-label">پست سازمانی</label><select id="un-position" class="form-control"><option value="">— ابتدا سازمان را انتخاب کنید —</option></select></div>
+      </div>
+      <!-- Employee Onboarding (فرآیند ورود کارمند جدید) — مستقل از «آنبوردینگ» (Learning Journey) -->
+      <div class="form-group" id="un-eo-toggle-wrap">
+        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="un-is-new-employee" onchange="UsersPage.onNewEmployeeToggle()"> کارمند جدید است — نیاز به Employee Onboarding</label>
+      </div>
+      <div class="form-group hidden" id="un-eo-program-wrap">
+        <label class="form-label">مسیر Employee Onboarding <span class="required">*</span></label>
+        <select id="un-eo-program" class="form-control"><option value="">— انتخاب مسیر —</option></select>
+        <span class="form-hint">تا تکمیل این مسیر، کاربر به Dashboard دسترسی ندارد — مسیرها از صفحه‌ی «آنبوردینگ» تعریف می‌شوند</span>
       </div>
     </div>
     <div class="modal-footer">
@@ -971,6 +1067,11 @@
 
       <!-- ─── تب ۱: مشخصات و هدف‌گذاری ──────────────────────────────── -->
       <div class="obtab-content active" id="obtab-basic">
+        <div class="form-group hidden" id="ob-is-public-wrap" data-roles="super_admin">
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="ob-is-public" onchange="OnboardingPage.onPublicToggle()"> برنامه‌ی عمومی (Public) — بدون سازمان خاص</label>
+          <span class="form-hint">برنامه‌ی عمومی برای کاربران همه‌ی سازمان‌ها و کاربران عمومی در دسترس است و نمی‌تواند واحد سازمانی هدف داشته باشد — بعد از ثبت قابل تغییر نیست.</span>
+        </div>
+        <div class="form-group hidden" id="ob-public-badge" style="color:var(--gray-500);">🌐 این یک برنامه‌ی عمومی (Public) است — بدون سازمان خاص</div>
         <div class="form-group" id="ob-org-wrap" data-roles="super_admin">
           <label class="form-label">سازمان <span class="required">*</span></label>
           <select id="ob-org-id" class="form-control" onchange="OnboardingPage.onOrgChange()">
@@ -1225,6 +1326,11 @@
 
       <!-- ─── تب ۱: مشخصات ─────────────────────────────────────────── -->
       <div class="ctab-content active" id="ctab-basic">
+        <div class="form-group hidden" id="c-is-public-wrap" data-roles="super_admin">
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="c-is-public" onchange="ContentPage.onPublicToggle()"> محتوای عمومی (Public) — بدون سازمان خاص</label>
+          <span class="form-hint">محتوای عمومی برای کاربران همه‌ی سازمان‌ها و کاربران عمومی در دسترس است و نمی‌تواند هدف‌گذاری (واحد/پست/کاربر خاص) داشته باشد — بعد از ثبت قابل تغییر نیست.</span>
+        </div>
+        <div class="form-group hidden" id="c-public-badge" style="color:var(--gray-500);">🌐 این یک محتوای عمومی (Public) است — بدون سازمان خاص</div>
         <div class="form-group" id="c-org-wrap" data-roles="super_admin">
           <label class="form-label">سازمان <span class="required">*</span></label>
           <select id="c-org-id" class="form-control" onchange="ContentPage.onOrgChange()">
@@ -1292,6 +1398,8 @@
         <div class="form-group"><label class="form-label">امتیاز تکمیل کامل این محتوا 🏆</label><input id="c-points" class="form-control" type="number" min="0" max="1000" placeholder="پیش‌فرض سراسری" style="max-width:220px;"><span class="form-hint">خالی = مقدار سراسری گیمیفیکیشن — عدد ۰ یعنی این محتوا هیچ امتیازی ندارد</span></div>
 
         <hr class="form-divider">
+        <div class="form-group hidden" id="c-targeting-public-note" style="color:var(--gray-500);">🌐 این محتوا Public است — هدف‌گذاری (واحد/پست/کاربر خاص) امکان‌پذیر نیست.</div>
+        <div id="c-targeting-section">
         <div class="form-section-title">انتشار هدف‌مند (اختیاری)</div>
         <div class="form-section-hint">
           اگر هیچ‌کدام از گزینه‌های زیر را انتخاب نکنید، این محتوا برای <b>کل سازمان</b> نمایش داده می‌شود.
@@ -1319,6 +1427,7 @@
             <div class="checkbox-scroll-box-empty">برای جستجو تایپ کنید</div>
           </div>
           <div class="chip-list" id="c-target-users-selected" style="margin-top:8px;"></div>
+        </div>
         </div>
       </div>
 
@@ -1691,6 +1800,151 @@
   </div>
 </div>
 
+<!-- ═══ MODAL: Create / Edit Employee Onboarding Program (purpose=employee_onboarding) ═══ -->
+<div id="modal-eo-program" class="modal-overlay hidden">
+  <div class="modal-box modal-xl">
+    <div class="modal-header"><h3 id="eopModalTitle">مسیر Employee Onboarding جدید</h3><button class="btn btn-icon" onclick="EmployeeOnboardingPage.closeProgramModal()">✕</button></div>
+
+    <div class="tab-bar" id="eopModalTabs" style="margin:16px 22px 0;">
+      <button class="tab-btn active" data-eoptab="basic" onclick="EmployeeOnboardingPage.switchProgramTab('basic')">۱. مشخصات</button>
+      <button class="tab-btn" data-eoptab="steps" onclick="EmployeeOnboardingPage.switchProgramTab('steps')">۲. مراحل</button>
+    </div>
+
+    <div class="modal-body">
+      <input type="hidden" id="eop-id">
+
+      <!-- ─── تب ۱: مشخصات ──────────────────────────────────────────── -->
+      <div class="obtab-content active" id="eoptab-basic">
+        <div class="form-group"><label class="form-label">نام مسیر <span class="required">*</span></label><input id="eop-name" class="form-control" placeholder="مثال: ورود کارمند جدید — واحد فروش"></div>
+        <div class="form-group"><label class="form-label">توضیحات</label><textarea id="eop-desc" class="form-control" rows="2"></textarea></div>
+        <div class="form-grid-2">
+          <div class="form-group"><label class="form-label">مهلت تکمیل (روز از لحظه‌ی ثبت‌نام)</label><input id="eop-deadline" class="form-control" type="number" min="1" placeholder="مثال: 14"><span class="form-hint">خالی = بدون مهلت</span></div>
+          <div class="form-group"><label class="form-label">امتیاز تکمیل کامل این مسیر 🏆</label><input id="eop-points" class="form-control" type="number" min="0" max="1000" placeholder="پیش‌فرض سراسری"><span class="form-hint">خالی = مقدار سراسری گیمیفیکیشن</span></div>
+        </div>
+        <div class="form-group hidden" id="eop-is-active-wrap" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="eop-is-active" style="width:16px;height:16px;" checked>
+          <label class="form-label" for="eop-is-active" style="margin:0;">فعال</label>
+        </div>
+        <div class="form-section-hint" style="margin-top:10px;">
+          این مسیر با انتخاب صریح ادمین در فرم ساخت/ویرایش کاربر (تیک «کارمند جدید») به هر کارمند اختصاص داده می‌شود — ثبت‌نام خودکار بر اساس نقش/واحد اینجا اعمال نمی‌شود.
+        </div>
+      </div>
+
+      <!-- ─── تب ۲: مراحل ──────────────────────────────────────────── -->
+      <div class="obtab-content" id="eoptab-steps">
+        <div class="form-section-hint" style="margin-bottom:14px;">
+          هر مرحله می‌تواند یک محتوای آموزشی (عکس/ویدیو/متن/PDF)، یک آزمون، آپلود مدارک (خودکار از کاتالوگ مدارک سازمان)، یا فقط یک توضیح آزاد باشد.
+        </div>
+        <div id="eopStepsList" class="content-items-list" style="margin-bottom:14px;"></div>
+        <button class="btn btn-primary" onclick="EmployeeOnboardingPage.openCreateStep()">➕ افزودن مرحله</button>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btn-eop-next" onclick="EmployeeOnboardingPage.nextProgramTab()">بعدی</button>
+      <button class="btn btn-primary hidden" id="btn-eop-save" onclick="EmployeeOnboardingPage.saveProgram()">ذخیره تغییرات</button>
+      <button class="btn btn-primary hidden" id="btn-eop-finish" onclick="EmployeeOnboardingPage.finishProgramWizard()">پایان</button>
+      <button class="btn btn-secondary" onclick="EmployeeOnboardingPage.closeProgramModal()">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Create / Edit Employee Onboarding Program Step ═══ -->
+<div id="modal-eo-program-step" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header"><h3 id="eopStepModalTitle">مرحله‌ی جدید</h3><button class="btn btn-icon" onclick="closeModal('modal-eo-program-step')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="eops-id">
+      <div class="form-group"><label class="form-label">عنوان مرحله <span class="required">*</span></label><input id="eops-title" class="form-control" placeholder="مثال: معرفی سازمان"></div>
+      <div class="form-group"><label class="form-label">توضیح</label><textarea id="eops-desc" class="form-control" rows="2"></textarea></div>
+      <div class="form-group"><label class="form-label">نوع مرحله</label>
+        <select id="eops-type" class="form-control" onchange="EmployeeOnboardingPage.refreshStepConditionalFields()">
+          <option value="custom">آزاد (بدون اکشن)</option>
+          <option value="content">محتوا</option>
+          <option value="quiz">آزمون</option>
+          <option value="document_upload">آپلود مدارک (خودکار از کاتالوگ)</option>
+        </select>
+      </div>
+      <div class="form-group hidden" id="eops-content-wrap">
+        <label class="form-label">محتوا <span class="required">*</span></label>
+        <select id="eops-content-id" class="form-control"><option value="">— انتخاب محتوا —</option></select>
+      </div>
+      <div class="form-group hidden" id="eops-quiz-wrap">
+        <label class="form-label">آزمون <span class="required">*</span></label>
+        <select id="eops-quiz-id" class="form-control"><option value="">— انتخاب آزمون —</option></select>
+      </div>
+      <div class="form-group hidden" id="eops-doc-hint">
+        <span class="form-hint">تکمیل این مرحله خودکار محاسبه می‌شود: وقتی همه‌ی مدارک اجباری فعال کاتالوگ سازمان توسط کارمند تأیید شود.</span>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="eops-required" style="width:16px;height:16px;" checked>
+        <label class="form-label" for="eops-required" style="margin:0;">تکمیل این مرحله اجباری است</label>
+      </div>
+      <div class="form-group"><label class="form-label">امتیاز تکمیل این مرحله 🏆</label><input id="eops-points" class="form-control" type="number" min="0" max="1000" placeholder="پیش‌فرض سراسری"><span class="form-hint">خالی = مقدار سراسری گیمیفیکیشن</span></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btn-eops-save" onclick="EmployeeOnboardingPage.saveStep()">ذخیره مرحله</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-eo-program-step')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Create / Edit Employee Document Type ═══ -->
+<div id="modal-eo-doctype" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header"><h3 id="eoDocTypeModalTitle">قلم جدید</h3><button class="btn btn-icon" onclick="closeModal('modal-eo-doctype')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="eo-dt-id">
+      <div class="form-group"><label class="form-label">نام <span class="required">*</span></label><input id="eo-dt-name" class="form-control" placeholder="مثال: کپی کارت ملی"></div>
+      <div class="form-group">
+        <label class="form-label">توضیحات</label>
+        <textarea id="eo-dt-desc" class="form-control" rows="2" placeholder="برای گزینه‌های جایگزین یا کمیت اینجا توضیح دهید — مثال: «پایان خدمت یا کارت معافیت» یا «۲ قطعه، هردو در یک فایل»"></textarea>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">نوع ورودی <span class="required">*</span></label>
+          <select id="eo-dt-input-type" class="form-control" onchange="EmployeeOnboardingPage.onDocTypeInputTypeChange()">
+            <option value="file">آپلود فایل</option>
+            <option value="text">مقدار متنی (مثال: شماره حساب)</option>
+          </select>
+        </div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:6px;margin-top:28px;"><input type="checkbox" id="eo-dt-required" checked> اجباری است</label></div>
+      </div>
+      <div id="eo-dt-file-fields">
+        <div class="form-grid-2">
+          <div class="form-group"><label class="form-label">فرمت‌های مجاز (با کاما جدا کنید — خالی = همه)</label><input id="eo-dt-extensions" class="form-control" dir="ltr" placeholder="pdf, jpg, png"></div>
+          <div class="form-group"><label class="form-label">حداکثر حجم (MB — خالی = سقف سراسری)</label><input id="eo-dt-max-size" class="form-control" type="number" min="1" max="200"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">فرم خام برای دانلود (اختیاری — مثال: فرم افتتاح حساب)</label>
+          <input type="file" id="eo-dt-template-input" onchange="EmployeeOnboardingPage.onTemplateFileSelected(event)">
+          <input type="hidden" id="eo-dt-template-url">
+          <span class="form-hint" id="eo-dt-template-hint">اگر کارمند باید یک فرم خاص را دانلود/پر/آپلود کند</span>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">ترتیب نمایش</label><input id="eo-dt-order" class="form-control" type="number" value="0"></div>
+      <div class="form-group"><label><input type="checkbox" id="eo-dt-active" checked> فعال</label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btn-save-eo-doctype" onclick="EmployeeOnboardingPage.saveDocType()">ذخیره</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-eo-doctype')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: جزئیات وضعیت یک کارمند (Monitoring Detail) ═══ -->
+<div id="modal-eo-monitoring-detail" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header"><h3 id="eoMonDetailTitle">وضعیت کارمند</h3><button class="btn btn-icon" onclick="closeModal('modal-eo-monitoring-detail')">✕</button></div>
+    <div class="modal-body" id="eoMonDetailBody">
+      <div class="loading-row">در حال بارگذاری...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-eo-monitoring-detail')">بستن</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Scripts ─────────────────────────────────────────────── -->
 <script src="../assets/js/config.js?v=20260715"></script>
 <script src="../assets/js/auth.js?v=20260715"></script>
@@ -1705,7 +1959,8 @@
 <script src="../assets/js/org_profile.js?v=20260715"></script>
 <script src="../assets/js/document_admin.js?v=20260715"></script>
 <script src="../assets/js/announcements_admin.js?v=20260715"></script>
-<script src="../assets/js/onboarding_admin.js?v=20260718c"></script>
+<script src="../assets/js/onboarding_admin.js?v=20260801a"></script>
+<script src="../assets/js/employee_onboarding_admin.js?v=20260801a"></script>
 <script src="../assets/js/tickets_admin.js?v=20260719a"></script>
 <script src="../assets/js/gamification_admin.js?v=20260720a"></script>
 <script src="../assets/js/rewards_admin.js?v=20260720a"></script>
@@ -1730,7 +1985,8 @@
   Router.register('documents', { title: 'کتابخانه اسناد',   load: () => { if (!App.isSuperAdmin) DocumentsPage.loadOwn(); } });
   Router.register('quiz',      { title: 'مدیریت آزمون',     load: () => QuizAdminPage.load(1) });
   Router.register('announcements', { title: 'اطلاعیه‌ها',   load: () => AnnouncementsPage.load(1) });
-  Router.register('onboarding', { title: 'آنبوردینگ',       load: () => OnboardingPage.load(1) });
+  Router.register('onboarding', { title: 'مسیر یادگیری',    load: () => OnboardingPage.load(1) });
+  Router.register('employee-onboarding', { title: 'آنبوردینگ', load: () => EmployeeOnboardingPage.init() });
   Router.register('reports',   { title: 'گزارش‌ها',         load: ReportsPage.load });
   Router.register('support',   { title: 'تیکت‌ها',           load: () => TicketsPage.load(1) });
   Router.register('gamification', { title: 'گیمیفیکیشن',     load: () => { if (App.isSuperAdmin) GamificationPage.load(); } });

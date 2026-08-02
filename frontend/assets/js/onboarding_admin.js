@@ -37,7 +37,10 @@ const OnboardingPage = (() => {
     const tbody = document.getElementById('obTableBody');
     tbody.innerHTML = `<tr><td colspan="7" class="loading-row">در حال بارگذاری...</td></tr>`;
     const orgFilter = document.getElementById('obOrgFilter')?.value || '';
-    const p = new URLSearchParams({ page, page_size: 20 });
+    // purpose=learning صراحتاً ارسال می‌شود تا مسیرهای Employee Onboarding
+    // (که همان API را با purpose=employee_onboarding استفاده می‌کنند) اینجا
+    // مخلوط نشوند — دو صفحه‌ی پنل ادمین کاملاً مجزا از هم می‌مانند.
+    const p = new URLSearchParams({ page, page_size: 20, purpose: 'learning' });
     if (state.search) p.set('search', state.search);
     if (App.isSuperAdmin && orgFilter) p.set('org_id', orgFilter);
     try {
@@ -52,7 +55,7 @@ const OnboardingPage = (() => {
       tbody.innerHTML = state.items.map(p => `
         <tr>
           <td style="font-weight:600;">${esc(p.name)}${p.is_default ? ' <span class="badge badge-admin">پیش‌فرض</span>' : ''}</td>
-          ${App.isSuperAdmin ? `<td class="th-org">${esc(p.org_name || '—')}</td>` : ''}
+          ${App.isSuperAdmin ? `<td class="th-org">${p.org_name ? esc(p.org_name) : '<span style="color:var(--gray-400);">عمومی</span>'}</td>` : ''}
           <td>${targetSummary(p)}</td>
           <td>${numFa(p.step_count)} مرحله</td>
           <td>${numFa(p.enrollment_count)} نفر</td>
@@ -135,8 +138,9 @@ const OnboardingPage = (() => {
     if (state.activeTab !== 'basic') return;
     const name = document.getElementById('ob-name').value.trim();
     if (!name) { toastError('نام برنامه اجباری است'); return; }
+    const isPublic = App.isSuperAdmin && document.getElementById('ob-is-public').checked;
     let orgId = null;
-    if (App.isSuperAdmin) {
+    if (App.isSuperAdmin && !isPublic) {
       orgId = document.getElementById('ob-org-id').value;
       if (!orgId) { toastError('لطفاً سازمان را انتخاب کنید'); return; }
     }
@@ -144,11 +148,15 @@ const OnboardingPage = (() => {
     setLoading(btn, true);
     try {
       const payload = basicPayload();
-      if (orgId) payload.org_id = orgId;
+      if (isPublic) payload.is_public = true;
+      else if (orgId) payload.org_id = orgId;
       const created = await api.post('/onboarding/programs', payload);
       state.programId = created.id;
       document.getElementById('ob-id').value = created.id;
-      if (App.isSuperAdmin) document.getElementById('ob-org-id').disabled = true;
+      if (App.isSuperAdmin) {
+        document.getElementById('ob-org-id').disabled = true;
+        document.getElementById('ob-is-public').disabled = true;
+      }
       toastSuccess('مشخصات ذخیره شد — حالا مراحل را اضافه کنید');
       await loadContentsAndQuizzesForSelect(created.org_id);
       state.activeSteps = created.steps || [];
@@ -157,6 +165,19 @@ const OnboardingPage = (() => {
       switchTab('steps');
     } catch (e) { toastError(e.message); }
     finally { setLoading(btn, false); }
+  }
+
+  // ─── برنامه‌ی Public (بدون سازمان) — فقط super_admin، فقط در حالت ساخت ──
+  function onPublicToggle() {
+    const checked = document.getElementById('ob-is-public').checked;
+    document.getElementById('ob-org-wrap').classList.toggle('hidden', checked);
+    if (checked) {
+      document.getElementById('ob-dept-id').value = '';
+      document.getElementById('ob-dept-id').innerHTML = '<option value="">— همه واحدها —</option>';
+    } else {
+      const orgId = document.getElementById('ob-org-id').value;
+      if (orgId) loadDeptsForSelect(orgId);
+    }
   }
 
   async function finishWizard() { closeModal('modal-onboarding'); await load(1); }
@@ -202,12 +223,17 @@ const OnboardingPage = (() => {
     document.getElementById('ob-is-active-wrap').classList.add('hidden');
     document.querySelectorAll('#ob-role-checks input').forEach(cb => cb.checked = false);
     document.getElementById('ob-dept-id').innerHTML = '<option value="">— همه واحدها —</option>';
+    document.getElementById('ob-public-badge').classList.add('hidden');
     state.activeSteps = [];
     renderSteps();
     setTabsUnlocked('basic');
     switchTab('basic');
 
     if (App.isSuperAdmin) {
+      document.getElementById('ob-is-public-wrap').classList.remove('hidden');
+      document.getElementById('ob-is-public').checked = false;
+      document.getElementById('ob-is-public').disabled = false;
+      document.getElementById('ob-org-wrap').classList.remove('hidden');
       document.getElementById('ob-org-id').disabled = false;
       await loadOrgsForSelect('');
     } else {
@@ -234,9 +260,18 @@ const OnboardingPage = (() => {
       cb.checked = (detail.target_roles || []).includes(cb.value);
     });
 
+    // is_public فقط در ساخت قابل تنظیم است — در ویرایش فقط وضعیت فعلی نمایش داده می‌شود
+    document.getElementById('ob-is-public-wrap').classList.add('hidden');
     if (App.isSuperAdmin) {
-      document.getElementById('ob-org-id').disabled = true;
-      await loadOrgsForSelect(detail.org_id);
+      if (detail.org_id) {
+        document.getElementById('ob-public-badge').classList.add('hidden');
+        document.getElementById('ob-org-wrap').classList.remove('hidden');
+        document.getElementById('ob-org-id').disabled = true;
+        await loadOrgsForSelect(detail.org_id);
+      } else {
+        document.getElementById('ob-public-badge').classList.remove('hidden');
+        document.getElementById('ob-org-wrap').classList.add('hidden');
+      }
     }
     await loadDeptsForSelect(detail.org_id, detail.target_dept_id);
     await loadContentsAndQuizzesForSelect(detail.org_id);
@@ -540,7 +575,7 @@ const OnboardingPage = (() => {
 
   return {
     load, searchDebounced, switchTab, nextTab, finishWizard, closeOnboardingModal,
-    openCreate, openEdit, save, remove, onOrgChange,
+    openCreate, openEdit, save, remove, onOrgChange, onPublicToggle,
     openCreateStep, openEditStep, saveStep, removeStep, refreshStepConditionalFields,
     openEnrollments, enrollSearchDebounced, submitManualEnroll,
   };

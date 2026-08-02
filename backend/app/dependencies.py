@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.user import User
+from app.services import onboarding_service
 
 # ─── OAuth2 Scheme ────────────────────────────────────────────────────────────
 # tokenUrl باید با endpoint لاگین match کنه
@@ -40,6 +41,27 @@ _PASSWORD_CHANGE_EXEMPT_PATHS = {
     "/api/auth/me",
     "/api/auth/logout",
 }
+
+# پیشوند مسیرهایی که حتی اگر Employee Onboarding کاربر ناقص باشد، همچنان
+# مجازند — با startswith چون بعضی از این مسیرها پارامتر داینامیک دارند
+# (مثلاً /api/employee-onboarding/me/document-types/{id}/submit).
+# باید شامل خودِ auth (برای لاگین/خروج/تغییر رمز)، «مسیر ورود من» —
+# هم مشاهده/تکمیل خودِ مراحل محتوا/آزمون مسیر (/api/me/onboarding/... —
+# همان موتور مشترک با مسیرهای یادگیری، پس یک کاربر مسدود موقتاً به
+# enrollment های یادگیری خودش هم دسترسی می‌گیرد؛ بی‌ضرر — Dashboard/
+# محتوا/... همچنان قفل می‌مانند)، هم آپلود مدرک
+# (/api/employee-onboarding/me/...) — و پراکسی فایل (برای دیدن فرم‌های
+# خام دانلودی/مدارک از قبل آپلودشده‌ی خودش).
+_EMPLOYEE_ONBOARDING_EXEMPT_PREFIXES = (
+    "/api/auth/",
+    "/api/me/onboarding",  # بدون / انتهایی عمداً — شامل خودِ GET /api/me/onboarding (بدون پارامتر) هم می‌شود
+    "/api/employee-onboarding/me/",
+    "/api/files/",
+)
+
+
+def _is_employee_onboarding_exempt(path: str) -> bool:
+    return any(path.startswith(prefix) for prefix in _EMPLOYEE_ONBOARDING_EXEMPT_PREFIXES)
 
 # ─── Role Hierarchy ───────────────────────────────────────────────────────────
 # هر نقش شامل تمام نقش‌های پایین‌تر از خودشه
@@ -66,15 +88,19 @@ async def get_current_user(
     """
     JWT را decode می‌کند و User را از دیتابیس برمی‌گرداند.
 
-    همچنین قفل must_change_password اینجا (پایین‌ترین/مشترک‌ترین
-    dependency که همه‌ی guard ها و CurrentUser از آن مشتق می‌شوند) اعمال
-    می‌شود تا هیچ endpointی (فعلی یا آینده) نتواند این بررسی را فراموش
-    کند — مگر مسیرهای صراحتاً معاف‌شده در _PASSWORD_CHANGE_EXEMPT_PATHS.
+    همچنین دو قفل زیر اینجا (پایین‌ترین/مشترک‌ترین dependency که همه‌ی
+    guard ها و CurrentUser از آن مشتق می‌شوند) اعمال می‌شوند تا هیچ
+    endpointی (فعلی یا آینده) نتواند آن‌ها را فراموش کند — به همان ترتیب
+    که کاربر باید طی کند:
+        Login → (۱) تغییر رمز اجباری → (۲) Employee Onboarding → Dashboard
 
     خطاها:
     - 401: token نامعتبر یا منقضی
     - 401: کاربر در دیتابیس وجود ندارد
     - 428: رمز عبور توسط ادمین تنظیم شده و کاربر هنوز آن را عوض نکرده
+    - 403 (code="employee_onboarding_required"): فرآیند ورود کارمند جدید
+      کامل نشده — بدنه‌ی خطا ماشین‌خوان است تا فرانت بتواند مستقیم کاربر
+      را به صفحه‌ی «مسیر ورود من» هدایت کند (به‌جای پارس‌کردن متن فارسی).
     """
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -106,6 +132,17 @@ async def get_current_user(
             status_code=status.HTTP_428_PRECONDITION_REQUIRED,
             detail="رمز عبور شما توسط مدیر سیستم تنظیم شده — قبل از ادامه باید آن را تغییر دهید",
         )
+
+    if not _is_employee_onboarding_exempt(request.url.path):
+        is_blocked = await onboarding_service.get_employee_onboarding_gate_status(db, user.id)
+        if is_blocked:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "employee_onboarding_required",
+                    "message": "قبل از مشاهده‌ی محتوای سیستم باید فرآیند ورود کارمند جدید را تکمیل کنید",
+                },
+            )
 
     return user
 

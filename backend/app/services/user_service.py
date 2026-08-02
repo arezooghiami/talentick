@@ -256,6 +256,9 @@ async def create_user(db: AsyncSession, data: UserCreateRequest, actor: User) ->
 
     org_id = uuid.UUID(data.org_id) if data.org_id else None
     _assert_general_user_allowed(actor, org_id, data.role, data.dept_id, data.position_id, data.manager_id)
+    employee_onboarding_program = await onboarding_service.validate_employee_onboarding_program_choice(
+        db, org_id, data.employee_onboarding_program_id
+    )
 
     existing_phone = await get_user_by_phone(db, data.phone)
     if existing_phone:
@@ -299,6 +302,17 @@ async def create_user(db: AsyncSession, data: UserCreateRequest, actor: User) ->
         await onboarding_service.auto_enroll_new_user(db, user)
     except Exception:
         logging.getLogger(__name__).exception("ثبت‌نام خودکار آنبوردینگ برای کاربر %s ناموفق بود", user.id)
+
+    # ثبت‌نام در مسیر Employee Onboarding انتخاب‌شده — غیرحیاتی (اعتبارسنجی
+    # واقعی/رد درخواست پیش‌تر و پیش از commit با validate_employee_onboarding_program_choice
+    # انجام شده؛ اینجا فقط idempotent enroll_user است که به‌ندرت خطا می‌دهد).
+    if employee_onboarding_program is not None:
+        try:
+            await onboarding_service.enroll_user(db, employee_onboarding_program, user, enrolled_by=actor.id)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "ثبت‌نام کاربر %s در مسیر Employee Onboarding ناموفق بود", user.id
+            )
 
     result = await db.execute(
         select(User)
@@ -348,6 +362,13 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
             raise PhoneAlreadyExistsError(data.phone)
 
     payload = data.model_dump(exclude_unset=True)
+
+    employee_onboarding_program = None
+    if "employee_onboarding_program_id" in payload:
+        employee_onboarding_program = await onboarding_service.validate_employee_onboarding_program_choice(
+            db, user.org_id, payload.pop("employee_onboarding_program_id")
+        )
+
     uuid_fields = {"dept_id", "position_id", "manager_id"}
 
     for field, value in payload.items():
@@ -357,6 +378,16 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
             setattr(user, field, value)
 
     await db.commit()
+
+    # ثبت‌نام در مسیر Employee Onboarding تازه‌انتخاب‌شده — idempotent
+    # (enroll_user)، غیرحیاتی.
+    if employee_onboarding_program is not None:
+        try:
+            await onboarding_service.enroll_user(db, employee_onboarding_program, user, enrolled_by=actor.id)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "ثبت‌نام کاربر %s در مسیر Employee Onboarding ناموفق بود", user.id
+            )
 
     result = await db.execute(
         select(User)

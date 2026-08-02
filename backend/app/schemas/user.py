@@ -59,6 +59,14 @@ class UserCreateRequest(BaseModel):
     dept_id: str | None = None
     position_id: str | None = None
     manager_id: str | None = None
+    employee_onboarding_program_id: str | None = Field(
+        None,
+        description=(
+            "کارمند جدید است — انتخاب صریح یک مسیر Employee Onboarding "
+            "(OnboardingProgram با purpose=employee_onboarding) برای ثبت‌نام خودکار این کاربر در آن. "
+            "خالی یعنی این کاربر نیازی به Employee Onboarding ندارد."
+        ),
+    )
 
     @field_validator("phone")
     @classmethod
@@ -88,6 +96,13 @@ class UserUpdateRequest(BaseModel):
     dept_id: str | None = None
     position_id: str | None = None
     manager_id: str | None = None
+    employee_onboarding_program_id: str | None = Field(
+        None,
+        description=(
+            "تخصیص/تغییر مسیر Employee Onboarding این کاربر — ارسال‌نشدن یعنی بدون تغییر. "
+            "اگر کاربر از قبل مسیری داشت، این مقدار Enrollment جدیدی می‌سازد (Idempotent روی همان مسیر)."
+        ),
+    )
 
     @field_validator("phone")
     @classmethod

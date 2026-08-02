@@ -128,7 +128,7 @@ const ContentPage = (() => {
     tbody.innerHTML = state.items.map(c => `
       <tr>
         <td style="font-weight:600;">${esc(c.title)}</td>
-        ${App.isSuperAdmin ? `<td class="th-org">${esc(c.org_name || '—')}</td>` : ''}
+        ${App.isSuperAdmin ? `<td class="th-org">${c.org_name ? esc(c.org_name) : '<span style="color:var(--gray-400);">عمومی</span>'}</td>` : ''}
         <td>${typeBadge(c.type)}</td>
         <td>${statusBadge(c.status)}</td>
         <td>${accessBadges(c)}</td>
@@ -196,8 +196,9 @@ const ContentPage = (() => {
     if (state.activeTab === 'basic') {
       const title = document.getElementById('c-title').value.trim();
       if (!title) { toastError('عنوان محتوا اجباری است'); return; }
+      const isPublic = App.isSuperAdmin && document.getElementById('c-is-public').checked;
       let orgId = null;
-      if (App.isSuperAdmin) {
+      if (App.isSuperAdmin && !isPublic) {
         orgId = document.getElementById('c-org-id').value;
         if (!orgId) { toastError('لطفاً سازمان را انتخاب کنید'); return; }
       }
@@ -205,12 +206,15 @@ const ContentPage = (() => {
       setLoading(btn, true);
       try {
         const payload = basicPayload();
-        if (orgId) payload.org_id = orgId;
+        if (isPublic) payload.is_public = true;
+        else if (orgId) payload.org_id = orgId;
         const created = await api.post('/contents/', payload);
         state.contentId = created.id;
         document.getElementById('c-id').value = created.id;
         document.getElementById('c-type').disabled = true;
         document.getElementById('c-org-id').disabled = true;
+        if (App.isSuperAdmin) document.getElementById('c-is-public').disabled = true;
+        toggleTargetingSection(isPublic);
         toastSuccess('مشخصات پایه ذخیره شد — حالا دسترسی و کاور را تنظیم کنید');
         setTabsUnlocked('access');
         switchTab('access');
@@ -311,10 +315,16 @@ const ContentPage = (() => {
     resetTargetSelections();
     state.activeItems = [];
     renderItems();
+    document.getElementById('c-public-badge').classList.add('hidden');
+    toggleTargetingSection(false);
 
     const orgSel = document.getElementById('c-org-id');
     orgSel.disabled = false;
     if (App.isSuperAdmin) {
+      document.getElementById('c-is-public-wrap').classList.remove('hidden');
+      document.getElementById('c-is-public').checked = false;
+      document.getElementById('c-is-public').disabled = false;
+      document.getElementById('c-org-wrap').classList.remove('hidden');
       await loadOrgsForSelect('');
       state.targetOrgId = null;
       renderDeptCheckboxes(true);
@@ -355,10 +365,20 @@ const ContentPage = (() => {
     setUploadName('c-thumb-name', c.thumbnail_url ? 'تصویر فعلی ثبت شده' : '');
     resetTargetSelections();
 
+    // is_public فقط در ساخت قابل تنظیم است — در ویرایش فقط وضعیت فعلی نمایش داده می‌شود
+    document.getElementById('c-is-public-wrap').classList.add('hidden');
+    toggleTargetingSection(!c.org_id);
     state.targetOrgId = c.org_id;
     if (App.isSuperAdmin) {
-      await loadOrgsForSelect(c.org_id);
-      document.getElementById('c-org-id').disabled = true; // سازمان بعد از ساخت غیرقابل تغییر است
+      if (c.org_id) {
+        document.getElementById('c-public-badge').classList.add('hidden');
+        document.getElementById('c-org-wrap').classList.remove('hidden');
+        await loadOrgsForSelect(c.org_id);
+        document.getElementById('c-org-id').disabled = true; // سازمان بعد از ساخت غیرقابل تغییر است
+      } else {
+        document.getElementById('c-public-badge').classList.remove('hidden');
+        document.getElementById('c-org-wrap').classList.add('hidden');
+      }
     }
 
     for (const t of (c.targets || [])) {
@@ -444,6 +464,25 @@ const ContentPage = (() => {
       return;
     }
     await loadTargetingLists(orgId);
+  }
+
+  // ─── محتوای Public (بدون سازمان) — فقط super_admin، فقط در حالت ساخت ──
+  function onPublicToggle() {
+    const checked = document.getElementById('c-is-public').checked;
+    document.getElementById('c-org-wrap').classList.toggle('hidden', checked);
+    if (checked) {
+      resetTargetSelections();
+      state.targetOrgId = null;
+    } else {
+      const orgId = document.getElementById('c-org-id').value;
+      if (orgId) loadTargetingLists(orgId);
+      else { renderDeptCheckboxes(true); renderPositionCheckboxes(true); }
+    }
+  }
+
+  function toggleTargetingSection(isPublic) {
+    document.getElementById('c-targeting-section').classList.toggle('hidden', isPublic);
+    document.getElementById('c-targeting-public-note').classList.toggle('hidden', !isPublic);
   }
 
   // ─── Targeting: واحدها و پست‌ها ──────────────────────────────────
@@ -801,7 +840,7 @@ const ContentPage = (() => {
     openCreate, openEdit, saveChanges, remove, uploadThumbnail,
     loadItems, toggleItemFields, openCreateItem, openEditItem, uploadItemMedia, saveItem, removeItem,
     moveItemUp, moveItemDown, pickBulkFiles, uploadBulkFiles,
-    onOrgChange, toggleDeptTarget, togglePositionTarget,
+    onOrgChange, onPublicToggle, toggleDeptTarget, togglePositionTarget,
     searchTargetUsers, toggleUserTarget, removeUserChip,
   };
 })();
