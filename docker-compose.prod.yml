@@ -43,14 +43,8 @@ services:
       APP_ENV: production
       DEBUG: "false"
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required — دامنه(های) واقعی فرانت را با کاما جدا از هم بدهید، مثل https://app.example.com}
-    # main.py یک fallback static mount از "../frontend" (نسبت به WORKDIR=/app)
-    # دارد — بدون این mount، کانتینر در همان لحظه‌ی import با RuntimeError از
-    # کار می‌افتد. read-only است و هیچ hot-reloadای نیست (برخلاف dev که
-    # ./backend:/app کد را هم mount می‌کند).
-    # ⚠️ نکته فنی: کامنت نباید بین `!reset` و اولین آیتم لیست بیاید — این کار
-    # باعث می‌شود docker compose کل کلید volumes را نادیده بگیرد (تست‌شده).
     volumes: !reset
-      - ./frontend:/frontend:ro
+      - ./frontend:/frontend:ro  # fallback static mount مورد نیاز main.py (read-only، بدون hot-reload) — ⚠️ کامنتِ چندخطی قبل از این کلید باعث می‌شد docker compose کل volumes را حذف کند (تست‌شده روی Compose v2.35.1)؛ به همین دلیل این توضیح inline نگه داشته شده
     depends_on:
       db:
         condition: service_healthy
