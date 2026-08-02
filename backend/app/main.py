@@ -23,7 +23,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.core.storage import ensure_bucket
 from app.database import engine
-from app.routers import announcements, auth, content, dashboard, departments, documents, files, me, onboarding, organizations, points, positions, quizzes, redemptions, reports, rewards, tickets, users
+from app.routers import announcements, auth, content, dashboard, departments, documents, employee_onboarding, files, me, onboarding, organizations, points, positions, quizzes, redemptions, reports, rewards, tickets, users
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,8 @@ app.include_router(dashboard.router)      # GET /api/dashboard/super-admin
 app.include_router(me.router)             # GET /api/me/contents, /api/me/quizzes — پرتال کاربر (LMS)
 app.include_router(reports.router)        # GET /api/reports/* — BI و گزارش‌گیری
 app.include_router(announcements.router)  # CRUD /api/announcements — مدیریت اطلاعیه‌ها
-app.include_router(onboarding.router)     # CRUD /api/onboarding — برنامه‌های آشنایی سازمانی
+app.include_router(onboarding.router)     # CRUD /api/onboarding — برنامه‌های آشنایی سازمانی (Learning Journey)
+app.include_router(employee_onboarding.router)  # CRUD /api/employee-onboarding — فرآیند ورود کارمند جدید (قبل از Dashboard)
 app.include_router(tickets.router)        # CRUD /api/tickets — تیکتینگ (پشتیبانی/بازخورد)
 app.include_router(points.router)         # گیمیفیکیشن — Rule Engine + Ledger (بخش‌های ۱ تا ۴ اسپک)
 app.include_router(rewards.router)        # CRUD /api/rewards — فروشگاه جایزه (بخش ۵ اسپک)

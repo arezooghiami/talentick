@@ -20,6 +20,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.content import Content
+from app.models.employee_onboarding import EmployeeDocumentSubmission, EmployeeDocumentType
 from app.models.onboarding import (
     STEP_STATUSES,
     STEP_TYPES,
@@ -149,6 +150,7 @@ async def program_to_response(db: AsyncSession, program: OnboardingProgram) -> O
         id=str(program.id),
         org_id=str(program.org_id) if program.org_id else None,
         org_name=org.name if org else None,
+        purpose=program.purpose,
         name=program.name,
         description=program.description,
         target_roles=program.target_roles or [],
@@ -185,10 +187,13 @@ async def list_programs(
     page: int = 1,
     page_size: int = 20,
     search: str | None = None,
+    purpose: str | None = None,
 ) -> tuple[list[OnboardingProgram], int]:
     q = select(OnboardingProgram)
     if org_id is not None:
         q = q.where(OnboardingProgram.org_id == org_id)
+    if purpose is not None:
+        q = q.where(OnboardingProgram.purpose == purpose)
     if search:
         q = q.where(OnboardingProgram.name.ilike(f"%{search.strip()}%"))
 
@@ -215,6 +220,7 @@ async def create_program(
     program = OnboardingProgram(
         id=uuid.uuid4(),
         org_id=org_id,
+        purpose=data.purpose,
         name=data.name,
         description=data.description,
         target_roles=data.target_roles or [],
@@ -341,13 +347,19 @@ def is_program_visible_to_user(program: OnboardingProgram, user: User) -> bool:
 
 async def auto_enroll_new_user(db: AsyncSession, user: User) -> None:
     """
-    وقتی کاربر جدید ساخته می‌شود، در تمام برنامه‌های is_default و فعال
-    که برایش قابل‌مشاهده‌اند (نقش/واحد) خودکار ثبت‌نام می‌شود:
+    وقتی کاربر جدید ساخته می‌شود، در تمام مسیرهای یادگیری (purpose=learning)
+    is_default و فعال که برایش قابل‌مشاهده‌اند (نقش/واحد) خودکار ثبت‌نام
+    می‌شود:
     - کاربر سازمانی: برنامه‌های سازمان خودش + برنامه‌های Public (org_id=NULL)
     - کاربر General (user.org_id=None): فقط برنامه‌های Public
 
+    عمداً فقط purpose=learning — مسیرهای Employee Onboarding خودکار
+    Enroll نمی‌شوند، فقط با انتخاب صریح ادمین در فرم کاربر
+    (validate_employee_onboarding_program_choice + enroll_user در
+    user_service.py).
+
     غیرحیاتی است — اگر خطا بدهد نباید ساخت کاربر را متوقف کند (به همین
-    دلیل در router با try/except فراخوانی می‌شود).
+    دلیل در router/service با try/except فراخوانی می‌شود).
     """
     if user.org_id is not None:
         org_clause = or_(OnboardingProgram.org_id == user.org_id, OnboardingProgram.org_id.is_(None))
@@ -357,6 +369,7 @@ async def auto_enroll_new_user(db: AsyncSession, user: User) -> None:
     result = await db.execute(
         select(OnboardingProgram).where(
             org_clause,
+            OnboardingProgram.purpose == "learning",
             OnboardingProgram.is_active.is_(True),
             OnboardingProgram.is_default.is_(True),
         )
@@ -364,6 +377,50 @@ async def auto_enroll_new_user(db: AsyncSession, user: User) -> None:
     for program in result.scalars().all():
         if is_program_visible_to_user(program, user):
             await enroll_user(db, program, user, enrolled_by=None)
+
+
+async def validate_employee_onboarding_program_choice(
+    db: AsyncSession, org_id: uuid.UUID | None, program_id: str | None
+) -> OnboardingProgram | None:
+    """
+    پیش از commit ساخت/ویرایش کاربر — اعتبارسنجی مسیر Employee Onboarding
+    انتخاب‌شده از دراپ‌داون فرم کاربر (انتخاب کاملاً صریح توسط ادمین است،
+    نه خودکار). None برمی‌گرداند اگر چیزی انتخاب نشده بود.
+    """
+    if not program_id:
+        return None
+    if org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Employee Onboarding فقط برای کاربران سازمانی قابل‌استفاده است")
+    try:
+        pid = uuid.UUID(program_id)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "شناسه‌ی مسیر Employee Onboarding نامعتبر است")
+    program = await db.get(OnboardingProgram, pid)
+    if not program or program.purpose != "employee_onboarding" or str(program.org_id) != str(org_id):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "مسیر Employee Onboarding انتخاب‌شده معتبر نیست")
+    if not program.is_active:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "این مسیر Employee Onboarding غیرفعال است")
+    return program
+
+
+async def get_employee_onboarding_gate_status(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """
+    آیا این کاربر همچنان از مشاهده‌ی محتوای سیستم مسدود است — یعنی
+    Enrollment ناتمامی در یک Program با purpose=employee_onboarding دارد؟
+
+    استفاده در dependencies.get_current_user — کوئری تک‌باره سبک (فقط
+    count با exists-like semantics)، هیچ محاسبه‌ی سنگینی اینجا نیست.
+    """
+    result = await db.execute(
+        select(func.count()).select_from(UserProgramEnrollment)
+        .join(OnboardingProgram, OnboardingProgram.id == UserProgramEnrollment.program_id)
+        .where(
+            UserProgramEnrollment.user_id == user_id,
+            OnboardingProgram.purpose == "employee_onboarding",
+            UserProgramEnrollment.completed_at.is_(None),
+        )
+    )
+    return result.scalar_one() > 0
 
 
 async def enroll_user(
@@ -502,6 +559,7 @@ async def get_my_enrollments(db: AsyncSession, user: User) -> list[MyEnrollmentR
         MyEnrollmentResponse(
             enrollment_id=str(e.id),
             program_id=str(p.id),
+            program_purpose=p.purpose,
             program_name=p.name,
             program_description=p.description,
             enrolled_at=e.enrolled_at,
@@ -568,6 +626,7 @@ async def get_my_enrollment_detail(db: AsyncSession, enrollment: UserProgramEnro
     return MyEnrollmentDetailResponse(
         enrollment_id=str(enrollment.id),
         program_id=str(program.id),
+        program_purpose=program.purpose,
         program_name=program.name,
         program_description=program.description,
         enrolled_at=enrollment.enrolled_at,
@@ -599,6 +658,12 @@ async def set_step_status(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "وضعیت نامعتبر است")
 
     step = await db.get(ProgramStep, step_progress.step_id)
+    if step and step.type == "document_upload":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "این مرحله به‌صورت خودکار از روی کاتالوگ مدارک محاسبه می‌شود — از "
+            "endpoint آپلود مدرک (/api/employee-onboarding/me/document-types/...) استفاده کنید",
+        )
     if new_status == "skipped" and step and step.is_required:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "مراحل اجباری را نمی‌توان رد کرد")
 
@@ -622,10 +687,73 @@ async def set_step_status(
     return step_progress
 
 
+async def _sync_document_step_progress(
+    db: AsyncSession, org_id: uuid.UUID | None, user_id: uuid.UUID, step_progress: UserStepProgress
+) -> None:
+    """
+    وضعیت یک مرحله‌ی نوع document_upload را از روی کاتالوگ مدارک فعال
+    سازمان محاسبه می‌کند — هرگز دستی ست نمی‌شود (نگاه کنید به
+    set_step_status که تکمیل دستی این نوع را رد می‌کند).
+    """
+    if org_id is None:
+        return
+
+    required_ids_result = await db.execute(
+        select(EmployeeDocumentType.id).where(
+            EmployeeDocumentType.org_id == org_id,
+            EmployeeDocumentType.is_required.is_(True),
+            EmployeeDocumentType.is_active.is_(True),
+        )
+    )
+    required_ids = {row[0] for row in required_ids_result.all()}
+
+    submitted_ids_result = await db.execute(
+        select(EmployeeDocumentSubmission.document_type_id).where(
+            EmployeeDocumentSubmission.user_id == user_id,
+            EmployeeDocumentSubmission.status == "approved",
+        )
+    )
+    submitted_ids = {row[0] for row in submitted_ids_result.all()}
+
+    if not required_ids or required_ids.issubset(submitted_ids):
+        # کاتالوگ الزامی خالی است یا کامل ارسال شده — این مرحله «انجام‌شده» حساب می‌شود
+        new_status = "completed"
+    elif submitted_ids & required_ids:
+        new_status = "in_progress"
+    else:
+        new_status = "not_started"
+
+    if step_progress.status != new_status:
+        step_progress.status = new_status
+        step_progress.completed_at = _now() if new_status == "completed" else None
+
+
+async def sync_document_upload_steps_for_user(db: AsyncSession, user_id: uuid.UUID) -> None:
+    """
+    فراخوانی‌شده از employee_onboarding_service بعد از هر ثبت/تغییر مدرک —
+    همه‌ی مراحل نوع document_upload این کاربر (در هر Program‌ای، هر
+    purpose‌ای) را بازمحاسبه و Enrollmentهای مرتبط را به‌روز می‌کند.
+
+    commit نمی‌کند — caller باید commit کند (غیرحیاتی، caller باید در
+    try/except صدا بزند).
+    """
+    result = await db.execute(
+        select(UserStepProgress.enrollment_id)
+        .join(ProgramStep, ProgramStep.id == UserStepProgress.step_id)
+        .where(UserStepProgress.user_id == user_id, ProgramStep.type == "document_upload")
+        .distinct()
+    )
+    for (enrollment_id,) in result.all():
+        await _recalculate_enrollment_progress(db, enrollment_id)
+
+
 async def _recalculate_enrollment_progress(db: AsyncSession, enrollment_id: uuid.UUID) -> None:
     """
     پیشرفت ثبت‌نام را از روی وضعیت مراحل بازمحاسبه می‌کند.
 
+    - قبل از هر چیز، مراحل نوع document_upload این Enrollment از روی
+      کاتالوگ مدارک سازمان بازمحاسبه می‌شوند (_sync_document_step_progress)
+      — این نوع مرحله هرگز دستی تکمیل نمی‌شود.
     - progress_pct = درصد مراحلی که «انجام‌شده» حساب می‌شوند از کل مراحل
       (اجباری فقط با completed، اختیاری با completed یا skipped).
     - completed_at ست می‌شود وقتی همه‌ی مراحل اجباری completed باشند —
@@ -636,7 +764,9 @@ async def _recalculate_enrollment_progress(db: AsyncSession, enrollment_id: uuid
         return
 
     steps_result = await db.execute(
-        select(ProgramStep.id, ProgramStep.is_required).where(ProgramStep.program_id == enrollment.program_id)
+        select(ProgramStep.id, ProgramStep.is_required, ProgramStep.type).where(
+            ProgramStep.program_id == enrollment.program_id
+        )
     )
     steps = steps_result.all()
     total = len(steps)
@@ -644,6 +774,18 @@ async def _recalculate_enrollment_progress(db: AsyncSession, enrollment_id: uuid
         enrollment.progress_pct = 0
         await db.flush()
         return
+
+    doc_step_ids = [sid for sid, _is_required, stype in steps if stype == "document_upload"]
+    if doc_step_ids:
+        doc_progress_result = await db.execute(
+            select(UserStepProgress).where(
+                UserStepProgress.enrollment_id == enrollment_id,
+                UserStepProgress.step_id.in_(doc_step_ids),
+            )
+        )
+        for sp in doc_progress_result.scalars().all():
+            await _sync_document_step_progress(db, enrollment.org_id, enrollment.user_id, sp)
+        await db.flush()
 
     progress_result = await db.execute(
         select(UserStepProgress.step_id, UserStepProgress.status).where(
@@ -654,7 +796,7 @@ async def _recalculate_enrollment_progress(db: AsyncSession, enrollment_id: uuid
 
     done_count = 0
     required_incomplete = False
-    for step_id, is_required in steps:
+    for step_id, is_required, _step_type in steps:
         step_status = status_map.get(step_id, "not_started")
         if is_required:
             if step_status == "completed":

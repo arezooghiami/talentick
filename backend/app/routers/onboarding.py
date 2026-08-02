@@ -99,10 +99,13 @@ async def list_programs(
     page_size: int = Query(20, ge=1, le=100),
     search: str | None = Query(None),
     org_id: str | None = Query(None, description="فقط super_admin — خالی = همه سازمان‌ها"),
+    purpose: str | None = Query(
+        None, description="learning | employee_onboarding — خالی یعنی هر دو (برای جداسازی دو صفحه‌ی پنل ادمین از هم استفاده می‌شود)"
+    ),
 ):
     target_org_id = _resolve_org_id(current_user, org_id)
     items, total = await onboarding_service.list_programs(
-        db, target_org_id, page=page, page_size=page_size, search=search,
+        db, target_org_id, page=page, page_size=page_size, search=search, purpose=purpose,
     )
     responses = [await onboarding_service.program_to_response(db, p) for p in items]
     return OnboardingProgramListResponse(
@@ -123,6 +126,8 @@ async def create_program(
     if body.is_public:
         if current_user.role != "super_admin":
             raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند برنامه‌ی Public بسازد")
+        if body.purpose == "employee_onboarding":
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "مسیر Employee Onboarding نمی‌تواند Public باشد — فقط برای کاربران سازمانی است")
         org_id = None
     else:
         org_id = _resolve_required_org_id(current_user, body.org_id)

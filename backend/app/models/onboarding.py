@@ -19,10 +19,24 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UUIDMixin
 
 # نوع مرحله
+# document_upload: کامل خودکار محاسبه می‌شود (از روی کاتالوگ
+# app.models.employee_onboarding.EmployeeDocumentType سازمان) — نه با کلیک
+# دستی کاربر؛ اجرای واقعی در services/onboarding_service.py
+# (_sync_document_step_progress) است. set_step_status تکمیل دستی این نوع
+# را رد می‌کند.
 STEP_TYPES = ("content", "quiz", "document_upload", "custom")
 
 # وضعیت پیشرفت کاربر
 STEP_STATUSES = ("not_started", "in_progress", "completed", "skipped")
+
+# هدف یک برنامه — همان موتور (Program → Step → Enrollment → StepProgress)
+# برای دو محصول مستقل استفاده می‌شود:
+#   learning            : مسیر یادگیری معمولی (رفتار پیش‌فرض/قبلی — بدون تغییر)
+#   employee_onboarding : فرآیند ورود کارمند جدید — قبل از مشاهده‌ی محتوای
+#                          سیستم باید تکمیل شود (Gate در dependencies.py)
+# جداسازی این دو فقط همین یک ستون است؛ در پنل ادمین دو صفحه‌ی کاملاً جدا
+# (فیلترشده با ?purpose=...) روی همین جدول‌ها کار می‌کنند.
+PROGRAM_PURPOSES = ("learning", "employee_onboarding")
 
 
 class OnboardingProgram(UUIDMixin, TimestampMixin, Base):
@@ -43,6 +57,11 @@ class OnboardingProgram(UUIDMixin, TimestampMixin, Base):
         nullable=True,
         index=True,
         comment="NULL یعنی برنامه‌ی Public/General (فقط super_admin می‌سازد، بدون target_dept_id)"
+    )
+
+    purpose: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="learning", index=True,
+        comment="learning | employee_onboarding — همان موتور، دو محصول مستقل در UI/API"
     )
 
     name: Mapped[str] = mapped_column(

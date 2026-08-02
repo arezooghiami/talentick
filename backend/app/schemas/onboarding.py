@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 
 STEP_TYPES = ("content", "quiz", "document_upload", "custom")
 STEP_STATUSES = ("not_started", "in_progress", "completed", "skipped")
+PROGRAM_PURPOSES = ("learning", "employee_onboarding")
+PURPOSE_PATTERN = "^(learning|employee_onboarding)$"
 
 
 # ─── ProgramStep ─────────────────────────────────────────────────────────────
@@ -62,6 +64,10 @@ class ProgramStepResponse(BaseModel):
 class OnboardingProgramCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=500)
     description: Optional[str] = None
+    purpose: str = Field(
+        "learning", pattern=PURPOSE_PATTERN,
+        description="learning (مسیر یادگیری) | employee_onboarding (ورود کارمند جدید) — بعد از ساخت قابل تغییر نیست",
+    )
     target_roles: list[str] = Field(
         default_factory=list, description="خالی یعنی همه‌ی نقش‌ها"
     )
@@ -96,6 +102,7 @@ class OnboardingProgramResponse(BaseModel):
     id: str
     org_id: Optional[str] = None
     org_name: Optional[str] = None
+    purpose: str = "learning"
     name: str
     description: Optional[str] = None
     target_roles: list[str] = Field(default_factory=list)
@@ -178,6 +185,7 @@ class MyStepProgressResponse(BaseModel):
 class MyEnrollmentResponse(BaseModel):
     enrollment_id: str
     program_id: str
+    program_purpose: str = "learning"
     program_name: str
     program_description: Optional[str] = None
     enrolled_at: datetime

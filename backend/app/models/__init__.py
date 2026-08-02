@@ -17,6 +17,10 @@ from app.models.content import (  # noqa: F401
     UserContentProgress,
 )
 from app.models.document import Document, DocumentCategory, DocumentTarget  # noqa: F401
+from app.models.employee_onboarding import (  # noqa: F401
+    EmployeeDocumentSubmission,
+    EmployeeDocumentType,
+)
 from app.models.onboarding import (  # noqa: F401
     OnboardingProgram,
     ProgramStep,
@@ -68,6 +72,10 @@ __all__ = [
     "ProgramStep",
     "UserProgramEnrollment",
     "UserStepProgress",
+    # Employee Onboarding (Document Catalog — استفاده‌شده توسط مراحل
+    # document_upload در OnboardingProgram با purpose="employee_onboarding")
+    "EmployeeDocumentType",
+    "EmployeeDocumentSubmission",
     # Quiz
     "Quiz",
     "Question",
