@@ -54,6 +54,12 @@ MAX_FILE_SIZE_MB = 200
 
 FILES_URL_PREFIX = "/api/files/"
 
+# پیشوند مسیر برای فایل‌های Public/General (متعلق به هیچ سازمانی نیست) —
+# مثل کاور/عکس گالری‌ی Public که super_admin بدون انتخاب سازمان می‌سازد.
+# routers/files.py این پیشوند را تشخیص می‌دهد و enforce_org_scope را برای
+# آن اجرا نمی‌کند (هر کاربر احراز هویت‌شده می‌تواند این فایل‌ها را ببیند).
+PUBLIC_PATH_SEGMENT = "public"
+
 
 @lru_cache
 def get_minio_client() -> Minio:
@@ -89,9 +95,14 @@ def ensure_bucket() -> None:
         pass  # از قبل policy‌ای وجود نداشت
 
 
-async def upload_file(file: UploadFile, org_id: uuid.UUID, subfolder: str = "contents") -> dict:
+async def upload_file(file: UploadFile, org_id: uuid.UUID | None, subfolder: str = "contents") -> dict:
     """
     فایل آپلودی را در MinIO (private) ذخیره می‌کند — مسیر جداگانه به ازای هر سازمان.
+
+    org_id=None یعنی فایل Public/General است (متعلق به هیچ سازمانی نیست —
+    مثل کاور یک گالری Public) و به‌جای UUID سازمان، از PUBLIC_PATH_SEGMENT
+    استفاده می‌شود؛ routers/files.py دسترسی به آن را برای هر کاربر
+    احراز هویت‌شده مجاز می‌کند.
 
     خروجی: {"url": "/api/files/<object_name>", "filename": ..., "size": ..., "content_type": ...}
     مقدار "url" داخلی و پایدار است (هرگز منقضی نمی‌شود) — نه یک presigned URL.
@@ -111,7 +122,8 @@ async def upload_file(file: UploadFile, org_id: uuid.UUID, subfolder: str = "con
             f"حجم فایل بیش از حد مجاز است (حداکثر {MAX_FILE_SIZE_MB}MB)",
         )
 
-    object_name = f"{org_id}/{subfolder}/{uuid.uuid4()}.{ext}"
+    org_segment = str(org_id) if org_id is not None else PUBLIC_PATH_SEGMENT
+    object_name = f"{org_segment}/{subfolder}/{uuid.uuid4()}.{ext}"
 
     try:
         ensure_bucket()

@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from minio.error import S3Error
 
 from app.config import settings
-from app.core.storage import get_minio_client, object_org_id
+from app.core.storage import PUBLIC_PATH_SEGMENT, get_minio_client, object_org_id
 from app.dependencies import ActiveUser, enforce_org_scope
 
 router = APIRouter(prefix="/api/files", tags=["Files"])
@@ -29,15 +29,19 @@ router = APIRouter(prefix="/api/files", tags=["Files"])
 @router.get("/{object_path:path}", summary="دریافت فایل آپلودشده (کاور/سند/ویدیو/آواتار/لوگو و ...)")
 async def get_file(object_path: str, current_user: ActiveUser) -> StreamingResponse:
     raw_org_id = object_org_id(object_path)
-    try:
-        org_id = uuid.UUID(raw_org_id) if raw_org_id else None
-    except ValueError:
-        org_id = None
 
-    if org_id is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "فایل یافت نشد")
+    # فایل Public/General (بدون سازمان — نگاه کنید به core/storage.py:upload_file)
+    # برای هر کاربر احراز هویت‌شده قابل مشاهده است، بدون بررسی org isolation.
+    if raw_org_id != PUBLIC_PATH_SEGMENT:
+        try:
+            org_id = uuid.UUID(raw_org_id) if raw_org_id else None
+        except ValueError:
+            org_id = None
 
-    enforce_org_scope(current_user, org_id)
+        if org_id is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "فایل یافت نشد")
+
+        enforce_org_scope(current_user, org_id)
 
     client = get_minio_client()
     try:

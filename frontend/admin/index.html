@@ -64,6 +64,8 @@
         <a class="nav-sub-item" onclick="ContentPage.goto('book')">کتاب</a>
         <!-- برنامه‌ی آشنایی سازمانی (Onboarding Journey) — فقط org_admin به بالا -->
         <a class="nav-sub-item" data-page="onboarding" data-roles="super_admin,org_admin" onclick="Router.navigate('onboarding')">مسیر یادگیری</a>
+        <!-- گالری (مجموعه عکس) — org_admin به بالا؛ حالت Public فقط super_admin -->
+        <a class="nav-sub-item" data-page="gallery" data-roles="super_admin,org_admin" onclick="Router.navigate('gallery')">گالری</a>
       </div>
 
       <div class="nav-item" id="navReport" data-page="reports" data-roles="super_admin,org_admin" onclick="Router.navigate('reports')">
@@ -521,6 +523,32 @@
             </table>
           </div>
           <div class="pagination" id="obPagination"></div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: گالری (مجموعه عکس) ═══ -->
+      <div id="view-gallery" class="view">
+        <div class="view-header">
+          <div><div class="view-title">گالری</div><div class="view-subtitle" id="galTotalLabel">در حال بارگذاری...</div></div>
+          <button class="btn btn-primary" onclick="GalleryPage.openCreate()">➕ گالری جدید</button>
+        </div>
+        <div class="data-table-wrap">
+          <div class="data-table-header">
+            <div class="search-box">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+              <input type="text" id="galSearch" placeholder="جستجو در عنوان یا توضیحات..." oninput="GalleryPage.searchDebounced()" />
+            </div>
+            <select class="filter-select" id="galOrgFilter" data-roles="super_admin" onchange="GalleryPage.load(1)">
+              <option value="">همه سازمان‌ها</option>
+            </select>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>کاور</th><th>عنوان</th><th class="th-org" data-roles="super_admin">سازمان</th><th>تعداد عکس</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+              <tbody id="galTableBody"><tr><td colspan="6" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="galPagination"></div>
         </div>
       </div>
 
@@ -1048,6 +1076,55 @@
     <div class="modal-footer">
       <button class="btn btn-primary" id="btn-save-announcement" onclick="AnnouncementsPage.save()">ذخیره اطلاعیه</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-announcement')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Create / Edit Gallery ═══ -->
+<div id="modal-gallery" class="modal-overlay hidden">
+  <div class="modal-box modal-xl">
+    <div class="modal-header"><h3 id="galModalTitle">گالری جدید</h3><button class="btn btn-icon" onclick="closeModal('modal-gallery')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="gal-id">
+      <input type="hidden" id="gal-cover-url">
+
+      <div class="form-group" data-roles="super_admin" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="gal-is-public" style="width:16px;height:16px;" onchange="GalleryPage.onPublicToggle()">
+        <label class="form-label" for="gal-is-public" style="margin:0;">گالری عمومی (Public) — برای همه‌ی سازمان‌ها</label>
+      </div>
+
+      <div class="form-group" id="gal-org-wrap" data-roles="super_admin">
+        <label class="form-label">سازمان <span class="required">*</span></label>
+        <select id="gal-org-id" class="form-control" onchange="GalleryPage.onOrgChange()">
+          <option value="">— انتخاب سازمان —</option>
+        </select>
+      </div>
+
+      <div class="form-group"><label class="form-label">عنوان <span class="required">*</span></label><input id="gal-title" class="form-control" placeholder="مثال: رویداد سالانه شرکت"></div>
+      <div class="form-group"><label class="form-label">توضیحات</label><textarea id="gal-desc" class="form-control" rows="2"></textarea></div>
+
+      <div class="form-group">
+        <label class="form-label">کاور</label>
+        <input type="file" id="gal-cover-input" class="form-control" accept="image/*" onchange="GalleryPage.onCoverSelected(event)">
+        <span class="form-hint">فرمت‌های مجاز: JPG, PNG, WEBP, GIF</span>
+        <div id="gal-cover-preview" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">عکس‌های گالری</label>
+        <input type="file" id="gal-photos-input" class="form-control" accept="image/*" multiple onchange="GalleryPage.onPhotosSelected(event)">
+        <span class="form-hint">می‌توانید چند عکس هم‌زمان انتخاب کنید</span>
+        <div id="gal-photos-grid" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="gal-is-active" style="width:16px;height:16px;" checked>
+        <label class="form-label" for="gal-is-active" style="margin:0;">فعال</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btn-save-gallery" onclick="GalleryPage.save()">ذخیره گالری</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-gallery')">انصراف</button>
     </div>
   </div>
 </div>
@@ -1959,6 +2036,7 @@
 <script src="../assets/js/org_profile.js?v=20260715"></script>
 <script src="../assets/js/document_admin.js?v=20260715"></script>
 <script src="../assets/js/announcements_admin.js?v=20260715"></script>
+<script src="../assets/js/gallery.js?v=20260803"></script>
 <script src="../assets/js/onboarding_admin.js?v=20260801a"></script>
 <script src="../assets/js/employee_onboarding_admin.js?v=20260801a"></script>
 <script src="../assets/js/tickets_admin.js?v=20260719a"></script>
@@ -1986,6 +2064,7 @@
   Router.register('quiz',      { title: 'مدیریت آزمون',     load: () => QuizAdminPage.load(1) });
   Router.register('announcements', { title: 'اطلاعیه‌ها',   load: () => AnnouncementsPage.load(1) });
   Router.register('onboarding', { title: 'مسیر یادگیری',    load: () => OnboardingPage.load(1) });
+  Router.register('gallery',   { title: 'گالری',            load: () => GalleryPage.load(1) });
   Router.register('employee-onboarding', { title: 'آنبوردینگ', load: () => EmployeeOnboardingPage.init() });
   Router.register('reports',   { title: 'گزارش‌ها',         load: ReportsPage.load });
   Router.register('support',   { title: 'تیکت‌ها',           load: () => TicketsPage.load(1) });

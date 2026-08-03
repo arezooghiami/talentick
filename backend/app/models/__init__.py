@@ -21,6 +21,7 @@ from app.models.employee_onboarding import (  # noqa: F401
     EmployeeDocumentSubmission,
     EmployeeDocumentType,
 )
+from app.models.gallery import Gallery, GalleryPhoto  # noqa: F401
 from app.models.onboarding import (  # noqa: F401
     OnboardingProgram,
     ProgramStep,
@@ -67,6 +68,9 @@ __all__ = [
     # Announcements
     "Announcement",
     "AnnouncementTarget",
+    # Gallery
+    "Gallery",
+    "GalleryPhoto",
     # Onboarding
     "OnboardingProgram",
     "ProgramStep",
