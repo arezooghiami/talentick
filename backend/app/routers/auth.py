@@ -10,6 +10,7 @@ Routes:
     GET  /api/auth/me               → پروفایل کامل کاربر لاگین‌شده
     POST /api/auth/forgot-password  → درخواست کد OTP پیامکی برای reset رمز
     POST /api/auth/reset-password   → تایید کد OTP + تنظیم رمز جدید (لاگین خودکار)
+    POST /api/auth/welcome-complete → علامت‌گذاری دیده‌شدن ۳ صفحه‌ی welcome (فقط یک‌بار، اولین ورود)
 
 امنیت:
     - حداکثر ۵ تلاش ورود ناموفق در هر ۵ دقیقه به ازای (IP + شناسه) —
@@ -254,3 +255,26 @@ async def reset_password(
         )
     except BadRequestError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.detail)
+
+
+@router.post(
+    "/welcome-complete",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="علامت‌گذاری دیده‌شدن صفحات welcome",
+    description="""
+    نیازمند `access_token` معتبر.
+
+    فرانت بعد از اینکه کاربر ۳ صفحه‌ی welcome را دید (یا رد کرد)، این
+    endpoint را صدا می‌زند تا `has_seen_welcome` روی کاربر `True` شود —
+    از این پس در پاسخ `login`/`me` همیشه `True` برمی‌گردد و فرانت دیگر
+    این صفحات را نشان نمی‌دهد.
+
+    این یک gate نیست — عدم فراخوانی این endpoint هیچ endpoint دیگری را
+    بلاک نمی‌کند؛ صرفاً یک تصمیم نمایش سمت فرانت است.
+    """,
+)
+async def welcome_complete(
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    await auth_service.mark_welcome_seen(db, current_user)

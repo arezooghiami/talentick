@@ -87,6 +87,10 @@ class TokenResponse(BaseModel):
         False,
         description="اگر True باشد، کاربر تا فراخوانی موفق POST /api/auth/change-password به هیچ endpoint دیگری دسترسی ندارد",
     )
+    has_seen_welcome: bool = Field(
+        False,
+        description="اگر False باشد، فرانت باید ۳ صفحه‌ی welcome را نشان دهد و بعد POST /api/auth/welcome-complete را صدا بزند",
+    )
 
 
 class ChangePasswordRequest(BaseModel):
@@ -126,5 +130,6 @@ class MeResponse(BaseModel):
     position: str | None = None
     last_login_at: datetime | None = None
     must_change_password: bool = False
+    has_seen_welcome: bool = False
 
     model_config = {"from_attributes": True}

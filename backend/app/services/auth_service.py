@@ -198,6 +198,7 @@ def _build_token_response(user: User, access_token: str, refresh_token: str) -> 
         "role": user.role,
         "full_name": user.full_name,
         "must_change_password": user.must_change_password,
+        "has_seen_welcome": user.has_seen_welcome,
     }
 
 
@@ -403,4 +404,14 @@ async def get_me(db: AsyncSession, user: User) -> dict:
         "position": user.position.name if user.position else None,
         "last_login_at": user.last_login_at,
         "must_change_password": user.must_change_password,
+        "has_seen_welcome": user.has_seen_welcome,
     }
+
+
+# ─── Welcome Screens (فقط flag ساده — بدون gate روی سایر endpoint ها) ──────
+
+async def mark_welcome_seen(db: AsyncSession, user: User) -> None:
+    """کاربر ۳ صفحه‌ی welcome را دید (یا رد کرد) — دیگر هیچ‌وقت نشانش نده."""
+    if not user.has_seen_welcome:
+        user.has_seen_welcome = True
+        await db.commit()

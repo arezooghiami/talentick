@@ -132,6 +132,13 @@ class User(UUIDMixin, TimestampMixin, Base):
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    has_seen_welcome: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False,
+        comment=(
+            "True یعنی کاربر ۳ صفحه‌ی welcome را دیده (POST /api/auth/welcome-complete) — "
+            "فقط برای تصمیم نمایش سمت فرانت است، هیچ endpoint دیگری را بلاک نمی‌کند"
+        ),
+    )
 
     # ─── Relationships ────────────────────────────────────────────────────
     organization: Mapped["Organization | None"] = relationship(back_populates="users")
