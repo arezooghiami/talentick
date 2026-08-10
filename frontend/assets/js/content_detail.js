@@ -37,9 +37,11 @@ const ContentDetailPage = (() => {
     const d = state.detail;
     document.title = `${d.title} — Talentick`;
 
-    document.getElementById('cdCover').innerHTML = d.thumbnail_url
-      ? `<img src="${esc(d.thumbnail_url)}" alt="">`
+    const cdCover = document.getElementById('cdCover');
+    cdCover.innerHTML = d.thumbnail_url
+      ? `<img data-src="${esc(d.thumbnail_url)}" alt="">`
       : (TYPE_ICON[d.type] || '📄');
+    if (d.thumbnail_url) hydrateAuthedImages(cdCover);
     document.getElementById('cdTitle').textContent = d.title;
     document.getElementById('cdType').textContent = TYPE_LABEL_FA[d.type] || d.type;
     document.getElementById('cdMetaExtra').textContent = [

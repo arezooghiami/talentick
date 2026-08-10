@@ -88,6 +88,22 @@ function setLoading(btn, loading, text = 'در حال پردازش...') {
   }
 }
 
+// ─── Authed image loading ─────────────────────────────────────────
+// /api/files/* فقط با هدر Authorization پاسخ می‌دهد — <img src="..."> این
+// هدر را نمی‌فرستد، پس با fetch احراز هویت‌شده و blob URL پر می‌شود.
+async function hydrateAuthedImages(container) {
+  const token = Auth.getToken();
+  const imgs = container.querySelectorAll('img[data-src]');
+  await Promise.all(Array.from(imgs).map(async (img) => {
+    const url = img.dataset.src;
+    try {
+      const res = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+      if (!res.ok) return;
+      img.src = URL.createObjectURL(await res.blob());
+    } catch { /* تصویر بارگذاری نمی‌شود — بی‌اهمیت */ }
+  }));
+}
+
 // ─── HTML escaping ─────────────────────────────────────────────────
 // باید هم برای متن (innerHTML) و هم برای مقدار attribute (بین "..." یا '...')
 // امن باشد — به همین دلیل هر ۵ کاراکتر حساس HTML را escape می‌کند، نه فقط

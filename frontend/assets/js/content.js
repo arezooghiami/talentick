@@ -312,6 +312,7 @@ const ContentPage = (() => {
     document.getElementById('c-points').value = '';
     document.getElementById('c-thumb-url').value = '';
     setUploadName('c-thumb-name', '');
+    renderThumbPreview('');
     resetTargetSelections();
     state.activeItems = [];
     renderItems();
@@ -363,6 +364,7 @@ const ContentPage = (() => {
     document.getElementById('c-points').value = c.points_override ?? '';
     document.getElementById('c-thumb-url').value = c.thumbnail_url || '';
     setUploadName('c-thumb-name', c.thumbnail_url ? 'تصویر فعلی ثبت شده' : '');
+    renderThumbPreview(c.thumbnail_url || '');
     resetTargetSelections();
 
     // is_public فقط در ساخت قابل تنظیم است — در ویرایش فقط وضعیت فعلی نمایش داده می‌شود
@@ -433,6 +435,7 @@ const ContentPage = (() => {
       const res = await api.upload('/contents/upload', file);
       document.getElementById('c-thumb-url').value = res.url;
       setUploadName('c-thumb-name', file.name, true);
+      renderThumbPreview(res.url);
       toastSuccess('تصویر با موفقیت آپلود شد');
     } catch (e) { toastError(e.message); }
     finally { inputEl.value = ''; }
@@ -816,6 +819,12 @@ const ContentPage = (() => {
     if (!el) return;
     el.textContent = name || 'فایلی انتخاب نشده';
     el.classList.toggle('has-file', hasFile);
+  }
+  function renderThumbPreview(url) {
+    const preview = document.getElementById('c-thumb-preview');
+    if (!preview) return;
+    preview.innerHTML = url ? `<img data-src="${esc(url)}" alt="" style="width:120px;height:80px;object-fit:cover;border-radius:6px;background:var(--gray-100);">` : '';
+    if (url) hydrateAuthedImages(preview);
   }
 
   // ─── Delegated Row Actions (نه onclick اینلاین با عنوان کاربر داخلش) ──

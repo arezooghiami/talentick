@@ -224,6 +224,7 @@ const DashboardHome = (() => {
       return;
     }
     container.innerHTML = items.map(c => renderCourseCard(c)).join('');
+    hydrateAuthedImages(container);
   }
 
   function renderCourseCard(c, opts = {}) {
@@ -233,7 +234,7 @@ const DashboardHome = (() => {
     return `
       <a class="dash-course-card" href="/content/detail.html?id=${c.id}" style="${opts.wide ? 'flex-direction:row;' : ''}">
         <div class="dash-course-thumb" style="background:${meta.color};${opts.wide ? 'width:150px;flex-shrink:0;height:auto;' : ''}">
-          ${c.thumbnail_url ? `<img src="${esc(c.thumbnail_url)}" alt="">` : meta.icon}
+          ${c.thumbnail_url ? `<img data-src="${esc(c.thumbnail_url)}" alt="">` : meta.icon}
           ${pct > 0 ? `<div class="dash-course-progress-bar"><div class="dash-course-progress-fill" style="width:${pct}%"></div></div>` : ''}
         </div>
         <div class="dash-course-body">

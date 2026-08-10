@@ -14,7 +14,7 @@ function renderContentCard(c) {
   return `
     <a class="content-card" href="/content/detail.html?id=${c.id}">
       <div class="content-card-thumb type-${c.type}">
-        ${c.thumbnail_url ? `<img src="${esc(c.thumbnail_url)}" alt="">` : (TYPE_ICON[c.type] || '📄')}
+        ${c.thumbnail_url ? `<img data-src="${esc(c.thumbnail_url)}" alt="">` : (TYPE_ICON[c.type] || '📄')}
         <span class="content-card-type">${TYPE_LABEL_FA[c.type] || c.type}</span>
         <span class="play-overlay"><span>▶</span></span>
       </div>

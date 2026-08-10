@@ -24,6 +24,7 @@ const MyContentPage = (() => {
         return;
       }
       grid.innerHTML = res.items.map(renderContentCard).join('');
+      hydrateAuthedImages(grid);
       renderEmpPagination('mcPagination', res.page, res.total_pages, load);
     } catch (e) {
       grid.innerHTML = `<div class="emp-empty" style="grid-column:1/-1;"><div class="icon">⚠️</div><h3>خطا در بارگذاری: ${esc(e.message)}</h3></div>`;

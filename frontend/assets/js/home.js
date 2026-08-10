@@ -48,7 +48,9 @@ const HomePage = (() => {
       const spotlight = inProgress[0];
       toggle('homeSpotlightSection', !!spotlight);
       if (spotlight) {
-        document.getElementById('homeSpotlight').innerHTML = renderSpotlightCard(spotlight);
+        const spotlightEl = document.getElementById('homeSpotlight');
+        spotlightEl.innerHTML = renderSpotlightCard(spotlight);
+        hydrateAuthedImages(spotlightEl);
       }
 
       const restInProgress = inProgress.filter(c => c.id !== spotlight?.id);
@@ -177,7 +179,10 @@ const HomePage = (() => {
       setText('homeOrgCardName', org.name || '—');
       setText('homeOrgCardDesc', org.description || '');
       const logoEl = document.getElementById('homeOrgLogo');
-      if (org.logo_url && logoEl) logoEl.innerHTML = `<img src="${esc(org.logo_url)}" alt="">`;
+      if (org.logo_url && logoEl) {
+        logoEl.innerHTML = `<img data-src="${esc(org.logo_url)}" alt="">`;
+        hydrateAuthedImages(logoEl);
+      }
       toggle('homeOrgCard', true);
     } catch { /* غیرحیاتی */ }
   }
@@ -188,7 +193,7 @@ const HomePage = (() => {
     return `
       <a class="home-spotlight" href="/content/detail.html?id=${c.id}">
         <div class="home-spotlight-thumb">
-          ${c.thumbnail_url ? `<img src="${esc(c.thumbnail_url)}" alt="">` : (TYPE_ICON[c.type] || '📄')}
+          ${c.thumbnail_url ? `<img data-src="${esc(c.thumbnail_url)}" alt="">` : (TYPE_ICON[c.type] || '📄')}
           <span class="home-spotlight-play">▶</span>
         </div>
         <div class="home-spotlight-body">
@@ -209,6 +214,7 @@ const HomePage = (() => {
       return;
     }
     container.innerHTML = items.map(renderContentCard).join('');
+    hydrateAuthedImages(container);
   }
 
   function toggle(id, show) {
