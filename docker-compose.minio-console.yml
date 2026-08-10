@@ -1,0 +1,17 @@
+# =============================================================================
+# Talentick — MinIO Console Override (موقت/دستی)
+# =============================================================================
+# فقط برای دسترسی موقت به کنسول گرافیکی MinIO از طریق SSH tunnel.
+# پورت 9001 فقط روی خودِ سرور (127.0.0.1) باز می‌شود، نه عمومی —
+# دسترسی از بیرون فقط با SSH tunnel ممکن است.
+#
+# استفاده (کنار دو فایل اصلی):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.minio-console.yml up -d minio
+#
+# برای برداشتنش دوباره:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d minio
+
+services:
+  minio:
+    ports: !override
+      - "127.0.0.1:9001:9001"
