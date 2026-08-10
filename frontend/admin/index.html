@@ -26,7 +26,7 @@
   <!-- ═══ SIDEBAR — مشترک بین هر ۳ نقش، آیتم‌ها با data-roles فیلتر می‌شوند ═══ -->
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-brand"><div class="logo-dot"></div>Talentick</div>
+      <div class="logo-brand"><svg class="logo-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.3 5.3L20 6"/></svg>Talentic</div>
     </div>
     <nav class="sidebar-nav">
 
@@ -174,10 +174,6 @@
           </div>
           <div class="dashboard-row">
             <div class="card">
-              <div class="card-header"><span class="card-title"><span class="card-title-bar"></span>نمودار رشد کاربران در ۱۲ هفته گذشته</span></div>
-              <div class="card-body"><div class="chart-container"><canvas id="userGrowthChart"></canvas></div></div>
-            </div>
-            <div class="card">
               <div class="card-header"><span class="card-title"><span class="card-title-bar"></span>۱۰ کاربر برتر سامانه</span></div>
               <div class="card-body" style="padding:12px 16px;max-height:300px;overflow-y:auto;">
                 <div class="user-list" id="topUsersList">
@@ -186,6 +182,10 @@
                   <div class="skeleton" style="height:38px;"></div>
                 </div>
               </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title"><span class="card-title-bar"></span>نمودار رشد کاربران در ۱۲ هفته گذشته</span></div>
+              <div class="card-body"><div class="chart-container"><canvas id="userGrowthChart"></canvas></div></div>
             </div>
           </div>
           <div class="section-header"><div class="section-title"><span class="card-title-bar"></span>آخرین تیکت‌ها</div></div>
@@ -937,7 +937,7 @@
         <div class="form-group"><label class="form-label">واحد سازمانی</label><select id="p-dept" class="form-control"><option value="">— بدون واحد —</option></select></div>
         <div class="form-group"><label class="form-label">سطح سازمانی <span class="required">*</span></label>
           <select id="p-level" class="form-control">
-            <option value="1">۱ — کارمند</option><option value="2">۲ — سرپرست</option><option value="3">۳ — مدیر</option><option value="4">۴ — مدیر ارشد</option><option value="5">۵ — مدیرعامل</option>
+            <option value="1">۱ — کارمند</option><option value="2">۲ — کارشناس</option><option value="3">۳ — کارشناس ارشد</option><option value="4">۴ — سرپرست</option><option value="5">۵ — مدیر</option><option value="6">۶ — مدیر ارشد</option><option value="7">۷ — معاون</option><option value="8">۸ — مدیرعامل</option>
           </select>
         </div>
       </div>

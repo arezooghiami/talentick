@@ -60,7 +60,7 @@ async def list_positions(
 
 @router.post(
     "/", response_model=PositionResponse, status_code=status.HTTP_201_CREATED, summary="ساخت پست جدید",
-    description="ساخت پست سازمانی جدید — `level` بین ۱ (کارمند) تا ۵ (مدیرعامل). **دسترسی:** manager به بالا (سازمان خودشان).",
+    description="ساخت پست سازمانی جدید — `level` بین ۱ (کارمند) تا ۸ (مدیرعامل). **دسترسی:** manager به بالا (سازمان خودشان).",
     responses={400: {"description": "واحد سازمانی (dept_id) معتبر نیست"}},
 )
 async def create_position(

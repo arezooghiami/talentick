@@ -176,7 +176,7 @@ class Position(UUIDMixin, TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     level: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1,
-        comment="سطح سازمانی: 1=کارمند، 5=مدیرعامل"
+        comment="سطح سازمانی: 1=کارمند، 8=مدیرعامل"
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

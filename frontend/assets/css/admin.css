@@ -10,19 +10,22 @@
 
 /* ─── CSS Custom Properties ─────────────────────────────────────────────────── */
 :root {
-  /* ── Brand Colors (مطابق فیگما) ── */
-  --primary:         #6C4CF1;   /* بنفش اصلی سایدبار */
+  /* ── Brand Colors ── */
+  --primary:         #6647FB;   /* بنفش اصلی */
   --primary-dark:    #5636D6;   /* hover state */
-  --primary-light:   #EEF2FF;   /* پس‌زمینه badge و icon */
-  --primary-50:      #F5F3FF;
+  --primary-light:   #F1EDFF;   /* پس‌زمینه badge و icon */
+  --primary-50:      #F7F5FF;
+  --secondary:       #D3C8FF;   /* لاواندر روشن سایدبار */
+  --stroke:          #B3B5BC;   /* خط دور آیکون‌باکس‌ها */
 
   /* ── Sidebar ── */
-  --sidebar-bg:      #6C4CF1;   /* بنفش سایدبار مطابق فیگما */
-  --sidebar-width:   220px;
-  --sidebar-text:    rgba(255,255,255,.85);
-  --sidebar-active:  #fff;
-  --sidebar-hover:   rgba(255,255,255,.12);
-  --sidebar-active-bg: rgba(255,255,255,.18);
+  --sidebar-bg:        linear-gradient(180deg, #D6CBFF 0%, #D3C8FF 60%, #D6CCFF 100%);
+  --sidebar-width:     236px;
+  --sidebar-text:      #544A79;
+  --sidebar-active:    #221A45;
+  --sidebar-hover:     rgba(255,255,255,.55);
+  --sidebar-active-bg: #FFFFFF;
+  --sidebar-border:    rgba(102,71,251,.12);
 
   /* ── Grays ── */
   --gray-50:   #F9FAFB;
@@ -43,9 +46,9 @@
   --info:      #3B82F6;
 
   /* ── Surface ── */
-  --bg:        #F0F2F8;         /* پس‌زمینه اصلی صفحه */
+  --bg:        #FFFFFF;         /* پس‌زمینه اصلی صفحه — سفید مطابق پالت */
   --card-bg:   #FFFFFF;
-  --border:    #E5E7EB;
+  --border:    #ECE9F7;
 
   /* ── Typography ── */
   --font-xs:   11px;
@@ -58,19 +61,19 @@
   --font-3xl:  28px;
 
   /* ── Spacing ── */
-  --header-h:  60px;
+  --header-h:  64px;
   --content-p: 28px;
 
   /* ── Radius ── */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
 
   /* ── Shadows ── */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-  --shadow-md: 0 4px 12px rgba(0,0,0,.08);
-  --shadow-lg: 0 10px 40px rgba(108,76,241,.15);
+  --shadow-sm: 0 1px 2px rgba(43,20,105,.05), 0 1px 3px rgba(43,20,105,.04);
+  --shadow-md: 0 6px 18px rgba(43,20,105,.08);
+  --shadow-lg: 0 16px 44px rgba(102,71,251,.18);
 
   /* ── Transition ── */
   --transition: .2s ease;
@@ -120,55 +123,57 @@ body {
 
 /* Logo */
 .sidebar-logo {
-  padding: 24px 20px 20px;
-  border-bottom: 1px solid rgba(255,255,255,.12);
+  padding: 26px 24px 18px;
   flex-shrink: 0;
 }
 
 .logo-brand {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 800;
-  color: #fff;
-  letter-spacing: -.5px;
+  color: #17132B;
+  letter-spacing: -.3px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
 }
 
-.logo-brand .logo-dot {
-  width: 8px;
-  height: 8px;
-  background: rgba(255,255,255,.6);
-  border-radius: 50%;
-  display: inline-block;
+.logo-brand .logo-mark {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--primary);
+  margin-inline-start: 1px;
 }
 
 /* Nav */
 .sidebar-nav {
   flex: 1;
-  padding: 12px 0;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .nav-section-label {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255,255,255,.4);
+  color: rgba(34,26,69,.4);
   text-transform: uppercase;
   letter-spacing: .08em;
-  padding: 16px 20px 6px;
+  padding: 16px 12px 6px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 20px;
+  padding: 10px 14px;
   color: var(--sidebar-text);
   font-size: var(--font-sm);
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   text-decoration: none;
   position: relative;
   white-space: nowrap;
@@ -182,29 +187,18 @@ body {
 .nav-item.active {
   background: var(--sidebar-active-bg);
   color: var(--sidebar-active);
-  font-weight: 600;
-}
-
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 60%;
-  background: #fff;
-  border-radius: 2px 0 0 2px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(43,20,105,.10);
 }
 
 .nav-item .nav-icon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  opacity: .85;
+  opacity: .75;
 }
 
-.nav-item.active .nav-icon { opacity: 1; }
+.nav-item.active .nav-icon { opacity: 1; color: var(--primary); }
 
 /* Sub-menu */
 .nav-submenu {
@@ -213,36 +207,38 @@ body {
   transition: max-height .3s ease;
 }
 
-.nav-submenu.open { max-height: 200px; }
+.nav-submenu.open { max-height: 220px; }
 
 .nav-sub-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 20px 8px 20px;
-  padding-right: 48px;   /* indent */
-  color: rgba(255,255,255,.65);
+  padding: 8px 14px 8px 14px;
+  padding-right: 42px;   /* indent */
+  margin: 1px 0;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
   font-size: 12px;
   cursor: pointer;
   text-decoration: none;
   transition: all var(--transition);
 }
 
-.nav-sub-item:hover { color: #fff; background: var(--sidebar-hover); }
-.nav-sub-item.active { color: #fff; font-weight: 600; }
+.nav-sub-item:hover { color: var(--sidebar-active); background: var(--sidebar-hover); }
+.nav-sub-item.active { color: var(--primary); font-weight: 700; background: var(--sidebar-active-bg); }
 
 .nav-chevron {
   margin-right: auto;
   transition: transform var(--transition);
-  opacity: .6;
+  opacity: .55;
 }
 
 .nav-item.open .nav-chevron { transform: rotate(180deg); }
 
 /* Sidebar Footer */
 .sidebar-footer {
-  padding: 16px 20px;
-  border-top: 1px solid rgba(255,255,255,.12);
+  padding: 14px 14px 18px;
+  border-top: 1px solid var(--sidebar-border);
 }
 
 .sidebar-user {
@@ -261,7 +257,7 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: rgba(255,255,255,.25);
+  background: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -275,8 +271,8 @@ body {
 
 .user-name-sidebar {
   font-size: 12px;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  color: var(--sidebar-active);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -284,7 +280,7 @@ body {
 
 .user-role-sidebar {
   font-size: 10px;
-  color: rgba(255,255,255,.5);
+  color: var(--sidebar-text);
 }
 
 /* ─── Main Content Area ──────────────────────────────────────────────────────── */
@@ -299,7 +295,7 @@ body {
 /* ─── Top Header ─────────────────────────────────────────────────────────────── */
 .top-header {
   height: var(--header-h);
-  background: var(--gray-800);          /* هدر تیره مطابق فیگما */
+  background: var(--bg);                /* هدر روشن، هم‌رنگ پس‌زمینه — مطابق طراحی */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -311,9 +307,9 @@ body {
 }
 
 .header-title {
-  font-size: var(--font-base);
-  font-weight: 600;
-  color: rgba(255,255,255,.8);
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--gray-800);
 }
 
 .header-actions {
@@ -325,10 +321,10 @@ body {
 .header-btn {
   width: 36px;
   height: 36px;
-  background: rgba(255,255,255,.1);
+  background: var(--primary-light);
   border: none;
   border-radius: var(--radius-md);
-  color: rgba(255,255,255,.7);
+  color: var(--primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -336,7 +332,7 @@ body {
   transition: background var(--transition);
 }
 
-.header-btn:hover { background: rgba(255,255,255,.18); }
+.header-btn:hover { background: var(--secondary); }
 
 /* ─── Page Content ───────────────────────────────────────────────────────────── */
 .page-content {
@@ -474,7 +470,7 @@ body {
 /* ─── Charts & Tables Row ────────────────────────────────────────────────────── */
 .dashboard-row {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 280px 1fr;
   gap: 16px;
   margin-bottom: 24px;
 }

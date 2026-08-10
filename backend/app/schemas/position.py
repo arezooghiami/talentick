@@ -2,7 +2,7 @@
 Talentick — Position Schemas
 ===============================
 پست‌های سازمانی (مثل «مدیر محصول»). هر Position می‌تواند به یک
-Department تعلق داشته باشد و level سلسله‌مراتبی دارد (۱=کارمند، ۵=مدیرعامل).
+Department تعلق داشته باشد و level سلسله‌مراتبی دارد (۱=کارمند، ۸=مدیرعامل).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ class PositionCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
     description: str | None = None
     dept_id: str | None = None
-    level: int = Field(1, ge=1, le=5)
+    level: int = Field(1, ge=1, le=8)
     org_id: str | None = None  # فقط super_admin — در router enforce می‌شود
 
 
@@ -24,7 +24,7 @@ class PositionUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=255)
     description: str | None = None
     dept_id: str | None = None
-    level: int | None = Field(None, ge=1, le=5)
+    level: int | None = Field(None, ge=1, le=8)
     is_active: bool | None = None
 
 
