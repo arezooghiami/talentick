@@ -18,11 +18,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=true
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
+# apt-get عمداً حذف شده: psycopg[binary]/psycopg2-binary در pyproject.toml
+# wheel از پیش‌کامپایل‌شده با libpq استاتیک دارند — نیازی به gcc/libpq-dev
+# برای build نیست. حذف apt-get از build اصلی‌ترین دلیل کند شدن غیرطبیعی
+# build بود (دانلود ایندکس پکیج‌های دبیان روی شبکه‌ی این سرور گاهی چند
+# دقیقه طول می‌کشید، حتی برای نصب یک پکیج کوچک).
 RUN pip install "poetry>=2.0.0,<3.0.0"
 
 WORKDIR /build
@@ -38,11 +38,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/build/.venv/bin:$PATH"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 COPY --from=builder /build/.venv /build/.venv
@@ -52,7 +47,7 @@ COPY backend/alembic.ini ./alembic.ini
 COPY backend/seed.py ./seed.py
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD python -c "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)" || exit 1
 
 EXPOSE 8000
 
