@@ -20,7 +20,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=60 \
-    PIP_RETRIES=10
+    PIP_RETRIES=10 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
+# pypi.org و files.pythonhosted.org روی شبکه‌ی این سرور عملاً غیرقابل‌دسترسند
+# (تست شد: 15s timeout با تقریباً صفر throughput) — به‌جایش mirror
+# دانشگاه Tsinghua ست شده که تست شد و در ~3.5s با ~50KB/s جواب داد
+# (سریع‌ترین گزینه‌ی در دسترس بین PyPI اصلی/Aliyun/Tsinghua).
+# اگر بعداً این mirror هم کند/غیرقابل‌دسترس شد، جایگزین را با یک تست
+# curl مشابه (نگاه کنید به تاریخچه‌ی کامیت‌ها) بسنجید، نه با حدس.
 
 # apt-get عمداً حذف شده: psycopg[binary]/psycopg2-binary در pyproject.toml
 # wheel از پیش‌کامپایل‌شده با libpq استاتیک دارند — نیازی به gcc/libpq-dev
