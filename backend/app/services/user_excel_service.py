@@ -6,13 +6,14 @@ Import/Export گروهی کاربران از/به فایل Excel + دانلود 
 ترتیب ستون‌های فایل (import و template) — ثابت و مستند:
     1. نام و نام خانوادگی *  (full_name)
     2. شماره موبایل *        (phone — شناسه‌ی اصلی یکتایی/لاگین)
-    3. ایمیل                 (email — اختیاری)
-    4. نقش                   (role — پیش‌فرض employee)
-    5. دپارتمان               (نام Department — باید در سازمان موجود باشد)
-    6. سمت                    (نام Position — باید در سازمان موجود باشد)
-    7. ایمیل مدیر مستقیم      (manager_email — باید کاربر موجود باشد)
+    3. رمز اولیه *           (password — رمز اولیه‌ی کاربر تازه‌ساخته‌شده؛
+                              همان مقداری که ادمین در فایل می‌نویسد)
+    4. ایمیل                 (email — اختیاری)
+    5. نقش                   (role — پیش‌فرض employee)
+    6. دپارتمان               (نام Department — باید در سازمان موجود باشد)
+    7. سمت                    (نام Position — باید در سازمان موجود باشد)
 
-* = الزامی
+* = الزامی (رمز اولیه فقط برای سطرهای کاربر جدید الزامی است)
 
 خروجی Export همین ستون‌ها را به‌علاوه وضعیت/سازمان/تاریخ ثبت‌نام دارد.
 """
@@ -30,7 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.phone import normalize_phone
-from app.core.security import generate_temp_password, hash_password
+from app.core.security import hash_password
 from app.models.organization import Department, Position
 from app.models.user import VALID_ROLES, User
 from app.schemas.user import CreatedUserCredential, UserImportResult, UserImportRowError
@@ -40,14 +41,18 @@ from app.schemas.user import CreatedUserCredential, UserImportResult, UserImport
 IMPORT_HEADERS = [
     "نام و نام خانوادگی",
     "شماره موبایل",
+    "رمز اولیه",
     "ایمیل",
     "نقش",
     "دپارتمان",
     "سمت",
-    "ایمیل مدیر مستقیم",
 ]
 
-EXPORT_HEADERS = IMPORT_HEADERS + ["وضعیت", "سازمان", "تاریخ ثبت‌نام"]
+MIN_PASSWORD_LENGTH = 8
+
+# رمز اولیه به‌صورت hash شده ذخیره می‌شود و قابل بازیابی/Export نیست —
+# ستون آن در خروجی Export حذف می‌شود.
+EXPORT_HEADERS = [h for h in IMPORT_HEADERS if h != "رمز اولیه"] + ["وضعیت", "سازمان", "تاریخ ثبت‌نام"]
 
 ROLE_HINT = "super_admin | org_admin | manager | employee (پیش‌فرض: employee)"
 
@@ -74,8 +79,8 @@ def build_template_workbook() -> bytes:
     ws.sheet_view.rightToLeft = True
     ws.append(IMPORT_HEADERS)
     ws.append([
-        "علی رضایی", "09120000000", "ali.rezaei@example.com", "employee",
-        "فناوری اطلاعات", "کارشناس Backend", "manager.email@example.com",
+        "علی رضایی", "09120000000", "Aa12345678", "ali.rezaei@example.com", "employee",
+        "فناوری اطلاعات", "کارشناس Backend",
     ])
     _style_header(ws, len(IMPORT_HEADERS))
 
@@ -88,11 +93,11 @@ def build_template_workbook() -> bytes:
     rows = [
         ("نام و نام خانوادگی", "الزامی — حداقل ۲ حرف."),
         ("شماره موبایل", "الزامی و یکتا در کل پلتفرم — 09xxxxxxxxx. شناسه‌ی اصلی لاگین کاربر."),
+        ("رمز اولیه", f"الزامی برای کاربر جدید — حداقل {MIN_PASSWORD_LENGTH} کاراکتر. همین مقدار به‌عنوان رمز عبور اولیه‌ی کاربر ثبت می‌شود و باید توسط ادمین به او اطلاع داده شود. برای سطرهای به‌روزرسانی کاربر موجود، خالی بگذارید (رمز فعلی کاربر تغییر نمی‌کند)."),
         ("ایمیل", "اختیاری. اگر پر شود باید معتبر و یکتا باشد."),
         ("نقش", ROLE_HINT),
         ("دپارتمان", "نام دقیق یکی از دپارتمان‌های تعریف‌شده در سازمان (اختیاری)."),
         ("سمت", "نام دقیق یکی از پست‌های سازمانی تعریف‌شده (اختیاری)."),
-        ("ایمیل مدیر مستقیم", "ایمیل یک کاربر موجود در همان سازمان (اختیاری)."),
     ]
     for row in rows:
         guide.append(row)
@@ -124,7 +129,6 @@ def build_export_workbook(users: list[User], org_names: dict[str, str]) -> bytes
             u.role,
             u.department.name if u.department else "",
             u.position.name if u.position else "",
-            "",  # ایمیل مدیر — در export نمایش داده نمی‌شود مگر جدا resolve شود
             "فعال" if u.is_active else "غیرفعال",
             org_names.get(str(u.org_id), ""),
             u.created_at.strftime("%Y-%m-%d") if u.created_at else "",
@@ -153,7 +157,7 @@ async def import_users_from_excel(
     """
     Import گروهی کاربران از فایل Excel برای یک سازمان مشخص.
 
-    - داده‌های هر سطر اعتبارسنجی می‌شوند (موبایل، ایمیل، نقش، دپارتمان/سمت/مدیر).
+    - داده‌های هر سطر اعتبارسنجی می‌شوند (موبایل، ایمیل، نقش، دپارتمان/سمت).
     - شماره موبایل شناسه‌ی اصلی یکتایی است — تکراری‌های داخل خودِ فایل
       شناسایی و رد می‌شوند.
     - اگر update_existing=True باشد، کاربران با موبایل تکراری (نسبت به DB)
@@ -178,19 +182,17 @@ async def import_users_from_excel(
     positions_result = await db.execute(select(Position).where(Position.org_id == org_id))
     positions_by_name = {p.name.strip().lower(): p for p in positions_result.scalars().all()}
 
-    org_users_result = await db.execute(select(User).where(User.org_id == org_id))
-    org_users_all = org_users_result.scalars().all()
-    users_by_email_in_org = {u.email.lower(): u for u in org_users_all if u.email}
-
     all_users_result = await db.execute(select(User))
     all_users_all = all_users_result.scalars().all()
     all_users_by_phone = {u.phone: u for u in all_users_all}
+    all_users_by_email = {u.email.lower(): u for u in all_users_all if u.email}
 
     errors: list[UserImportRowError] = []
     created = 0
     updated = 0
     skipped = 0
     seen_phones: set[str] = set()
+    seen_emails: set[str] = set()
 
     # سطرهایی که باید ساخته/به‌روزرسانی شوند را جمع می‌کنیم تا در آخر یک‌جا commit شود
     to_create: list[User] = []
@@ -202,11 +204,11 @@ async def import_users_from_excel(
 
         full_name = _norm(row[0]) if len(row) > 0 else ""
         phone_raw = _norm(row[1]) if len(row) > 1 else ""
-        email = _norm(row[2]).lower() if len(row) > 2 else ""
-        role = _norm(row[3]).lower() if len(row) > 3 and _norm(row[3]) else "employee"
-        dept_name = _norm(row[4]) if len(row) > 4 else ""
-        position_name = _norm(row[5]) if len(row) > 5 else ""
-        manager_email = _norm(row[6]).lower() if len(row) > 6 else ""
+        password = _norm(row[2]) if len(row) > 2 else ""
+        email = _norm(row[3]).lower() if len(row) > 3 else ""
+        role = _norm(row[4]).lower() if len(row) > 4 and _norm(row[4]) else "employee"
+        dept_name = _norm(row[5]) if len(row) > 5 else ""
+        position_name = _norm(row[6]) if len(row) > 6 else ""
 
         row_error = None
         phone = ""
@@ -219,12 +221,20 @@ async def import_users_from_excel(
             except ValueError:
                 row_error = "شماره موبایل الزامی و باید معتبر باشد (09xxxxxxxxx)"
 
-        if not row_error and email and ("@" not in email or "." not in email.split("@")[-1]):
+        if not row_error and password and len(password) < MIN_PASSWORD_LENGTH:
+            row_error = f"رمز اولیه باید حداقل {MIN_PASSWORD_LENGTH} کاراکتر باشد"
+        elif not row_error and email and ("@" not in email or "." not in email.split("@")[-1]):
             row_error = "ایمیل نامعتبر است"
         elif not row_error and role not in VALID_ROLES:
             row_error = f"نقش نامعتبر است — مقادیر مجاز: {', '.join(sorted(VALID_ROLES))}"
         elif not row_error and phone in seen_phones:
             row_error = "شماره موبایل تکراری در همین فایل"
+        elif not row_error and email and email in seen_emails:
+            row_error = "ایمیل تکراری در همین فایل"
+        elif not row_error and email:
+            email_owner = all_users_by_email.get(email)
+            if email_owner and email_owner.phone != phone:
+                row_error = f"این ایمیل قبلاً برای کاربر دیگری («{email_owner.full_name}») ثبت شده است"
 
         dept = None
         if not row_error and dept_name:
@@ -238,18 +248,14 @@ async def import_users_from_excel(
             if position is None:
                 row_error = f"سمت «{position_name}» در این سازمان یافت نشد"
 
-        manager = None
-        if not row_error and manager_email:
-            manager = users_by_email_in_org.get(manager_email)
-            if manager is None:
-                row_error = f"مدیر مستقیم با ایمیل «{manager_email}» در این سازمان یافت نشد"
-
         if row_error:
             errors.append(UserImportRowError(row=idx, phone=phone or None, email=email or None, message=row_error))
             skipped += 1
             continue
 
         seen_phones.add(phone)
+        if email:
+            seen_emails.add(email)
         existing = all_users_by_phone.get(phone)
 
         if existing:
@@ -272,39 +278,51 @@ async def import_users_from_excel(
             existing.role = role
             existing.dept_id = dept.id if dept else None
             existing.position_id = position.id if position else None
-            existing.manager_id = manager.id if manager else None
             if email:
                 existing.email = email
+                all_users_by_email[email] = existing
+            if password:
+                existing.hashed_password = hash_password(password)
+                existing.must_change_password = True
+                created_credentials.append(
+                    CreatedUserCredential(phone=phone, email=email or None, temp_password=password)
+                )
             updated += 1
         else:
-            temp_password = generate_temp_password()
+            if not password:
+                errors.append(UserImportRowError(
+                    row=idx, phone=phone, email=email or None,
+                    message=f"رمز اولیه برای کاربر جدید الزامی است (حداقل {MIN_PASSWORD_LENGTH} کاراکتر)",
+                ))
+                skipped += 1
+                continue
+
             new_user = User(
                 id=uuid.uuid4(),
                 org_id=org_id,
                 email=email or None,
                 full_name=full_name,
-                hashed_password=hash_password(temp_password),
+                hashed_password=hash_password(password),
                 role=role,
                 dept_id=dept.id if dept else None,
                 position_id=position.id if position else None,
-                manager_id=manager.id if manager else None,
                 phone=phone,
                 is_active=True,
                 is_email_verified=False,
-                # رمز موقت را ادمین از طریق created_users در همین پاسخ
-                # می‌بیند و باید دستی به کاربر بدهد — کاربر موظف به تغییر
-                # آن در اولین ورود است (بدون سرویس ایمیل/پیامک در این جریان).
+                # رمز اولیه را خودِ ادمین در فایل اکسل مشخص کرده و از طریق
+                # created_users در همین پاسخ دوباره می‌بیند — کاربر موظف به
+                # تغییر آن در اولین ورود است (بدون سرویس ایمیل/پیامک در این جریان).
                 must_change_password=True,
             )
             db.add(new_user)
             to_create.append(new_user)
             created_credentials.append(
-                CreatedUserCredential(phone=phone, email=email or None, temp_password=temp_password)
+                CreatedUserCredential(phone=phone, email=email or None, temp_password=password)
             )
-            # جلوگیری از تکراری و امکان ارجاع «مدیر مستقیم» به کاربر تازه‌ساخته‌شده در همین فایل
+            # جلوگیری از تکراری در باقی سطرهای همین فایل
             all_users_by_phone[phone] = new_user
             if email:
-                users_by_email_in_org[email] = new_user
+                all_users_by_email[email] = new_user
             created += 1
 
     if created or updated:

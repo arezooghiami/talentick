@@ -41,3 +41,19 @@ class PositionResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PositionImportRowError(BaseModel):
+    """خطای مربوط به یک سطر خاص در فایل Import پست‌های سازمانی."""
+    row: int = Field(..., description="شماره سطر در فایل اکسل (شامل هدر)")
+    name: str | None = None
+    message: str
+
+
+class PositionImportResult(BaseModel):
+    """گزارش کامل نتیجه Import گروهی پست‌های سازمانی از Excel."""
+    total_rows: int
+    created: int
+    updated: int
+    skipped: int
+    errors: list[PositionImportRowError] = Field(default_factory=list)

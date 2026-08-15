@@ -3,6 +3,11 @@
    =============================================================================
    این فایل باید اول از همه load بشه.
    تمام رنگ‌ها، فونت‌ها و متغیرها اینجا تعریف می‌شن.
+
+   ─── طراحی: SaaS Enterprise حرفه‌ای (الهام از Linear/Stripe/Vercel/Notion) ───
+   Background خنثی و روشن، Surface سفید، Purple فقط به‌عنوان Accent —
+   نه رنگ غالب. تمام نام‌های متغیر حفظ شده‌اند (change-password.html و
+   admin/index.html مستقیم به آن‌ها وابسته‌اند)، فقط مقادیر پالایش شده‌اند.
    ============================================================================= */
 
 /* ─── Google Fonts ──────────────────────────────────────────────────────────── */
@@ -11,23 +16,26 @@
 /* ─── CSS Custom Properties ─────────────────────────────────────────────────── */
 :root {
   /* ── Brand Colors ── */
-  --primary:         #6647FB;   /* بنفش اصلی */
+  --primary:         #6647FB;   /* بنفش اصلی — accent، نه رنگ غالب */
   --primary-dark:    #5636D6;   /* hover state */
+  --primary-darker:  #4527B4;   /* active/pressed */
   --primary-light:   #F1EDFF;   /* پس‌زمینه badge و icon */
-  --primary-50:      #F7F5FF;
-  --secondary:       #D3C8FF;   /* لاواندر روشن سایدبار */
-  --stroke:          #B3B5BC;   /* خط دور آیکون‌باکس‌ها */
+  --primary-50:      #F7F6FE;
+  --primary-100:     #ECE6FE;
+  --secondary:       #EEE9FE;   /* تینت نرم — قبلاً پس‌زمینه سایدبار، الان فقط لهجه‌ی جزئی */
+  --stroke:          #E2E1EC;   /* خط دور آیکون‌باکس‌ها */
 
-  /* ── Sidebar ── */
-  --sidebar-bg:        linear-gradient(180deg, #D6CBFF 0%, #D3C8FF 60%, #D6CCFF 100%);
-  --sidebar-width:     236px;
-  --sidebar-text:      #544A79;
-  --sidebar-active:    #221A45;
-  --sidebar-hover:     rgba(255,255,255,.55);
-  --sidebar-active-bg: #FFFFFF;
-  --sidebar-border:    rgba(102,71,251,.12);
+  /* ── Sidebar — سطح سفید/خنثی، Purple فقط برای وضعیت فعال ── */
+  --sidebar-bg:        #FFFFFF;
+  --sidebar-width:     252px;
+  --sidebar-text:      var(--gray-600);
+  --sidebar-active:    var(--gray-900);
+  --sidebar-hover:     #F6F5FB;
+  --sidebar-active-bg: var(--primary-50);
+  --sidebar-border:    #EEEDF6;
 
   /* ── Grays ── */
+  --gray-25:   #FCFCFD;
   --gray-50:   #F9FAFB;
   --gray-100:  #F3F4F6;
   --gray-200:  #E5E7EB;
@@ -41,14 +49,18 @@
 
   /* ── Semantic ── */
   --success:   #10B981;
+  --success-light: #ECFDF5;
   --warning:   #F59E0B;
+  --warning-light: #FFFBEB;
   --danger:    #EF4444;
+  --danger-light: #FEF2F2;
   --info:      #3B82F6;
+  --info-light: #EFF6FF;
 
   /* ── Surface ── */
-  --bg:        #FFFFFF;         /* پس‌زمینه اصلی صفحه — سفید مطابق پالت */
+  --bg:        #F7F7FB;         /* پس‌زمینه خنثی صفحه — سطوح سفید روی آن برجسته دیده می‌شوند */
   --card-bg:   #FFFFFF;
-  --border:    #ECE9F7;
+  --border:    #ECEAF5;
 
   /* ── Typography ── */
   --font-xs:   11px;
@@ -61,8 +73,8 @@
   --font-3xl:  28px;
 
   /* ── Spacing ── */
-  --header-h:  64px;
-  --content-p: 28px;
+  --header-h:  68px;
+  --content-p: 32px;
 
   /* ── Radius ── */
   --radius-sm: 8px;
@@ -70,13 +82,15 @@
   --radius-lg: 18px;
   --radius-xl: 24px;
 
-  /* ── Shadows ── */
-  --shadow-sm: 0 1px 2px rgba(43,20,105,.05), 0 1px 3px rgba(43,20,105,.04);
-  --shadow-md: 0 6px 18px rgba(43,20,105,.08);
-  --shadow-lg: 0 16px 44px rgba(102,71,251,.18);
+  /* ── Shadows — خنثی و ظریف (نه بنفش‌رنگ سنگین) ── */
+  --shadow-xs: 0 1px 2px rgba(15,23,42,.04);
+  --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 1px 6px rgba(15,23,42,.05);
+  --shadow-md: 0 4px 14px rgba(15,23,42,.07), 0 1px 3px rgba(15,23,42,.05);
+  --shadow-lg: 0 16px 40px rgba(15,23,42,.12);
+  --shadow-brand: 0 8px 20px rgba(102,71,251,.28);
 
   /* ── Transition ── */
-  --transition: .2s ease;
+  --transition: .16s ease;
 }
 
 /* ─── Reset ─────────────────────────────────────────────────────────────────── */
@@ -97,6 +111,7 @@ body {
   min-height: 100vh;
   /* RTL layout — سایدبار سمت راست */
   direction: rtl;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ─── Layout Shell ───────────────────────────────────────────────────────────── */
@@ -109,6 +124,7 @@ body {
 .sidebar {
   width: var(--sidebar-width);
   background: var(--sidebar-bg);
+  border-left: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -123,57 +139,50 @@ body {
 
 /* Logo */
 .sidebar-logo {
-  padding: 26px 24px 18px;
+  padding: 24px 22px 18px;
   flex-shrink: 0;
 }
 
 .logo-brand {
-  font-size: 21px;
-  font-weight: 800;
-  color: #17132B;
-  letter-spacing: -.3px;
   display: flex;
   align-items: center;
-  gap: 2px;
 }
 
 .logo-brand .logo-mark {
-  width: 17px;
-  height: 17px;
+  width: 132px;
+  height: auto;
   flex-shrink: 0;
-  color: var(--primary);
-  margin-inline-start: 1px;
 }
 
 /* Nav */
 .sidebar-nav {
   flex: 1;
-  padding: 8px 14px;
+  padding: 4px 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .nav-section-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(34,26,69,.4);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--gray-400);
   text-transform: uppercase;
-  letter-spacing: .08em;
-  padding: 16px 12px 6px;
+  letter-spacing: .07em;
+  padding: 18px 12px 8px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 11px;
+  padding: 9px 13px;
   color: var(--sidebar-text);
   font-size: var(--font-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition);
-  border-radius: var(--radius-md);
+  transition: background var(--transition), color var(--transition);
+  border-radius: var(--radius-sm);
   text-decoration: none;
   position: relative;
   white-space: nowrap;
@@ -186,19 +195,20 @@ body {
 
 .nav-item.active {
   background: var(--sidebar-active-bg);
-  color: var(--sidebar-active);
+  color: var(--primary-darker);
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(43,20,105,.10);
 }
 
 .nav-item .nav-icon {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   flex-shrink: 0;
-  opacity: .75;
+  color: var(--gray-400);
+  transition: color var(--transition);
 }
 
-.nav-item.active .nav-icon { opacity: 1; color: var(--primary); }
+.nav-item:hover .nav-icon { color: var(--gray-600); }
+.nav-item.active .nav-icon { color: var(--primary); }
 
 /* Sub-menu */
 .nav-submenu {
@@ -207,38 +217,41 @@ body {
   transition: max-height .3s ease;
 }
 
-.nav-submenu.open { max-height: 220px; }
+.nav-submenu.open { max-height: 240px; }
 
 .nav-sub-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px 8px 14px;
-  padding-right: 42px;   /* indent */
+  padding: 7px 13px 7px 13px;
+  padding-right: 40px;   /* indent */
   margin: 1px 0;
   border-radius: var(--radius-sm);
-  color: var(--sidebar-text);
-  font-size: 12px;
+  color: var(--gray-500);
+  font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
   text-decoration: none;
-  transition: all var(--transition);
+  transition: background var(--transition), color var(--transition);
 }
 
 .nav-sub-item:hover { color: var(--sidebar-active); background: var(--sidebar-hover); }
-.nav-sub-item.active { color: var(--primary); font-weight: 700; background: var(--sidebar-active-bg); }
+.nav-sub-item.active { color: var(--primary-darker); font-weight: 700; background: var(--sidebar-active-bg); }
 
 .nav-chevron {
   margin-right: auto;
   transition: transform var(--transition);
-  opacity: .55;
+  opacity: .5;
+  color: var(--gray-400);
 }
 
 .nav-item.open .nav-chevron { transform: rotate(180deg); }
 
 /* Sidebar Footer */
 .sidebar-footer {
-  padding: 14px 14px 18px;
+  padding: 14px 14px 16px;
   border-top: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
 }
 
 .sidebar-user {
@@ -257,7 +270,7 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -270,17 +283,18 @@ body {
 .user-info-sidebar { min-width: 0; }
 
 .user-name-sidebar {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--sidebar-active);
+  color: var(--gray-900);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .user-role-sidebar {
-  font-size: 10px;
-  color: var(--sidebar-text);
+  font-size: 10.5px;
+  color: var(--gray-500);
+  margin-top: 1px;
 }
 
 /* ─── Main Content Area ──────────────────────────────────────────────────────── */
@@ -290,12 +304,14 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
 }
 
 /* ─── Top Header ─────────────────────────────────────────────────────────────── */
 .top-header {
   height: var(--header-h);
-  background: var(--bg);                /* هدر روشن، هم‌رنگ پس‌زمینه — مطابق طراحی */
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -307,32 +323,33 @@ body {
 }
 
 .header-title {
-  font-size: var(--font-lg);
+  font-size: var(--font-xl);
   font-weight: 700;
-  color: var(--gray-800);
+  color: var(--gray-900);
+  letter-spacing: -.01em;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .header-btn {
-  width: 36px;
-  height: 36px;
-  background: var(--primary-light);
+  width: 38px;
+  height: 38px;
+  background: var(--gray-100);
   border: none;
   border-radius: var(--radius-md);
-  color: var(--primary);
+  color: var(--gray-500);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--transition);
+  transition: background var(--transition), color var(--transition);
 }
 
-.header-btn:hover { background: var(--secondary); }
+.header-btn:hover { background: var(--danger-light); color: var(--danger); }
 
 /* ─── Page Content ───────────────────────────────────────────────────────────── */
 .page-content {
@@ -341,7 +358,7 @@ body {
   overflow-y: auto;
 }
 
-/* ─── Page Header ────────────────────────────────────────────────────────────── */
+/* ─── Page Header (legacy alias — همان view-header) ─────────────────────────── */
 .page-header {
   display: flex;
   align-items: center;
@@ -352,7 +369,7 @@ body {
 .page-title {
   font-size: var(--font-xl);
   font-weight: 700;
-  color: var(--gray-800);
+  color: var(--gray-900);
 }
 
 .page-subtitle {
@@ -364,36 +381,39 @@ body {
 /* ─── Stats Grid (کارت‌های آمار) ─────────────────────────────────────────────── */
 .stats-area {
   display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: 220px 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 /* کارت بزرگ کاربران فعال — ستون اول */
 .stat-main {
   background: var(--card-bg);
   border-radius: var(--radius-lg);
-  padding: 24px 20px;
+  padding: 22px 22px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .stat-main-label {
-  font-size: var(--font-sm);
+  font-size: 12px;
   color: var(--gray-500);
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .03em;
 }
 
 .stat-main-value {
-  font-size: 48px;
+  font-size: 44px;
   font-weight: 800;
-  color: var(--gray-800);
+  color: var(--gray-900);
   line-height: 1;
+  letter-spacing: -.02em;
 }
 
 /* گرید ۳×۲ کارت‌های کوچک */
@@ -401,45 +421,50 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(2, auto);
-  gap: 12px;
+  gap: 14px;
 }
 
 .stat-card {
   background: var(--card-bg);
   border-radius: var(--radius-lg);
-  padding: 18px 20px;
+  padding: 16px 18px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
+
+.stat-card:hover { border-color: var(--primary-100); box-shadow: var(--shadow-md); }
 
 .stat-card-info {}
 
 .stat-card-label {
-  font-size: var(--font-sm);
+  font-size: 12px;
   color: var(--gray-500);
-  margin-bottom: 4px;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .stat-card-value {
   font-size: var(--font-2xl);
-  font-weight: 700;
-  color: var(--gray-800);
+  font-weight: 800;
+  color: var(--gray-900);
   line-height: 1;
+  letter-spacing: -.01em;
 }
 
 .stat-card-suffix {
   font-size: var(--font-xs);
   color: var(--gray-400);
-  font-weight: 400;
+  font-weight: 500;
   margin-right: 3px;
 }
 
 /* کارت پاداش — عرض کامل */
 .stat-reward {
-  background: var(--card-bg);
+  background: linear-gradient(135deg, var(--primary-50), var(--card-bg) 60%);
   border-radius: var(--radius-lg);
   padding: 20px 24px;
   border: 1px solid var(--border);
@@ -447,18 +472,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .stat-reward-label {
   font-size: var(--font-sm);
-  color: var(--gray-500);
+  color: var(--gray-600);
+  font-weight: 600;
 }
 
 .stat-reward-value {
   font-size: var(--font-2xl);
   font-weight: 800;
-  color: var(--gray-800);
+  color: var(--primary-darker);
 }
 
 .stat-reward-unit {
@@ -470,9 +496,9 @@ body {
 /* ─── Charts & Tables Row ────────────────────────────────────────────────────── */
 .dashboard-row {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: 300px 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
 }
 
 /* ─── Card ───────────────────────────────────────────────────────────────────── */
@@ -488,23 +514,25 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 15px 18px;
   border-bottom: 1px solid var(--border);
 }
 
 .card-title {
   font-size: var(--font-base);
-  font-weight: 600;
-  color: var(--gray-800);
+  font-weight: 700;
+  color: var(--gray-900);
+  display: flex;
+  align-items: center;
 }
 
 .card-title-bar {
   width: 3px;
-  height: 16px;
+  height: 14px;
   background: var(--primary);
   border-radius: 2px;
   display: inline-block;
-  margin-left: 8px;
+  margin-left: 9px;
   vertical-align: middle;
 }
 
@@ -518,18 +546,20 @@ body {
   background: none;
   border: none;
   font-family: inherit;
+  transition: color var(--transition);
 }
+.card-action:hover { color: var(--primary); }
 
-.card-body { padding: 20px; }
+.card-body { padding: 18px; }
 
 /* ─── Top Users List ─────────────────────────────────────────────────────────── */
-.user-list { display: flex; flex-direction: column; gap: 10px; }
+.user-list { display: flex; flex-direction: column; gap: 2px; }
 
 .user-list-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 8px 8px;
   border-radius: var(--radius-md);
   transition: background var(--transition);
 }
@@ -537,11 +567,11 @@ body {
 .user-list-item:hover { background: var(--gray-50); }
 
 .user-avatar {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--primary-light);
-  color: var(--primary);
+  color: var(--primary-darker);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -576,22 +606,24 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .ticket-card {
   background: var(--card-bg);
   border-radius: var(--radius-lg);
-  padding: 18px;
+  padding: 16px 18px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition), border-color var(--transition);
 }
+.ticket-card:hover { box-shadow: var(--shadow-md); border-color: var(--primary-100); }
 
 .ticket-user {
   font-size: var(--font-sm);
-  font-weight: 600;
-  color: var(--gray-800);
-  margin-bottom: 6px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 5px;
 }
 
 .ticket-status {
@@ -619,8 +651,8 @@ body {
 
 .section-title {
   font-size: var(--font-base);
-  font-weight: 600;
-  color: var(--gray-800);
+  font-weight: 700;
+  color: var(--gray-900);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -634,7 +666,7 @@ body {
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gray-300); }
@@ -657,4 +689,29 @@ body {
    admin-components.css که فقط داخل شِل admin/index.html لود می‌شود) ─── */
 .hidden { display: none !important; }
 .required { color: var(--danger); }
-.form-hint { font-size: 11px; color: var(--gray-400); margin-top: 4px; display: block; }
+.form-hint { font-size: 11px; color: var(--gray-400); margin-top: 4px; display: block; line-height: 1.6; }
+
+/* صفحاتی مثل change-password.html فقط admin.css را لود می‌کنند (نه
+   admin-components.css) — این سه کلاس باید اینجا هم موجود باشند تا فرم‌شان
+   بی‌استایل نماند. مقادیر عمداً با نسخه‌ی admin-components.css یکسان است. */
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 6px; }
+.form-control {
+  width: 100%; padding: 10px 13px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-md);
+  font-family: 'Vazirmatn', sans-serif; font-size: 13px; color: var(--gray-800); outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition); background: var(--card-bg);
+}
+.form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3.5px var(--primary-light); }
+.form-control::placeholder { color: var(--gray-400); }
+
+/* ─── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .stats-area { grid-template-columns: 1fr; }
+  .dashboard-row { grid-template-columns: 1fr; }
+  .tickets-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 760px) {
+  :root { --content-p: 18px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .tickets-row { grid-template-columns: 1fr; }
+}

@@ -246,7 +246,84 @@ const StructurePage = (() => {
     });
   }
 
+  // ─── Positions: Excel قالب / خروجی / Import ────────────────────────
+  async function downloadPositionTemplate() {
+    try {
+      await api.download('/positions/template', 'talentick-positions-template.xlsx');
+      toastSuccess('فایل Excel دانلود شد');
+    } catch (e) { toastError(e.message); }
+  }
+
+  async function exportPositionsExcel() {
+    try {
+      const deptFilter = document.getElementById('posDeptFilter')?.value || '';
+      const p = new URLSearchParams({ org_id: state.orgId });
+      if (deptFilter) p.set('dept_id', deptFilter);
+      await api.download(`/positions/export?${p}`, 'talentick-positions-export.xlsx');
+      toastSuccess('فایل Excel دانلود شد');
+    } catch (e) { toastError(e.message); }
+  }
+
+  function onPositionImportFileChange(inputEl) {
+    const file = inputEl.files?.[0];
+    setUploadName('pi-file-name', file ? file.name : '', !!file);
+  }
+
+  function openPositionImport() {
+    document.getElementById('pi-file').value = '';
+    setUploadName('pi-file-name', '');
+    openModal('modal-position-import');
+  }
+
+  async function submitPositionImport() {
+    const fileInput = document.getElementById('pi-file');
+    const file = fileInput.files?.[0];
+    if (!file) { toastError('لطفاً یک فایل Excel انتخاب کنید'); return; }
+
+    const btn = document.getElementById('btn-import-positions');
+    setLoading(btn, true);
+    try {
+      const p = new URLSearchParams({ org_id: state.orgId });
+      const result = await api.upload(`/positions/import?${p}`, file);
+      closeModal('modal-position-import');
+      showPositionImportResult(result);
+      await loadPositions();
+    } catch (e) { toastError(e.message); }
+    finally { setLoading(btn, false); }
+  }
+
+  function showPositionImportResult(result) {
+    document.getElementById('piResultStats').innerHTML = [
+      ['کل ردیف‌ها', result.total_rows, 'var(--gray-700)'],
+      ['ساخته‌شده', result.created, 'var(--success)'],
+      ['به‌روزرسانی‌شده', result.updated, 'var(--primary)'],
+      ['رد‌شده / خطا', result.skipped + (result.errors?.length || 0), 'var(--danger)'],
+    ].map(([label, value, color]) => `
+      <div class="stat-card"><div class="stat-card-info"><div class="stat-card-label">${label}</div><div class="stat-card-value" style="color:${color};">${numFa(value)}</div></div></div>
+    `).join('');
+
+    const errorsWrap = document.getElementById('piResultErrorsWrap');
+    const errorsList = document.getElementById('piResultErrorsList');
+    if (result.errors?.length) {
+      errorsWrap.classList.remove('hidden');
+      errorsList.innerHTML = result.errors.map(er => `
+        <div style="font-size:12.5px;color:var(--danger);background:#FEF2F2;border-radius:var(--radius-sm);padding:8px 10px;">
+          سطر ${numFa(er.row)}${er.name ? ' (' + esc(er.name) + ')' : ''}: ${esc(er.message)}
+        </div>`).join('');
+    } else {
+      errorsWrap.classList.add('hidden');
+    }
+
+    openModal('modal-position-import-result');
+  }
+
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+  function setUploadName(id, name, hasFile = !!name) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = name || 'فایلی انتخاب نشده';
+    el.classList.toggle('has-file', hasFile);
+  }
 
   // ─── Delegated Row Actions — به‌جای onclick اینلاین با نام کاربر ──────
   document.getElementById('deptsTableBody')?.addEventListener('click', (e) => {
@@ -263,5 +340,7 @@ const StructurePage = (() => {
     openCreateDept, openEditDept, saveDept, removeDept,
     openCreatePosition, openEditPosition, savePosition, removePosition,
     loadPositions,
+    downloadPositionTemplate, exportPositionsExcel, openPositionImport,
+    onPositionImportFileChange, submitPositionImport,
   };
 })();
