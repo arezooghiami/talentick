@@ -16,7 +16,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_IN_PROJECT=true
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    PIP_DEFAULT_TIMEOUT=100 \
+    PIP_RETRIES=10 \
+    POETRY_REQUESTS_TIMEOUT=100
 
 # apt-get عمداً حذف شده: psycopg[binary]/psycopg2-binary در pyproject.toml
 # wheel از پیش‌کامپایل‌شده با libpq استاتیک دارند — نیازی به gcc/libpq-dev
