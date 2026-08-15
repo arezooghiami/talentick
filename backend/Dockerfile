@@ -1,38 +1,42 @@
 # =============================================================================
 # Talentick Backend — Dockerfile
-# Python 3.12 slim — multi-stage با Poetry، بدون virtualenv اضافه در ایمیج نهایی
+# Python 3.12 slim — multi-stage، venv دستی + pip (بدون Poetry داخل ایمیج)
 # =============================================================================
-# ⚠️ Build context این Dockerfile باید ریشه‌ی مونوریپو باشد (نه backend/)
-# چون pyproject.toml/poetry.lock آنجا هستند:
+# ⚠️ Build context این Dockerfile باید ریشه‌ی مونوریپو باشد چون
+# backend/requirements.txt آنجاست:
 #   docker build -f backend/Dockerfile .
 # در docker-compose.yml/docker-compose.prod.yml معادل آن:
 #   build: { context: ., dockerfile: backend/Dockerfile }
+#
+# ⚠️ backend/requirements.txt از poetry.lock تولید می‌شود — منبع حقیقتِ
+# نسخه‌ها همچنان pyproject.toml/poetry.lock است. با هر تغییر وابستگی‌ها،
+# این فایل باید دوباره export شود:
+#   poetry export --format requirements.txt --without-hashes -o backend/requirements.txt
 
-# ─── Stage 1: Builder — نصب وابستگی‌ها با Poetry ───────────────────────────
+# ─── Stage 1: Builder — نصب وابستگی‌ها با pip در یک venv مجزا ──────────────
 FROM python:3.12-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_IN_PROJECT=true \
     PIP_DEFAULT_TIMEOUT=100 \
-    PIP_RETRIES=10 \
-    POETRY_REQUESTS_TIMEOUT=100
+    PIP_RETRIES=10
 
 # apt-get عمداً حذف شده: psycopg[binary]/psycopg2-binary در pyproject.toml
 # wheel از پیش‌کامپایل‌شده با libpq استاتیک دارند — نیازی به gcc/libpq-dev
-# برای build نیست. حذف apt-get از build اصلی‌ترین دلیل کند شدن غیرطبیعی
-# build بود (دانلود ایندکس پکیج‌های دبیان روی شبکه‌ی این سرور گاهی چند
-# دقیقه طول می‌کشید، حتی برای نصب یک پکیج کوچک).
-RUN pip install "poetry>=2.0.0,<3.0.0"
-
+# برای build نیست.
+#
+# Poetry هم عمداً داخل ایمیج نصب نمی‌شود: خودِ Poetry حدود ۳۰ پکیج
+# جانبی (cleo, cachecontrol, build, keyring, ...) دارد که ربطی به اپ
+# ندارند و روی شبکه‌ی کند سرور، همین نصب اولیه‌ی Poetry (نه پکیج‌های
+# واقعی اپ) تنها‌ترین گلوگاه بود. به‌جایش از backend/requirements.txt
+# (خروجی poetry export) مستقیم با pip نصب می‌کنیم.
 WORKDIR /build
 
-# فقط فایل‌های قفل وابستگی کپی می‌شوند تا cache layer با تغییر کد نشکند
-COPY pyproject.toml poetry.lock ./
-RUN poetry install --only main --no-root
+COPY backend/requirements.txt ./
+RUN python -m venv .venv \
+    && .venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # ─── Stage 2: Runtime — فقط venv نصب‌شده + سورس کپی می‌شود ──────────────────
 FROM python:3.12-slim AS runtime
