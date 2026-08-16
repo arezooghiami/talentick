@@ -229,13 +229,18 @@ const UsersPage = (() => {
   }
 
   async function openEdit(id) {
-    const u = state.items.find(x => x.id === id);
-    if (!u) return;
+    let u;
+    try {
+      u = await api.get(`/users/${id}`); // جزئیات کامل (dept_id/position_id/org_id) — لیست ردیف‌ها این فیلدها را ندارد
+    } catch (e) {
+      toastError(e.message);
+      return;
+    }
     document.getElementById('userModalTitle').textContent = 'ویرایش کاربر';
     document.getElementById('un-id').value = u.id;
     document.getElementById('un-name').value = u.full_name;
     document.getElementById('un-email').value = u.email || '';
-    document.getElementById('un-phone').value = '';
+    document.getElementById('un-phone').value = u.phone || '';
     document.getElementById('un-password').value = '';
     document.getElementById('un-role').value = u.role;
     document.getElementById('un-role').disabled = false;
