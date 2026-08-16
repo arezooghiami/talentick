@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.exceptions import BadRequestError, ForbiddenError
+from app.core.phone import normalize_phone_search
 from app.core.security import hash_password
 from app.dependencies import ROLE_HIERARCHY
 from app.models.organization import Organization
@@ -88,8 +89,9 @@ async def list_users(
 
     if search:
         like = f"%{search}%"
+        phone_like = f"%{normalize_phone_search(search)}%"
         base_q = base_q.where(
-            (User.full_name.ilike(like)) | (User.email.ilike(like)) | (User.phone.ilike(like))
+            (User.full_name.ilike(like)) | (User.email.ilike(like)) | (User.phone.ilike(phone_like))
         )
     if role:
         base_q = base_q.where(User.role == role)

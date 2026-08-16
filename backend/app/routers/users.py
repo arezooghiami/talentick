@@ -33,6 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core.phone import normalize_phone_search
 from app.database import get_db
 from app.dependencies import CurrentUser, Manager, OrgAdmin, require_active
 from app.dependencies import enforce_org_scope as _enforce_org_scope
@@ -228,7 +229,10 @@ async def export_users_excel(
     )
     if search:
         like = f"%{search}%"
-        q = q.where((User.full_name.ilike(like)) | (User.email.ilike(like)))
+        phone_like = f"%{normalize_phone_search(search)}%"
+        q = q.where(
+            (User.full_name.ilike(like)) | (User.email.ilike(like)) | (User.phone.ilike(phone_like))
+        )
     if role:
         q = q.where(User.role == role)
     if scoped_org_id:

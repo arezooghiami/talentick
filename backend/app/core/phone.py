@@ -37,3 +37,26 @@ def normalize_phone(raw: str) -> str:
         raise ValueError("شماره موبایل نامعتبر است — فرمت صحیح: 09xxxxxxxxx")
 
     return f"+98{core}"
+
+
+def normalize_phone_search(raw: str) -> str:
+    """
+    نسخه‌ی سست‌گیرانه‌ی normalize_phone برای عبارت جستجوی جزئی (نه لزوماً یک
+    شماره کامل و معتبر) — کاربر معمولاً با فرمت رایج 09xxxxxxxxx جستجو
+    می‌کند، درحالی‌که در دیتابیس شماره‌ها همیشه به‌صورت +98XXXXXXXXXX
+    ذخیره شده‌اند. برخلاف normalize_phone هیچ اعتبارسنجی طول/فرمتی
+    انجام نمی‌دهد — فقط پیشوند رایج را به +98 تبدیل می‌کند تا با ilike
+    مطابقت پیدا کند.
+    """
+    cleaned = re.sub(r"[\s\-()]", "", raw or "")
+
+    if cleaned.startswith("0098"):
+        core = cleaned[4:]
+    elif cleaned.startswith("098"):
+        core = cleaned[2:]
+    elif cleaned.startswith("0"):
+        core = cleaned[1:]
+    else:
+        return cleaned
+
+    return f"+98{core}"
