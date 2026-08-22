@@ -204,6 +204,7 @@ textarea.form-control { resize: vertical; line-height: 1.7; }
 .item-row:hover { border-color: var(--gray-300); }
 .item-row-order { font-size: 11px; color: var(--gray-400); width: 18px; text-align: center; flex-shrink: 0; font-weight: 700; }
 .item-row-icon { width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; }
+.item-row-thumb { width: 28px; height: 28px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; background: var(--gray-100); }
 .item-row-info { flex: 1; min-width: 0; }
 .item-row-title { font-size: 13px; font-weight: 600; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-row-meta { font-size: 11px; color: var(--gray-400); }

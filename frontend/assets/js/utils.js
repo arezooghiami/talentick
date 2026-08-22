@@ -104,6 +104,27 @@ async function hydrateAuthedImages(container) {
   }));
 }
 
+// ─── Authed file download ──────────────────────────────────────────
+// مثل hydrateAuthedImages: /api/files/* فقط با Bearer پاسخ می‌دهد، پس یک
+// <a href="..."> ساده کار نمی‌کند — با fetch احراز هویت‌شده دانلود می‌شود.
+async function downloadAuthedFile(url, filename) {
+  const token = Auth.getToken();
+  try {
+    const res = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+    if (!res.ok) { toastError('خطا در دریافت فایل'); return; }
+    const blobUrl = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename || '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    toastError('خطا در دریافت فایل');
+  }
+}
+
 // ─── HTML escaping ─────────────────────────────────────────────────
 // باید هم برای متن (innerHTML) و هم برای مقدار attribute (بین "..." یا '...')
 // امن باشد — به همین دلیل هر ۵ کاراکتر حساس HTML را escape می‌کند، نه فقط

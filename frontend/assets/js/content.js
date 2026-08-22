@@ -618,21 +618,43 @@ const ContentPage = (() => {
     }
     const canEdit = App.isSuperAdmin || App.isOrgAdmin;
     const sorted = sortedItems();
-    wrap.innerHTML = sorted.map((it, idx) => `
+    wrap.innerHTML = sorted.map((it, idx) => {
+      const downloadable = ['video', 'pdf', 'image', 'file'].includes(it.type) && !!it.media_url;
+      const icon = it.type === 'image' && it.media_url
+        ? `<img class="item-row-thumb" data-src="${esc(it.media_url)}" alt="">`
+        : `<div class="item-row-icon">${ITEM_TYPE_ICONS[it.type] || '📄'}</div>`;
+      return `
       <div class="item-row">
         <div class="item-row-order">${numFa(idx + 1)}</div>
-        <div class="item-row-icon">${ITEM_TYPE_ICONS[it.type] || '📄'}</div>
+        ${icon}
         <div class="item-row-info">
           <div class="item-row-title">${esc(it.title)}</div>
           <div class="item-row-meta">${ITEM_TYPE_LABELS[it.type] || it.type}${it.duration_min ? ' • ' + numFa(it.duration_min) + ' دقیقه' : ''}${it.is_free ? ' • رایگان' : ''}</div>
         </div>
         <div class="item-row-actions">
+          ${downloadable ? `<button class="btn-icon" title="دانلود فایل" data-role="download-item" data-id="${it.id}">⬇️</button>` : ''}
           ${canEdit && idx > 0 ? `<button class="btn-icon" title="جابه‌جایی به بالا" onclick="ContentPage.moveItemUp('${it.id}')">▲</button>` : ''}
           ${canEdit && idx < sorted.length - 1 ? `<button class="btn-icon" title="جابه‌جایی به پایین" onclick="ContentPage.moveItemDown('${it.id}')">▼</button>` : ''}
           ${canEdit ? `<button class="btn-icon" title="ویرایش" onclick="ContentPage.openEditItem('${it.id}')">✎</button>` : ''}
           ${canEdit ? `<button class="btn-icon" title="حذف" data-role="delete-item" data-id="${it.id}" data-title="${esc(it.title)}">🗑</button>` : ''}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
+    hydrateAuthedImages(wrap);
+  }
+
+  // پسوند فایل اصلی هیچ‌جا ذخیره نمی‌شود (فقط media_url) — پسوند را از خودِ
+  // URI آپلودشده استخراج می‌کنیم تا نام فایل دانلودی بی‌پسوند نباشد.
+  function filenameWithExt(base, url) {
+    const ext = /\.([a-zA-Z0-9]{1,8})$/.exec((url || '').split('?')[0])?.[1];
+    if (!ext || /\.[a-zA-Z0-9]{1,8}$/.test(base)) return base;
+    return `${base}.${ext}`;
+  }
+
+  function downloadItem(id) {
+    const it = state.activeItems.find(x => x.id === id);
+    if (!it || !it.media_url) return;
+    downloadAuthedFile(it.media_url, filenameWithExt(it.title || 'file', it.media_url));
   }
 
   async function swapOrder(id, dir) {
@@ -688,6 +710,7 @@ const ContentPage = (() => {
     document.getElementById('i-free').checked = true;
     document.getElementById('i-points').value = '';
     setUploadName('i-upload-name', '');
+    renderItemUploadPreview('', 'text');
     toggleItemFields();
     openModal('modal-item');
   }
@@ -707,6 +730,7 @@ const ContentPage = (() => {
     document.getElementById('i-free').checked = !!it.is_free;
     document.getElementById('i-points').value = it.points_override ?? '';
     setUploadName('i-upload-name', it.media_url && it.type !== 'link' ? 'فایل فعلی ثبت شده' : '');
+    renderItemUploadPreview(it.type !== 'link' ? (it.media_url || '') : '', it.type);
     toggleItemFields();
     if (it.type === 'quiz_ref') populateQuizSelect(it.quiz_id);
     openModal('modal-item');
@@ -719,6 +743,7 @@ const ContentPage = (() => {
       const res = await api.upload('/contents/upload', file);
       document.getElementById('i-media-url').value = res.url;
       setUploadName('i-upload-name', file.name, true);
+      renderItemUploadPreview(res.url, document.getElementById('i-type').value);
       toastSuccess('فایل با موفقیت آپلود شد');
     } catch (e) { toastError(e.message); }
     finally { inputEl.value = ''; }
@@ -827,6 +852,33 @@ const ContentPage = (() => {
     if (url) hydrateAuthedImages(preview);
   }
 
+  // پیش‌نمایش فایل آپلودشده‌ی یک آیتم — همانند پیش‌نمایش کاور، تا مدیر
+  // بدون نیاز به دانلود جداگانه ببیند دقیقاً چه فایلی ثبت شده.
+  function renderItemUploadPreview(url, type) {
+    const preview = document.getElementById('i-upload-preview');
+    if (!preview) return;
+    if (!url) { preview.innerHTML = ''; return; }
+    if (type === 'image') {
+      preview.innerHTML = `<div style="display:flex;align-items:center;gap:10px;">
+        <img data-src="${esc(url)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:6px;background:var(--gray-100);">
+        <button type="button" class="btn btn-secondary" style="font-size:12px;padding:6px 10px;" onclick="ContentPage.downloadCurrentItemMedia()">دانلود فایل ↓</button>
+      </div>`;
+      hydrateAuthedImages(preview);
+    } else {
+      preview.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:20px;">${ITEM_TYPE_ICONS[type] || '📎'}</span>
+        <span style="font-size:12px;color:var(--gray-500);">فایل فعلی آپلود شده</span>
+        <button type="button" class="btn btn-secondary" style="font-size:12px;padding:6px 10px;" onclick="ContentPage.downloadCurrentItemMedia()">دانلود ↓</button>
+      </div>`;
+    }
+  }
+
+  function downloadCurrentItemMedia() {
+    const url = document.getElementById('i-media-url').value;
+    const title = document.getElementById('i-title').value.trim() || 'file';
+    if (url) downloadAuthedFile(url, filenameWithExt(title, url));
+  }
+
   // ─── Delegated Row Actions (نه onclick اینلاین با عنوان کاربر داخلش) ──
   // چون confirmAction عنوان را با textContent نشان می‌دهد، امن است — اما
   // onclick="fn('${esc(title)}')" روی یک attribute تک‌کوتیشن، امن نیست:
@@ -839,8 +891,10 @@ const ContentPage = (() => {
     if (btn) remove(btn.dataset.id, btn.dataset.title);
   });
   document.getElementById('contentItemsList')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-role="delete-item"]');
-    if (btn) removeItem(btn.dataset.id, btn.dataset.title);
+    const delBtn = e.target.closest('[data-role="delete-item"]');
+    if (delBtn) { removeItem(delBtn.dataset.id, delBtn.dataset.title); return; }
+    const dlBtn = e.target.closest('[data-role="download-item"]');
+    if (dlBtn) downloadItem(dlBtn.dataset.id);
   });
 
   return {
@@ -848,7 +902,7 @@ const ContentPage = (() => {
     switchTab, prevTab, nextTab, finishWizard, closeContentModal,
     openCreate, openEdit, saveChanges, remove, uploadThumbnail,
     loadItems, toggleItemFields, openCreateItem, openEditItem, uploadItemMedia, saveItem, removeItem,
-    moveItemUp, moveItemDown, pickBulkFiles, uploadBulkFiles,
+    moveItemUp, moveItemDown, pickBulkFiles, uploadBulkFiles, downloadItem, downloadCurrentItemMedia,
     onOrgChange, onPublicToggle, toggleDeptTarget, togglePositionTarget,
     searchTargetUsers, toggleUserTarget, removeUserChip,
   };
