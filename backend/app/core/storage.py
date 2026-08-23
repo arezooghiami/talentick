@@ -138,7 +138,15 @@ def get_public_minio_client(request: Request) -> Minio:
     """
     host = request.headers.get("host") or request.url.netloc
     forwarded_proto = request.headers.get("x-forwarded-proto")
-    secure = (forwarded_proto or request.url.scheme) == "https"
+    # نکته: در production جلوی این اپ یک لایه‌ی TLS-terminating دیگر هم هست؛
+    # nginx خودش فقط روی پورت ۸۰ گوش می‌دهد، پس $scheme داخل nginx همیشه
+    # "http" است و proxy_set_header X-Forwarded-Proto $scheme در nginx.conf
+    # هر مقدار https واقعی که از آن لایه‌ی جلویی آمده را با "http" بازنویسی
+    # می‌کند. یعنی این هدر در production هرگز قابل اعتماد نیست — همیشه
+    # secure=True فرض می‌شود، وگرنه presigned URL با http:// ساخته می‌شود و
+    # مرورگر (که خودش از https بارگذاری شده) آپلود را با mixed-content/CORS
+    # رد می‌کند.
+    secure = True if settings.is_production else (forwarded_proto or request.url.scheme) == "https"
     return Minio(
         host,
         access_key=settings.minio_root_user,
