@@ -25,6 +25,7 @@ Talentick — Storage Utilities (MinIO)
 
 from __future__ import annotations
 
+import asyncio
 import io
 import uuid
 from functools import lru_cache
@@ -128,7 +129,11 @@ async def upload_file(file: UploadFile, org_id: uuid.UUID | None, subfolder: str
     try:
         ensure_bucket()
         client = get_minio_client()
-        client.put_object(
+        # put_object در minio-py synchronous/blocking است — بدون to_thread حین
+        # آپلود فایل حجیم کل event loop قفل می‌شود و هیچ درخواست هم‌زمان دیگری
+        # (آپلود/دانلود کاربران دیگر) پاسخ داده نمی‌شود.
+        await asyncio.to_thread(
+            client.put_object,
             settings.minio_bucket_name,
             object_name,
             data=io.BytesIO(data),
