@@ -119,21 +119,26 @@ async function resolveAuthedPlaybackUrl(internalUrl) {
 }
 
 // ─── Authed file download ──────────────────────────────────────────
-// مثل hydrateAuthedImages: /api/files/* فقط با Bearer پاسخ می‌دهد، پس یک
-// <a href="..."> ساده کار نمی‌کند — با fetch احراز هویت‌شده دانلود می‌شود.
+// /api/files/* فقط با Bearer پاسخ می‌دهد، پس یک <a href="..."> ساده کار
+// نمی‌کند. قبلاً کل فایل با fetch از پشت اپ عبور داده و blob می‌شد، ولی
+// برای ویدیوی حجیم این یعنی بافر کردن کل فایل در حافظه‌ی مرورگر و رد شدن
+// از استریم FastAPI که در عمل به ERR_HTTP2_PROTOCOL_ERROR منجر می‌شد؛ به
+// جایش مثل resolveAuthedPlaybackUrl یک presigned URL کوتاه‌مدت (این‌بار
+// با response-content-disposition: attachment) می‌گیریم و مرورگر مستقیم
+// از MinIO دانلود می‌کند — بدون بافر JS و بدون عبور بایت‌ها از اپ.
 async function downloadAuthedFile(url, filename) {
   const token = Auth.getToken();
   try {
-    const res = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+    const playbackEndpoint = url.replace('/api/files/', '/api/files/playback-url/') + `?download=${encodeURIComponent(filename || 'file')}`;
+    const res = await fetch(playbackEndpoint, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
     if (!res.ok) { toastError('خطا در دریافت فایل'); return; }
-    const blobUrl = URL.createObjectURL(await res.blob());
+    const { url: presignedUrl } = await res.json();
     const a = document.createElement('a');
-    a.href = blobUrl;
+    a.href = presignedUrl;
     a.download = filename || '';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(blobUrl);
   } catch {
     toastError('خطا در دریافت فایل');
   }

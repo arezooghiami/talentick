@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from minio.error import S3Error
 
@@ -54,7 +54,12 @@ def _check_file_access(object_path: str, current_user) -> None:
 
 
 @router.get("/playback-url/{object_path:path}", summary="لینک موقت presigned برای پخش/دانلود مستقیم از MinIO")
-async def get_file_playback_url(object_path: str, request: Request, current_user: ActiveUser) -> dict:
+async def get_file_playback_url(
+    object_path: str,
+    request: Request,
+    current_user: ActiveUser,
+    download: str | None = Query(None, description="اگر داده شود، لینک برای دانلود (attachment) با این نام فایل امضا می‌شود، نه پخش inline"),
+) -> dict:
     _check_file_access(object_path, current_user)
 
     client = get_minio_client()
@@ -63,7 +68,7 @@ async def get_file_playback_url(object_path: str, request: Request, current_user
     except S3Error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "فایل یافت نشد")
 
-    return {"url": await create_download_url(request, object_path)}
+    return {"url": await create_download_url(request, object_path, download_filename=download)}
 
 
 @router.get("/{object_path:path}", summary="دریافت فایل آپلودشده (کاور/سند/ویدیو/آواتار/لوگو و ...)")

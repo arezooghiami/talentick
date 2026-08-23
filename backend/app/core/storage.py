@@ -37,6 +37,7 @@ import io
 import uuid
 from datetime import timedelta
 from functools import lru_cache
+from urllib.parse import quote
 
 from fastapi import HTTPException, Request, UploadFile, status
 from minio import Minio
@@ -186,14 +187,29 @@ async def create_upload_url(request: Request, filename: str | None, org_id: uuid
     }
 
 
-async def create_download_url(request: Request, object_name: str) -> str:
-    """presigned GET کوتاه‌مدت — MinIO خودش Range request (seek ویدیو) را بومی هندل می‌کند."""
+async def create_download_url(request: Request, object_name: str, download_filename: str | None = None) -> str:
+    """presigned GET کوتاه‌مدت — MinIO خودش Range request (seek ویدیو) را بومی هندل می‌کند.
+
+    download_filename وقتی داده شود (دانلود فایل، نه پخش inline) با
+    response-content-disposition مرورگر را وادار می‌کند فایل را با همان نام
+    دانلود کند، نه اینکه (برای mp4/pdf/...) inline باز کند.
+    """
     client = get_public_minio_client(request)
+    response_headers = None
+    if download_filename:
+        # RFC 5987: filename ascii-only برای سازگاری قدیمی + filename* برای
+        # عنوان فارسی/یونیکد که quoted-string ساده پشتیبانی نمی‌کند.
+        ascii_fallback = download_filename.encode("ascii", "ignore").decode("ascii") or "file"
+        encoded = quote(download_filename)
+        response_headers = {
+            "response-content-disposition": f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{encoded}"
+        }
     return await asyncio.to_thread(
         client.presigned_get_object,
         settings.minio_bucket_name,
         object_name,
         expires=PRESIGNED_URL_EXPIRY,
+        response_headers=response_headers,
     )
 
 
