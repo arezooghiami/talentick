@@ -183,7 +183,7 @@ const DocumentsPage = (() => {
         <tr>
           <td style="font-weight:500;">${esc(d.title)}</td>
           <td style="color:var(--gray-500);">${d.category_name ? esc(d.category_name) : '—'}</td>
-          <td><a href="${esc(d.file_url)}" target="_blank" rel="noopener" style="color:var(--primary);">${esc((d.file_type || '').toUpperCase() || 'فایل')}</a></td>
+          <td><button type="button" class="btn-link" style="color:var(--primary);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;font:inherit;" onclick="DocumentsPage.downloadDoc('${d.id}')">${esc((d.file_type || '').toUpperCase() || 'فایل')}</button></td>
           <td>${d.target_count > 0 ? `<span class="badge badge-manager">محدود (${numFa(d.target_count)})</span>` : `<span class="badge badge-active">کل سازمان</span>`}</td>
           <td style="color:var(--gray-500);">${d.uploaded_by_name ? esc(d.uploaded_by_name) : '—'}</td>
           <td style="color:var(--gray-500);">${fmtDate(d.created_at)}</td>
@@ -198,6 +198,13 @@ const DocumentsPage = (() => {
     } catch (e) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
     }
+  }
+
+  async function downloadDoc(id) {
+    const d = state.docs.find(x => x.id === id);
+    if (!d || !d.file_url) return;
+    const ext = (d.file_url.match(/\.[a-z0-9]+$/i) || [''])[0];
+    await downloadAuthedFile(d.file_url, d.file_name || `${d.title}${ext}`);
   }
 
   function resetFileFields() {
@@ -333,6 +340,6 @@ const DocumentsPage = (() => {
   return {
     openFor, loadOwn, loadDocs, searchDebounced,
     openCreateCategory, openEditCategory, saveCategory, removeCategory,
-    openCreateDoc, openEditDoc, saveDoc, removeDoc, onFileSelected,
+    openCreateDoc, openEditDoc, saveDoc, removeDoc, onFileSelected, downloadDoc,
   };
 })();

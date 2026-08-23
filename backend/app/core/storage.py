@@ -87,6 +87,7 @@ def get_minio_client() -> Minio:
         access_key=settings.minio_root_user,
         secret_key=settings.minio_root_password,
         secure=settings.minio_use_ssl,
+        region=settings.minio_region,
     )
 
 
@@ -143,6 +144,12 @@ def get_public_minio_client(request: Request) -> Minio:
         access_key=settings.minio_root_user,
         secret_key=settings.minio_root_password,
         secure=secure,
+        # بدون این، minio-py قبل از ساخت presigned URL یک GET واقعی برای
+        # پیدا کردن region باکت به همین `host` (هاست عمومی اپ، نه MinIO
+        # واقعی) می‌زند که چون این مسیر به MinIO نمی‌رسد با خطا (404/...)
+        # شکست می‌خورد. region ثابت این round-trip را کامل حذف می‌کند —
+        # presigned URL کاملاً محلی (بدون تماس شبکه) امضا می‌شود.
+        region=settings.minio_region,
     )
 
 

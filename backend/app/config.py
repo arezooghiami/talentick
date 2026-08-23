@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     minio_root_password: str = "minioadmin123"
     minio_bucket_name: str = "talentick"
     minio_use_ssl: bool = False
+    # region ثابت — presigned URL بدون این، قبل از ساخت امضا یک GET واقعی
+    # برای پیدا کردن region باکت به endpoint می‌زند (get_public_minio_client
+    # در core/storage.py، endpoint را روی هاست عمومی اپ ست می‌کند نه MinIO
+    # واقعی، پس آن GET هرگز به MinIO نمی‌رسد و presigned URL با خطا شکست
+    # می‌خورد). ست کردن صریح region این round-trip را کلاً حذف می‌کند.
+    minio_region: str = "us-east-1"
 
     # ─── Organization (V0 single-tenant) ──────────────────────────────────
     default_org_slug: str = "my-company"
