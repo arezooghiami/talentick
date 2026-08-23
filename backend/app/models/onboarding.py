@@ -223,6 +223,10 @@ class UserProgramEnrollment(UUIDMixin, TimestampMixin, Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    cancelled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+        comment="غیرفعال‌سازی نرم — وقتی ادمین ثبت‌نام Employee Onboarding را از فرم ویرایش کاربر برمی‌دارد"
+    )
     progress_pct: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
     )

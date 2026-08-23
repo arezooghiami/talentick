@@ -418,9 +418,33 @@ async def get_employee_onboarding_gate_status(db: AsyncSession, user_id: uuid.UU
             UserProgramEnrollment.user_id == user_id,
             OnboardingProgram.purpose == "employee_onboarding",
             UserProgramEnrollment.completed_at.is_(None),
+            UserProgramEnrollment.cancelled_at.is_(None),
         )
     )
     return result.scalar_one() > 0
+
+
+async def unenroll_user_from_employee_onboarding(db: AsyncSession, user: User) -> None:
+    """
+    لغو نرم (soft-cancel) تمام Enrollment های فعالِ Employee Onboarding کاربر —
+    وقتی ادمین چک‌باکس مربوطه را در فرم ویرایش کاربر بردارد. رکورد و
+    تاریخچه‌ی UserStepProgress حذف نمی‌شود، فقط cancelled_at ست می‌شود.
+    """
+    rows = (await db.execute(
+        select(UserProgramEnrollment)
+        .join(OnboardingProgram, OnboardingProgram.id == UserProgramEnrollment.program_id)
+        .where(
+            UserProgramEnrollment.user_id == user.id,
+            OnboardingProgram.purpose == "employee_onboarding",
+            UserProgramEnrollment.cancelled_at.is_(None),
+        )
+    )).scalars().all()
+    if not rows:
+        return
+    now = _now()
+    for enrollment in rows:
+        enrollment.cancelled_at = now
+    await db.commit()
 
 
 async def enroll_user(
@@ -434,6 +458,13 @@ async def enroll_user(
         )
     )).scalar_one_or_none()
     if existing:
+        if existing.cancelled_at is not None:
+            # قبلاً لغو نرم شده بود — با انتخاب دوباره‌ی همین مسیر توسط ادمین
+            # فعال می‌شود (تاریخچه‌ی UserStepProgress دست‌نخورده می‌ماند).
+            existing.cancelled_at = None
+            existing.enrolled_by = enrolled_by
+            await db.commit()
+            await db.refresh(existing)
         return existing
 
     now = _now()

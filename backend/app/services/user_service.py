@@ -371,8 +371,9 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
     payload = data.model_dump(exclude_unset=True)
     payload.pop("org_id", None)
 
+    onboarding_program_id_provided = "employee_onboarding_program_id" in payload
     employee_onboarding_program = None
-    if "employee_onboarding_program_id" in payload:
+    if onboarding_program_id_provided:
         employee_onboarding_program = await onboarding_service.validate_employee_onboarding_program_choice(
             db, new_org_id, payload.pop("employee_onboarding_program_id")
         )
@@ -395,14 +396,18 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
 
     await db.commit()
 
-    # ثبت‌نام در مسیر Employee Onboarding تازه‌انتخاب‌شده — idempotent
-    # (enroll_user)، غیرحیاتی.
-    if employee_onboarding_program is not None:
+    # ثبت‌نام/لغو Employee Onboarding — idempotent، غیرحیاتی. اگر فیلد
+    # صراحتاً ارسال شده باشد: مقدار غیرخالی → ثبت‌نام (enroll_user)، مقدار
+    # خالی/null → لغو نرم Enrollment فعال (چک‌باکس برداشته‌شده در فرم).
+    if onboarding_program_id_provided:
         try:
-            await onboarding_service.enroll_user(db, employee_onboarding_program, user, enrolled_by=actor.id)
+            if employee_onboarding_program is not None:
+                await onboarding_service.enroll_user(db, employee_onboarding_program, user, enrolled_by=actor.id)
+            else:
+                await onboarding_service.unenroll_user_from_employee_onboarding(db, user)
         except Exception:
             logging.getLogger(__name__).exception(
-                "ثبت‌نام کاربر %s در مسیر Employee Onboarding ناموفق بود", user.id
+                "ثبت‌نام/لغو کاربر %s در مسیر Employee Onboarding ناموفق بود", user.id
             )
 
     result = await db.execute(

@@ -382,7 +382,11 @@ async def get_employee_status(db: AsyncSession, user: User) -> EmployeeOnboardin
     rows = (await db.execute(
         select(UserProgramEnrollment, OnboardingProgram)
         .join(OnboardingProgram, OnboardingProgram.id == UserProgramEnrollment.program_id)
-        .where(UserProgramEnrollment.user_id == user.id, OnboardingProgram.purpose == "employee_onboarding")
+        .where(
+            UserProgramEnrollment.user_id == user.id,
+            OnboardingProgram.purpose == "employee_onboarding",
+            UserProgramEnrollment.cancelled_at.is_(None),
+        )
         .order_by(UserProgramEnrollment.enrolled_at.desc())
     )).all()
 
