@@ -604,14 +604,29 @@ const EmployeeOnboardingPage = (() => {
           </p>`).join('')}
       ` : '<p style="font-size:13px;color:var(--gray-400);">در هیچ مسیری ثبت‌نام نشده</p>';
 
-      const docsRows = (s.documents.items || []).map(it => `
+      const docsRows = (s.documents.items || []).map(it => {
+        let valueCell = '—';
+        if (it.input_type === 'text') {
+          valueCell = esc(it.text_value || '—');
+        } else if (it.file_url) {
+          const ext = (it.file_url.match(/\.[a-z0-9]+$/i) || [''])[0];
+          const filename = esc(`${it.document_type_name || 'file'}${ext}`);
+          const isImage = /\.(jpe?g|png|gif|webp|bmp)$/i.test(ext);
+          const preview = isImage
+            ? `<img data-src="${esc(it.file_url)}" class="eo-doc-thumb" alt="" title="برای بزرگ‌نمایی کلیک کنید" style="width:36px;height:36px;object-fit:cover;border-radius:4px;cursor:pointer;vertical-align:middle;margin-left:8px;" onclick="EmployeeOnboardingPage.previewDocFile(this)">`
+            : '';
+          valueCell = `${preview}<button type="button" class="btn-link" style="font-size:12px;color:var(--primary);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;" onclick="EmployeeOnboardingPage.downloadDocFile('${esc(it.file_url)}','${filename}')">دانلود</button>`;
+        }
+        return `
         <tr>
           <td>${esc(it.document_type_name)}${it.is_required ? '' : ' <span class="badge badge-employee" style="font-size:10px;">اختیاری</span>'}</td>
           <td>${EO_DOC_STATUS_LABELS[it.status] || esc(it.status)}</td>
-          <td style="font-size:12px;color:var(--gray-500);">${it.input_type === 'text' ? esc(it.text_value || '—') : (it.file_url ? `<a href="${esc(it.file_url)}" target="_blank" rel="noopener">مشاهده فایل</a>` : '—')}</td>
-        </tr>`).join('');
+          <td style="font-size:12px;color:var(--gray-500);">${valueCell}</td>
+        </tr>`;
+      }).join('');
 
-      document.getElementById('eoMonDetailBody').innerHTML = `
+      const detailBody = document.getElementById('eoMonDetailBody');
+      detailBody.innerHTML = `
         ${enrollmentsHtml}
         <div class="form-section-title" style="margin-top:14px;">مدارک</div>
         <table style="width:100%;">
@@ -619,9 +634,19 @@ const EmployeeOnboardingPage = (() => {
           <tbody>${docsRows || '<tr><td colspan="3" style="color:var(--gray-400);">موردی در کاتالوگ سازمان تعریف نشده</td></tr>'}</tbody>
         </table>
       `;
+      hydrateAuthedImages(detailBody);
     } catch (e) {
       document.getElementById('eoMonDetailBody').innerHTML = `<p style="color:var(--danger);">${esc(e.message)}</p>`;
     }
+  }
+
+  /** کلیک روی تصویر بندانگشتی مدرک — بزرگ‌نمایی در تب جدید با همان blob که hydrateAuthedImages بارگذاری کرده. */
+  function previewDocFile(imgEl) {
+    if (imgEl.src && imgEl.src.startsWith('blob:')) window.open(imgEl.src, '_blank');
+  }
+
+  async function downloadDocFile(url, filename) {
+    await downloadAuthedFile(url, filename);
   }
 
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
@@ -659,6 +684,6 @@ const EmployeeOnboardingPage = (() => {
     finishProgramWizard, closeProgramModal, saveProgram, removeProgram,
     openCreateStep, openEditStep, saveStep, removeStep, refreshStepConditionalFields,
     openCreateDocType, openEditDocType, onDocTypeInputTypeChange, onTemplateFileSelected, saveDocType, removeDocType,
-    searchDebounced, loadMonitoring, viewDetail,
+    searchDebounced, loadMonitoring, viewDetail, previewDocFile, downloadDocFile,
   };
 })();

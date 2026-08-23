@@ -252,11 +252,15 @@ const UsersPage = (() => {
     document.getElementById('un-general-user').checked = !u.org_id;
 
     const orgId = App.isSuperAdmin ? u.org_id : App.currentUser.org_id;
+    if (App.isSuperAdmin) {
+      // لیست سازمان‌ها همیشه بارگذاری می‌شود (حتی برای کاربر عمومی) چون
+      // با برداشتن تیک «کاربر عمومی» این select نمایان می‌شود و باید از قبل پر باشد.
+      await populateOrgSelect(orgId);
+    }
     if (App.isSuperAdmin && u.org_id) {
       document.getElementById('un-org-wrap').classList.remove('hidden');
       document.getElementById('un-dept-position-wrap').classList.remove('hidden');
       document.getElementById('un-eo-toggle-wrap').classList.remove('hidden');
-      await populateOrgSelect(orgId);
     } else {
       document.getElementById('un-org-wrap').classList.add('hidden');
     }
