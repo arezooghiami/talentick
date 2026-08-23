@@ -376,7 +376,12 @@ async def update_user(
     if str(user.id) == body.manager_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "کاربر نمی‌تواند مدیر مستقیم خودش باشد")
 
-    await _validate_org_refs(db, user.org_id, body.dept_id, body.position_id, body.manager_id)
+    org_id_provided = "org_id" in body.model_fields_set
+    if org_id_provided and current_user.role != "super_admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند سازمان کاربر را تغییر دهد")
+
+    target_org_id = body.org_id if org_id_provided else user.org_id
+    await _validate_org_refs(db, target_org_id, body.dept_id, body.position_id, body.manager_id)
 
     try:
         updated = await user_service.update_user(db, user, body, actor=current_user)

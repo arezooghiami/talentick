@@ -347,7 +347,12 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
     if data.role is not None and data.role != user.role:
         _assert_role_assignable(actor, data.role)
 
-    if user.org_id is None:
+    org_id_provided = "org_id" in data.model_fields_set
+    new_org_id = uuid.UUID(data.org_id) if (org_id_provided and data.org_id) else (
+        None if org_id_provided else user.org_id
+    )
+
+    if new_org_id is None:
         target_role = data.role if data.role is not None else user.role
         _assert_general_user_allowed(
             actor, None, target_role, data.dept_id, data.position_id, data.manager_id
@@ -364,11 +369,12 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
             raise PhoneAlreadyExistsError(data.phone)
 
     payload = data.model_dump(exclude_unset=True)
+    payload.pop("org_id", None)
 
     employee_onboarding_program = None
     if "employee_onboarding_program_id" in payload:
         employee_onboarding_program = await onboarding_service.validate_employee_onboarding_program_choice(
-            db, user.org_id, payload.pop("employee_onboarding_program_id")
+            db, new_org_id, payload.pop("employee_onboarding_program_id")
         )
 
     uuid_fields = {"dept_id", "position_id", "manager_id"}
@@ -378,6 +384,14 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
             setattr(user, field, uuid.UUID(value) if value else None)
         elif value is not None:
             setattr(user, field, value)
+
+    if org_id_provided:
+        user.org_id = new_org_id
+        if new_org_id is None:
+            # کاربر General نمی‌تواند واحد/پست/مدیر سازمانی داشته باشد
+            user.dept_id = None
+            user.position_id = None
+            user.manager_id = None
 
     await db.commit()
 

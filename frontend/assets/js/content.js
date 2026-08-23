@@ -432,12 +432,12 @@ const ContentPage = (() => {
     const file = inputEl.files?.[0];
     if (!file) return;
     try {
-      const res = await api.upload('/contents/upload', file);
+      const res = await api.uploadDirect('/contents/upload', file, (pct) => setUploadName('c-thumb-name', `در حال آپلود... ${numFa(pct)}٪`, true));
       document.getElementById('c-thumb-url').value = res.url;
       setUploadName('c-thumb-name', file.name, true);
       renderThumbPreview(res.url);
       toastSuccess('تصویر با موفقیت آپلود شد');
-    } catch (e) { toastError(e.message); }
+    } catch (e) { toastError(e.message); setUploadName('c-thumb-name', ''); }
     finally { inputEl.value = ''; }
   }
 
@@ -740,12 +740,12 @@ const ContentPage = (() => {
     const file = inputEl.files?.[0];
     if (!file) return;
     try {
-      const res = await api.upload('/contents/upload', file);
+      const res = await api.uploadDirect('/contents/upload', file, (pct) => setUploadName('i-upload-name', `در حال آپلود... ${numFa(pct)}٪`, true));
       document.getElementById('i-media-url').value = res.url;
       setUploadName('i-upload-name', file.name, true);
       renderItemUploadPreview(res.url, document.getElementById('i-type').value);
       toastSuccess('فایل با موفقیت آپلود شد');
-    } catch (e) { toastError(e.message); }
+    } catch (e) { toastError(e.message); setUploadName('i-upload-name', ''); }
     finally { inputEl.value = ''; }
   }
 
@@ -814,9 +814,10 @@ const ContentPage = (() => {
       : 0;
     let done = 0, failed = 0;
     for (const file of files) {
-      progressEl.textContent = `در حال آپلود ${numFa(done + failed + 1)} از ${numFa(files.length)}: ${file.name}`;
+      const label = `در حال آپلود ${numFa(done + failed + 1)} از ${numFa(files.length)}: ${file.name}`;
+      progressEl.textContent = label;
       try {
-        const uploaded = await api.upload('/contents/upload', file);
+        const uploaded = await api.uploadDirect('/contents/upload', file, (pct) => { progressEl.textContent = `${label} (${numFa(pct)}٪)`; });
         await api.post(`/contents/${state.contentId}/items`, {
           title: titleFromFilename(file.name),
           type: inferItemType(file.name),

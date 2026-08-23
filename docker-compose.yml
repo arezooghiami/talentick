@@ -74,6 +74,8 @@ services:
         --port 8000
         --reload
         --log-level info
+        --proxy-headers
+        --forwarded-allow-ips=*
 
   # ─── Nginx (frontend + reverse proxy) ─────────────────────────────────────
   nginx:

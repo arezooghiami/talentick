@@ -104,6 +104,20 @@ async function hydrateAuthedImages(container) {
   }));
 }
 
+// ─── Authed video playback ──────────────────────────────────────────
+// برخلاف hydrateAuthedImages (که کل فایل را blob می‌کند — برای عکس مناسب
+// است ولی برای ویدیوی حجیم یعنی پخش تا دانلود کامل فایل شروع نمی‌شود و
+// seek کار نمی‌کند)، اینجا یک presigned URL کوتاه‌مدت از اپ می‌گیریم و
+// مستقیم به <video> می‌دهیم — MinIO خودش Range request را هندل می‌کند.
+async function resolveAuthedPlaybackUrl(internalUrl) {
+  const token = Auth.getToken();
+  const playbackEndpoint = internalUrl.replace('/api/files/', '/api/files/playback-url/');
+  const res = await fetch(playbackEndpoint, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+  if (!res.ok) throw new Error('خطا در دریافت لینک پخش');
+  const data = await res.json();
+  return data.url;
+}
+
 // ─── Authed file download ──────────────────────────────────────────
 // مثل hydrateAuthedImages: /api/files/* فقط با Bearer پاسخ می‌دهد، پس یک
 // <a href="..."> ساده کار نمی‌کند — با fetch احراز هویت‌شده دانلود می‌شود.

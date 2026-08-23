@@ -190,3 +190,13 @@ class UploadResponse(BaseModel):
     filename: Optional[str] = None
     size: int
     content_type: Optional[str] = None
+
+
+class UploadUrlRequest(BaseModel):
+    filename: str = Field(..., min_length=1, description="نام فایل — فقط برای تشخیص پسوند لازم است")
+
+
+class UploadUrlResponse(BaseModel):
+    upload_url: str = Field(..., description="presigned PUT — فایل مستقیم با درخواست PUT به این آدرس آپلود شود")
+    url: str = Field(..., description="مسیر پایدار داخلی — بعد از تکمیل آپلود همین را در فرم/دیتابیس ذخیره کنید")
+    object_name: str

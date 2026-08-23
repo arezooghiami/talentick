@@ -9,7 +9,7 @@ Routes:
   GET    /api/contents/{id}             → جزئیات + آیتم‌ها
   PATCH  /api/contents/{id}             → ویرایش
   DELETE /api/contents/{id}             → حذف
-  POST   /api/contents/upload           → آپلود فایل/تصویر/ویدیو به MinIO
+  POST   /api/contents/upload           → presigned PUT URL برای آپلود مستقیم مرورگر → MinIO
   POST   /api/contents/{id}/items       → افزودن آیتم به محتوا
   PATCH  /api/contents/items/{item_id}  → ویرایش آیتم
   DELETE /api/contents/items/{item_id}  → حذف آیتم
@@ -23,10 +23,10 @@ from __future__ import annotations
 import math
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.storage import upload_file
+from app.core.storage import create_upload_url, upload_file
 from app.database import get_db
 from app.dependencies import Employee, OrgAdmin
 from app.dependencies import enforce_org_scope as _enforce_org_scope
@@ -45,6 +45,8 @@ from app.schemas.content import (
     ContentResponse,
     ContentUpdate,
     UploadResponse,
+    UploadUrlRequest,
+    UploadUrlResponse,
 )
 from app.services import content_service
 
@@ -220,17 +222,20 @@ async def delete_content(
 
 
 # ─── Upload ──────────────────────────────────────────────────────────────
+# presigned PUT — مرورگر مستقیم به MinIO آپلود می‌کند (بدون عبور بایت‌های
+# ویدیوهای حجیم/چند ساعته از حافظه‌ی اپ). نگاه کنید به core/storage.py.
 
-@router.post("/upload", response_model=UploadResponse, summary="آپلود فایل/تصویر/ویدیوی محتوا به MinIO")
+@router.post("/upload", response_model=UploadUrlResponse, summary="دریافت presigned URL برای آپلود مستقیم فایل/تصویر/ویدیوی محتوا به MinIO")
 async def upload_content_file(
+    request: Request,
     current_user: OrgAdmin,
-    file: UploadFile = File(...),
+    payload: UploadUrlRequest,
 ):
     org_id = current_user.org_id
     if org_id is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
-    result = await upload_file(file, org_id, subfolder="contents")
-    return UploadResponse(**result)
+    result = await create_upload_url(request, payload.filename, org_id, subfolder="contents")
+    return UploadUrlResponse(**result)
 
 
 # ─── Cover (کاور محتوا) ──────────────────────────────────────────────────────

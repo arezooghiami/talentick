@@ -383,10 +383,14 @@ const UsersPage = (() => {
     setLoading(btn, true);
     try {
       if (id) {
-        await api.patch(`/users/${id}`, {
+        const patchBody = {
           full_name, email: email || null, role, phone: phone || null, dept_id, position_id,
           employee_onboarding_program_id,
-        });
+        };
+        // فقط super_admin اجازه‌ی تغییر سازمان کاربر را دارد — برای بقیه‌ی
+        // نقش‌ها این کلید اصلاً ارسال نمی‌شود تا سرور 403 ندهد.
+        if (App.isSuperAdmin) patchBody.org_id = org_id;
+        await api.patch(`/users/${id}`, patchBody);
         toastSuccess('کاربر با موفقیت ویرایش شد');
       } else {
         await api.post('/users/', {

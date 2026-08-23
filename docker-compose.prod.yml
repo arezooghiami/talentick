@@ -60,6 +60,8 @@ services:
         --host 0.0.0.0
         --port 8000
         --log-level info
+        --proxy-headers
+        --forwarded-allow-ips=*
     # ⚠️ Rate limiting فعلی (core/rate_limit.py) in-memory و per-process
     # است. با بیش از ۱ replica/worker، هر instance شمارنده‌ی brute-force
     # جدا دارد و محدودیت واقعی دور زده می‌شود. `deploy.replicas` در

@@ -17,10 +17,17 @@ Talentick — Storage Utilities (MinIO)
     ذخیره می‌شود — چون هرگز منقضی نمی‌شود (برخلاف presigned URL که اگر
     داخل دیتابیس ذخیره شود، بعد از انقضا دیگر کار نمی‌کند).
 
-استفاده:
+استفاده (آپلود قدیمی — چندبخشی از طریق اپ، هنوز برای فایل‌های کوچک/غیرویدیویی
+استفاده می‌شود):
     from app.core.storage import upload_file
     result = await upload_file(file, org_id, subfolder="contents")
     # result["url"] == "/api/files/<org_id>/contents/<uuid>.<ext>"
+
+استفاده (presigned — برای فایل حجیم/ویدیو؛ نگاه کنید به routers/content.py):
+    از create_upload_url مرورگر مستقیم و بدون واسطه‌ی اپ به MinIO آپلود
+    می‌کند (بدون بافر کردن کل فایل در RAM اپ) و از create_download_url یک
+    presigned GET کوتاه‌مدت برای پخش/دانلود مستقیم (با پشتیبانی بومی از
+    Range request برای seek سریع ویدیو) می‌سازد.
 """
 
 from __future__ import annotations
@@ -28,9 +35,10 @@ from __future__ import annotations
 import asyncio
 import io
 import uuid
+from datetime import timedelta
 from functools import lru_cache
 
-from fastapi import HTTPException, UploadFile, status
+from fastapi import HTTPException, Request, UploadFile, status
 from minio import Minio
 from minio.error import S3Error
 
@@ -51,7 +59,16 @@ ALLOWED_EXTENSIONS = {
     "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx",
 }
 
+# سقف حجم فقط برای مسیر آپلود قدیمی (چندبخشی از طریق اپ) به‌عنوان محافظ حافظه
+# اپلیکیشن معنا دارد — نگاه کنید به تابع upload_file. مسیر presigned
+# (create_upload_url) اصلاً از این محدودیت عبور نمی‌کند چون بایت‌های فایل هرگز
+# از اپ رد نمی‌شوند؛ کاربردش الان فقط به‌عنوان مقدار پیش‌فرض سقف مخصوص
+# document_type در آنبوردینگ کارمند باقی مانده (services/employee_onboarding_service.py).
 MAX_FILE_SIZE_MB = 200
+
+# اعتبار presigned URL — هم برای PUT آپلود (باید کل مدت آپلود فایل حجیم را
+# پوشش دهد) و هم برای GET پخش (باید یک جلسه‌ی تماشای طولانی را پوشش دهد).
+PRESIGNED_URL_EXPIRY = timedelta(hours=6)
 
 FILES_URL_PREFIX = "/api/files/"
 
@@ -96,6 +113,75 @@ def ensure_bucket() -> None:
         pass  # از قبل policy‌ای وجود نداشت
 
 
+def build_object_name(filename: str | None, org_id: uuid.UUID | None, subfolder: str) -> str:
+    """پسوند را اعتبارسنجی و یک object_name یکتا می‌سازد — هم مسیر آپلود قدیمی
+    (upload_file) و هم مسیر presigned (create_upload_url) از این استفاده می‌کنند."""
+    ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"فرمت فایل مجاز نیست. فرمت‌های مجاز: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+    org_segment = str(org_id) if org_id is not None else PUBLIC_PATH_SEGMENT
+    return f"{org_segment}/{subfolder}/{uuid.uuid4()}.{ext}"
+
+
+def get_public_minio_client(request: Request) -> Minio:
+    """
+    Client مخصوص presigned URL. بر خلاف get_minio_client (که به `minio:9000`
+    داخل شبکه‌ی docker وصل می‌شود و از بیرون هرگز resolve نمی‌شود)، این یکی
+    همان host/scheme درخواست واقعی مرورگر را به‌عنوان endpoint می‌گیرد — چون
+    nginx یک location برای پراکسی مستقیم به MinIO دارد (نگاه کنید به
+    nginx/nginx.conf، location به نام bucket)، presigned URL ساخته‌شده با این
+    host از طریق همان مسیر برای مرورگر در دسترس خواهد بود.
+    """
+    host = request.headers.get("host") or request.url.netloc
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    secure = (forwarded_proto or request.url.scheme) == "https"
+    return Minio(
+        host,
+        access_key=settings.minio_root_user,
+        secret_key=settings.minio_root_password,
+        secure=secure,
+    )
+
+
+async def create_upload_url(request: Request, filename: str | None, org_id: uuid.UUID | None, subfolder: str = "contents") -> dict:
+    """
+    presigned PUT URL برای آپلود مستقیم مرورگر → MinIO — بدون عبور بایت‌های
+    فایل از حافظه‌ی اپ. برای ویدیوهای چند ساعته/چند گیگابایتی دوره‌ها ضروری
+    است (خواندن کامل چنین فایلی در RAM اپ نه عملی است نه امن).
+
+    خروجی: {"upload_url": presigned PUT، "url": مسیر پایدار داخلی برای ذخیره
+    در دیتابیس بعد از تکمیل آپلود، "object_name": ...}
+    """
+    object_name = build_object_name(filename, org_id, subfolder)
+    ensure_bucket()
+    client = get_public_minio_client(request)
+    upload_url = await asyncio.to_thread(
+        client.presigned_put_object,
+        settings.minio_bucket_name,
+        object_name,
+        expires=PRESIGNED_URL_EXPIRY,
+    )
+    return {
+        "upload_url": upload_url,
+        "url": f"{FILES_URL_PREFIX}{object_name}",
+        "object_name": object_name,
+    }
+
+
+async def create_download_url(request: Request, object_name: str) -> str:
+    """presigned GET کوتاه‌مدت — MinIO خودش Range request (seek ویدیو) را بومی هندل می‌کند."""
+    client = get_public_minio_client(request)
+    return await asyncio.to_thread(
+        client.presigned_get_object,
+        settings.minio_bucket_name,
+        object_name,
+        expires=PRESIGNED_URL_EXPIRY,
+    )
+
+
 async def upload_file(file: UploadFile, org_id: uuid.UUID | None, subfolder: str = "contents") -> dict:
     """
     فایل آپلودی را در MinIO (private) ذخیره می‌کند — مسیر جداگانه به ازای هر سازمان.
@@ -108,23 +194,8 @@ async def upload_file(file: UploadFile, org_id: uuid.UUID | None, subfolder: str
     خروجی: {"url": "/api/files/<object_name>", "filename": ..., "size": ..., "content_type": ...}
     مقدار "url" داخلی و پایدار است (هرگز منقضی نمی‌شود) — نه یک presigned URL.
     """
-    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            f"فرمت فایل مجاز نیست. فرمت‌های مجاز: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-        )
-
+    object_name = build_object_name(file.filename, org_id, subfolder)
     data = await file.read()
-    size_mb = len(data) / (1024 * 1024)
-    if size_mb > MAX_FILE_SIZE_MB:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            f"حجم فایل بیش از حد مجاز است (حداکثر {MAX_FILE_SIZE_MB}MB)",
-        )
-
-    org_segment = str(org_id) if org_id is not None else PUBLIC_PATH_SEGMENT
-    object_name = f"{org_segment}/{subfolder}/{uuid.uuid4()}.{ext}"
 
     try:
         ensure_bucket()

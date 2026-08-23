@@ -110,19 +110,28 @@ const ContentDetailPage = (() => {
     body.innerHTML = '';
     footer.innerHTML = '';
 
+    // نکته: /api/files/... فقط با هدر Authorization پاسخ می‌دهد — نه
+    // <video src>، <img src> و نه <iframe src> این هدر را می‌فرستند، پس
+    // نمی‌شود media_url را مستقیم اینجا گذاشت. برای هرکدام ابتدا یک
+    // presigned URL کوتاه‌مدت (احراز هویت‌شده) از اپ گرفته می‌شود که خود
+    // المنت مستقیماً از MinIO پخش/بارگذاری می‌کند (با پشتیبانی بومی Range
+    // برای seek سریع ویدیو — به‌جای دانلود کامل فایل قبل از پخش).
     if (it.type === 'text') {
       body.innerHTML = `<div class="viewer-text-body">${esc(it.body || '')}</div>`;
       footer.innerHTML = markCompleteBtnHtml(it);
     } else if (it.type === 'video') {
-      body.innerHTML = `<video controls id="viewerVideo" src="${esc(it.media_url || '')}"></video>`;
+      body.innerHTML = `<video controls id="viewerVideo"></video>`;
       document.getElementById('viewerVideo').addEventListener('ended', () => markComplete(it.id, true));
       footer.innerHTML = markCompleteBtnHtml(it);
+      hydrateViewerMedia('viewerVideo', 'src', it.media_url);
     } else if (it.type === 'image') {
-      body.innerHTML = `<img src="${esc(it.media_url || '')}" alt="${esc(it.title)}">`;
+      body.innerHTML = `<img id="viewerImage" alt="${esc(it.title)}">`;
       footer.innerHTML = markCompleteBtnHtml(it);
+      hydrateViewerMedia('viewerImage', 'src', it.media_url);
     } else if (it.type === 'pdf') {
-      body.innerHTML = `<iframe src="${esc(it.media_url || '')}"></iframe>`;
+      body.innerHTML = `<iframe id="viewerPdf"></iframe>`;
       footer.innerHTML = markCompleteBtnHtml(it);
+      hydrateViewerMedia('viewerPdf', 'src', it.media_url);
     } else if (it.type === 'link') {
       body.innerHTML = `<div style="text-align:center;padding:30px 10px;"><div style="font-size:40px;margin-bottom:14px;">🔗</div><p style="color:var(--gray-500);font-size:13.5px;margin-bottom:18px;">این آیتم یک لینک خارجی است — با کلیک روی دکمه‌ی زیر در تب جدید باز می‌شود.</p></div>`;
       footer.innerHTML = `
@@ -131,11 +140,29 @@ const ContentDetailPage = (() => {
     } else if (it.type === 'file') {
       body.innerHTML = `<div style="text-align:center;padding:30px 10px;"><div style="font-size:40px;margin-bottom:14px;">📎</div><p style="color:var(--gray-500);font-size:13.5px;">فایل ضمیمه‌ی این آیتم را دانلود کنید.</p></div>`;
       footer.innerHTML = `
-        <a class="btn btn-primary" href="${esc(it.media_url || '#')}" target="_blank" rel="noopener" onclick="ContentDetailPage.markComplete('${it.id}', true)">دانلود فایل ↓</a>
+        <button type="button" class="btn btn-primary" onclick="ContentDetailPage.downloadViewerFile('${it.id}')">دانلود فایل ↓</button>
         <button class="btn btn-secondary" onclick="ContentDetailPage.closeViewer()">بستن</button>`;
     }
 
     document.getElementById('itemViewer').classList.remove('hidden');
+  }
+
+  async function hydrateViewerMedia(elId, attr, internalUrl) {
+    if (!internalUrl) return;
+    try {
+      const url = await resolveAuthedPlaybackUrl(internalUrl);
+      const el = document.getElementById(elId);
+      if (el) el[attr] = url;
+    } catch {
+      toastError('خطا در بارگذاری فایل');
+    }
+  }
+
+  async function downloadViewerFile(itemId) {
+    const it = state.detail.items.find(x => x.id === itemId);
+    if (!it || !it.media_url) return;
+    markComplete(itemId, true);
+    await downloadAuthedFile(it.media_url, it.title || 'file');
   }
 
   function markCompleteBtnHtml(it) {
@@ -172,5 +199,5 @@ const ContentDetailPage = (() => {
 
   const LEVEL_FA = { beginner: 'مقدماتی', intermediate: 'متوسط', advanced: 'پیشرفته' };
 
-  return { load, openItem, markComplete, closeViewer };
+  return { load, openItem, markComplete, closeViewer, downloadViewerFile };
 })();

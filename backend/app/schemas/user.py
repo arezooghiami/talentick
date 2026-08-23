@@ -87,12 +87,17 @@ class UserUpdateRequest(BaseModel):
 
     نکته: برای پاک کردن dept_id/position_id/manager_id مقدار رشته
     خالی "" بفرستید (None یعنی «این فیلد تغییر نکند»).
+
+    org_id: تغییر سازمانِ کاربر — فقط super_admin مجاز است (در router
+    enforce می‌شود). null/"" یعنی تبدیل به کاربر General (بدون سازمان)؛
+    ارسال‌نشدن یعنی بدون تغییر.
     """
     full_name: str | None = Field(None, min_length=2, max_length=255)
     email: EmailStr | None = None
     role: str | None = Field(None, pattern=ROLE_PATTERN)
     phone: str | None = None
     is_active: bool | None = None
+    org_id: str | None = None
     dept_id: str | None = None
     position_id: str | None = None
     manager_id: str | None = None
