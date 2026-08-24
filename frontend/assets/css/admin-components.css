@@ -94,6 +94,8 @@
 /* ─── Modal ────────────────────────────────────────────────────────── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,17,26,.52); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
 .modal-overlay.hidden { display: none; }
+/* پاپ‌آپ تأیید حذف باید همیشه بالای هر مودال دیگری (حتی مودال‌های ویرایش که بعد از آن در DOM می‌آیند) نمایش داده شود */
+#modal-confirm-delete { z-index: 1100; }
 .modal-box { background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: modalIn .16s ease; }
 @keyframes modalIn { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--card-bg); z-index: 2; }
