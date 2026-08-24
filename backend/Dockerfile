@@ -70,6 +70,7 @@ COPY backend/app ./app
 COPY backend/migrations ./migrations
 COPY backend/alembic.ini ./alembic.ini
 COPY backend/seed.py ./seed.py
+COPY backend/fix_media_org_paths.py ./fix_media_org_paths.py
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)" || exit 1
