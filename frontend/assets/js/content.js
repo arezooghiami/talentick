@@ -27,6 +27,7 @@ const ContentPage = (() => {
   const state = {
     type: 'course', page: 1, search: '', status: '',
     items: [], total: 0, totalPages: 1,
+    categories: [], modalCategories: [], categoryModalOrgId: null,
     // ویزارد محتوا
     mode: null, contentId: null, activeTab: 'basic', maxUnlockedTab: 'basic',
     activeItems: [], quizzesLoaded: false,
@@ -54,6 +55,7 @@ const ContentPage = (() => {
       el.classList.toggle('active', el.dataset.page === 'content'));
     document.getElementById('headerTitle').textContent = 'مدیریت محتوا';
     if (App.isSuperAdmin) await loadOrgFilterOptions();
+    await loadCategories();
     setType(type);
   }
 
@@ -69,6 +71,195 @@ const ContentPage = (() => {
     } catch { /* غیرحیاتی — فقط فیلتر است */ }
   }
 
+  function onOrgFilterChange() {
+    loadCategories();
+    load(1);
+  }
+
+  // ─── دسته‌بندی‌های محتوا: فیلتر بالای صفحه ─────────────────────────
+  // org_admin: همیشه سازمان خودش — super_admin: سازمانِ فیلتر بالای صفحه؛
+  // اگر «همه سازمان‌ها» انتخاب شده باشد (بدون org_id)، دسته‌بندی‌های همه‌ی
+  // سازمان‌ها با هم نمایش داده می‌شود (هم‌راستا با لیست محتوا که در این
+  // حالت هم محتوای همه سازمان‌ها را نشان می‌دهد). این فقط dropdown فیلتر
+  // را پر می‌کند — مدیریت خودِ دسته‌ها در مودال جداگانه‌ای انجام می‌شود
+  // (پایین‌تر) تا این صفحه شلوغ نشود.
+  async function loadCategories() {
+    const orgId = App.isSuperAdmin ? (document.getElementById('contentOrgFilter')?.value || '') : App.homeOrgId;
+    try {
+      const items = await api.get(orgId ? `/contents/categories?org_id=${orgId}` : '/contents/categories');
+      state.categories = items || [];
+      populateCategoryFilter();
+    } catch { /* غیرحیاتی — فقط فیلتر است */ }
+  }
+
+  function populateCategoryFilter() {
+    const sel = document.getElementById('contentCategoryFilter');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">همه دسته‌ها</option>' +
+      state.categories.map(c => `<option value="${c.id}" ${c.id === cur ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  }
+
+  // ─── مودال «دسته‌بندی‌های محتوا» — لیست + فرم ساخت/ویرایش ──────────
+  // org_admin: همیشه سازمان خودش، بدون نیاز به انتخاب. super_admin: با
+  // انتخابگر سازمان داخل خودِ مودال (پیش‌فرض = فیلتر بالای صفحه اگر
+  // انتخاب شده باشد) — مستقل از فیلتر بالای صفحه تا تغییر سازمان داخل
+  // مودال باعث تغییر لیست محتوای پشت مودال نشود.
+  async function openCategoriesModal() {
+    if (App.isSuperAdmin) {
+      const preselect = document.getElementById('contentOrgFilter')?.value || '';
+      await populateCategoryManageOrgSelect(preselect);
+      state.categoryModalOrgId = preselect || null;
+    } else {
+      state.categoryModalOrgId = App.homeOrgId;
+    }
+    showCategoryList();
+    await loadCategoriesModalList();
+    openModal('modal-content-categories');
+  }
+
+  async function ensureOrgsLoaded() {
+    if (state.orgsLoaded) return true;
+    try {
+      const res = await api.get('/orgs/');
+      state.orgs = Array.isArray(res) ? res : (res.items || []);
+      state.orgsLoaded = true;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function populateCategoryManageOrgSelect(selectedId) {
+    const sel = document.getElementById('cc-manage-org');
+    if (!sel) return;
+    const ok = await ensureOrgsLoaded();
+    if (!ok) { sel.innerHTML = '<option value="">خطا در بارگذاری سازمان‌ها</option>'; return; }
+    sel.innerHTML = '<option value="">— انتخاب سازمان —</option>' +
+      state.orgs.map(o => `<option value="${o.id}" ${o.id === selectedId ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
+  }
+
+  function onCategoryManageOrgChange() {
+    state.categoryModalOrgId = document.getElementById('cc-manage-org').value || null;
+    showCategoryList();
+    loadCategoriesModalList();
+  }
+
+  async function loadCategoriesModalList() {
+    const orgId = state.categoryModalOrgId;
+    const tbody = document.getElementById('contentCategoriesTableBody');
+    if (!orgId) {
+      state.modalCategories = [];
+      if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--gray-400);">ابتدا سازمان را از بالا انتخاب کنید</td></tr>`;
+      return;
+    }
+    if (tbody) tbody.innerHTML = `<tr><td colspan="3" class="loading-row">در حال بارگذاری...</td></tr>`;
+    try {
+      const items = await api.get(`/contents/categories?org_id=${orgId}`);
+      state.modalCategories = items || [];
+      if (!tbody) return;
+      if (!state.modalCategories.length) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--gray-400);">دسته‌ای ثبت نشده</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = state.modalCategories.map(c => `
+        <tr>
+          <td style="font-weight:500;">${esc(c.name)}</td>
+          <td>${numFa(c.content_count)}</td>
+          <td>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="ContentPage.openEditCategory('${c.id}')">ویرایش</button>
+              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-content-category" data-id="${c.id}" data-title="${esc(c.name)}">حذف</button>
+            </div>
+          </td>
+        </tr>`).join('');
+    } catch (e) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function showCategoryList() {
+    document.getElementById('cc-list-view').classList.remove('hidden');
+    document.getElementById('cc-form-view').classList.add('hidden');
+  }
+
+  function showCategoryForm() {
+    document.getElementById('cc-list-view').classList.add('hidden');
+    document.getElementById('cc-form-view').classList.remove('hidden');
+  }
+
+  function hideCategoryForm() {
+    showCategoryList();
+  }
+
+  function openCreateCategory() {
+    if (!state.categoryModalOrgId) { toastError('ابتدا سازمان را از بالا انتخاب کنید'); return; }
+    document.getElementById('cc-form-title').textContent = 'دسته جدید';
+    document.getElementById('cc-id').value = '';
+    document.getElementById('cc-name').value = '';
+    showCategoryForm();
+  }
+
+  function openEditCategory(id) {
+    const c = state.modalCategories.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('cc-form-title').textContent = 'ویرایش دسته‌بندی';
+    document.getElementById('cc-id').value = c.id;
+    document.getElementById('cc-name').value = c.name || '';
+    showCategoryForm();
+  }
+
+  async function saveCategory() {
+    const id = document.getElementById('cc-id').value;
+    const name = document.getElementById('cc-name').value.trim();
+    if (!name) { toastError('نام دسته اجباری است'); return; }
+    const payload = { name };
+    if (!id) payload.org_id = state.categoryModalOrgId;
+
+    const btn = document.getElementById('btn-save-content-category');
+    setLoading(btn, true);
+    try {
+      if (id) { await api.patch(`/contents/categories/${id}`, payload); toastSuccess('دسته با موفقیت ویرایش شد'); }
+      else { await api.post('/contents/categories', payload); toastSuccess('دسته با موفقیت ایجاد شد'); }
+      hideCategoryForm();
+      await loadCategoriesModalList();
+      await loadCategories();
+      await load(state.page);
+    } catch (e) { toastError(e.message); }
+    finally { setLoading(btn, false); }
+  }
+
+  function removeCategory(id, name) {
+    confirmAction(`آیا مطمئن هستید که می‌خواهید دسته "${name}" را حذف کنید؟ محتوای این دسته حذف نمی‌شود — فقط بدون دسته می‌ماند.`, async () => {
+      await api.delete(`/contents/categories/${id}`);
+      toastSuccess('دسته با موفقیت حذف شد');
+      await loadCategoriesModalList();
+      await loadCategories();
+      await load(state.page);
+    });
+  }
+
+  // انتخابگر دسته‌ی داخل ویزارد محتوا — مستقل از فیلتر بالای صفحه، چون
+  // سازمانِ محتوا (c-org-id) می‌تواند با سازمانِ انتخاب‌شده در فیلتر فرق کند.
+  async function populateContentCategorySelect(orgId, selectedId) {
+    const sel = document.getElementById('c-category');
+    if (!sel) return;
+    if (!orgId) {
+      sel.innerHTML = '<option value="">— بدون دسته —</option>';
+      sel.disabled = true;
+      return;
+    }
+    try {
+      const items = await api.get(`/contents/categories?org_id=${orgId}`);
+      sel.innerHTML = '<option value="">— بدون دسته —</option>' +
+        (items || []).map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+      sel.disabled = false;
+    } catch {
+      sel.innerHTML = '<option value="">— بدون دسته —</option>';
+      sel.disabled = true;
+    }
+  }
+
   // ─── Tabs / Load (لیست محتوا) ───────────────────────────────────
   function setType(type) {
     state.type = type;
@@ -82,11 +273,13 @@ const ContentPage = (() => {
     state.page = page;
     state.status = document.getElementById('contentStatusFilter')?.value || '';
     const orgFilter = document.getElementById('contentOrgFilter')?.value || '';
+    const categoryFilter = document.getElementById('contentCategoryFilter')?.value || '';
     const tbody = document.getElementById('contentTableBody');
-    tbody.innerHTML = `<tr><td colspan="8" class="loading-row">در حال بارگذاری...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="loading-row">در حال بارگذاری...</td></tr>`;
     const p = new URLSearchParams({ page, page_size: 10, type: state.type });
     if (state.search) p.set('search', state.search);
     if (state.status) p.set('status', state.status);
+    if (categoryFilter) p.set('category_id', categoryFilter);
     if (App.isSuperAdmin && orgFilter) p.set('org_id', orgFilter);
     try {
       const res = await api.get(`/contents/?${p}`);
@@ -97,7 +290,7 @@ const ContentPage = (() => {
       renderTable();
       renderPagination('contentPagination', state.page, state.totalPages, load);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
     }
   }
 
@@ -121,7 +314,7 @@ const ContentPage = (() => {
   function renderTable() {
     const tbody = document.getElementById('contentTableBody');
     if (!state.items.length) {
-      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🗂️</div>هنوز محتوایی از نوع «${TYPE_LABELS[state.type]}» ثبت نشده</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">🗂️</div>هنوز محتوایی از نوع «${TYPE_LABELS[state.type]}» ثبت نشده</div></td></tr>`;
       return;
     }
     const canEdit = App.isSuperAdmin || App.isOrgAdmin;
@@ -130,6 +323,7 @@ const ContentPage = (() => {
         <td style="font-weight:600;">${esc(c.title)}</td>
         ${App.isSuperAdmin ? `<td class="th-org">${c.org_name ? esc(c.org_name) : '<span style="color:var(--gray-400);">عمومی</span>'}</td>` : ''}
         <td>${typeBadge(c.type)}</td>
+        <td style="color:var(--gray-500);">${c.category_name ? esc(c.category_name) : '—'}</td>
         <td>${statusBadge(c.status)}</td>
         <td>${accessBadges(c)}</td>
         <td>${numFa(c.total_items_count)} آیتم</td>
@@ -241,12 +435,13 @@ const ContentPage = (() => {
   async function finishWizard() {
     closeModal('modal-content');
     await load(1);
+    await loadCategories();
   }
 
   function closeContentModal() {
     const wasCreatingDraft = state.mode === 'create' && state.contentId;
     closeModal('modal-content');
-    if (wasCreatingDraft) load(1); // محتوا از مرحله ۱ به بعد از قبل روی سرور ساخته شده
+    if (wasCreatingDraft) { load(1); loadCategories(); } // محتوا از مرحله ۱ به بعد از قبل روی سرور ساخته شده
   }
 
   // ─── ساخت / ویرایش محتوا ────────────────────────────────────────
@@ -270,6 +465,7 @@ const ContentPage = (() => {
       title: document.getElementById('c-title').value.trim(),
       type: document.getElementById('c-type').value,
       description: document.getElementById('c-desc').value.trim() || null,
+      category_id: document.getElementById('c-category').value || null,
       level: document.getElementById('c-level').value || null,
       author: document.getElementById('c-author').value.trim() || null,
       tags: parseTagsInput(),
@@ -280,6 +476,7 @@ const ContentPage = (() => {
     return {
       title: document.getElementById('c-title').value.trim(),
       description: document.getElementById('c-desc').value.trim() || null,
+      category_id: document.getElementById('c-category').value || null,
       level: document.getElementById('c-level').value || null,
       author: document.getElementById('c-author').value.trim() || null,
       tags: parseTagsInput(),
@@ -330,9 +527,11 @@ const ContentPage = (() => {
       state.targetOrgId = null;
       renderDeptCheckboxes(true);
       renderPositionCheckboxes(true);
+      await populateContentCategorySelect(null, '');
     } else {
       state.targetOrgId = App.homeOrgId;
       await loadTargetingLists(state.targetOrgId);
+      await populateContentCategorySelect(state.targetOrgId, '');
     }
 
     setTabsUnlocked('basic');
@@ -390,6 +589,7 @@ const ContentPage = (() => {
     }
     renderUserChips();
     await loadTargetingLists(c.org_id);
+    await populateContentCategorySelect(c.org_id, c.category_id || '');
 
     state.activeItems = c.items || [];
     renderItems();
@@ -408,6 +608,7 @@ const ContentPage = (() => {
       await api.patch(`/contents/${state.contentId}`, collectEditablePayload());
       toastSuccess('تغییرات با موفقیت ذخیره شد');
       await load(state.page);
+      await loadCategories();
     } catch (e) { toastError(e.message); }
     finally { setLoading(btn, false); }
   }
@@ -425,6 +626,7 @@ const ContentPage = (() => {
       await api.delete(`/contents/${id}`);
       toastSuccess('محتوا با موفقیت حذف شد');
       await load(1);
+      await loadCategories();
     });
   }
 
@@ -457,17 +659,10 @@ const ContentPage = (() => {
   // ─── Targeting: سازمان (فقط super_admin) ────────────────────────
   async function loadOrgsForSelect(selectedId) {
     const sel = document.getElementById('c-org-id');
-    try {
-      if (!state.orgsLoaded) {
-        const res = await api.get('/orgs/');
-        state.orgs = Array.isArray(res) ? res : (res.items || []);
-        state.orgsLoaded = true;
-      }
-      sel.innerHTML = '<option value="">— انتخاب سازمان —</option>' +
-        state.orgs.map(o => `<option value="${o.id}" ${o.id === selectedId ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
-    } catch {
-      sel.innerHTML = '<option value="">خطا در بارگذاری سازمان‌ها</option>';
-    }
+    const ok = await ensureOrgsLoaded();
+    if (!ok) { sel.innerHTML = '<option value="">خطا در بارگذاری سازمان‌ها</option>'; return; }
+    sel.innerHTML = '<option value="">— انتخاب سازمان —</option>' +
+      state.orgs.map(o => `<option value="${o.id}" ${o.id === selectedId ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
   }
 
   async function onOrgChange() {
@@ -477,9 +672,11 @@ const ContentPage = (() => {
     if (!orgId) {
       renderDeptCheckboxes(true);
       renderPositionCheckboxes(true);
+      await populateContentCategorySelect(null, '');
       return;
     }
     await loadTargetingLists(orgId);
+    await populateContentCategorySelect(orgId, '');
   }
 
   // ─── محتوای Public (بدون سازمان) — فقط super_admin، فقط در حالت ساخت ──
@@ -489,10 +686,11 @@ const ContentPage = (() => {
     if (checked) {
       resetTargetSelections();
       state.targetOrgId = null;
+      populateContentCategorySelect(null, '');
     } else {
       const orgId = document.getElementById('c-org-id').value;
-      if (orgId) loadTargetingLists(orgId);
-      else { renderDeptCheckboxes(true); renderPositionCheckboxes(true); }
+      if (orgId) { loadTargetingLists(orgId); populateContentCategorySelect(orgId, ''); }
+      else { renderDeptCheckboxes(true); renderPositionCheckboxes(true); populateContentCategorySelect(null, ''); }
     }
   }
 
@@ -904,6 +1102,10 @@ const ContentPage = (() => {
     const btn = e.target.closest('[data-role="delete-content"]');
     if (btn) remove(btn.dataset.id, btn.dataset.title);
   });
+  document.getElementById('contentCategoriesTableBody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-role="delete-content-category"]');
+    if (btn) removeCategory(btn.dataset.id, btn.dataset.title);
+  });
   document.getElementById('contentItemsList')?.addEventListener('click', (e) => {
     const delBtn = e.target.closest('[data-role="delete-item"]');
     if (delBtn) { removeItem(delBtn.dataset.id, delBtn.dataset.title); return; }
@@ -912,7 +1114,9 @@ const ContentPage = (() => {
   });
 
   return {
-    goto, setType, load, searchDebounced,
+    goto, setType, load, searchDebounced, onOrgFilterChange,
+    openCategoriesModal, onCategoryManageOrgChange,
+    openCreateCategory, openEditCategory, saveCategory, removeCategory, hideCategoryForm,
     switchTab, prevTab, nextTab, finishWizard, closeContentModal,
     openCreate, openEdit, saveChanges, remove, uploadThumbnail,
     loadItems, toggleItemFields, openCreateItem, openEditItem, uploadItemMedia, saveItem, removeItem,

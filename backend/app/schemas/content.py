@@ -20,6 +20,29 @@ CONTENT_LEVELS = ("beginner", "intermediate", "advanced")
 TARGET_TYPES = ("department", "position", "user")
 
 
+# ─── ContentCategory ─────────────────────────────────────────────────────────
+
+class ContentCategoryCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=255)
+    order_index: int = 0
+    org_id: Optional[str] = Field(None, description="فقط super_admin — در router enforce می‌شود")
+
+
+class ContentCategoryUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=255)
+    order_index: Optional[int] = None
+
+
+class ContentCategoryResponse(BaseModel):
+    id: str
+    name: str
+    order_index: int
+    content_count: int = 0
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ─── ContentTarget (هدف انتشار: سازمان/دپارتمان/پست/نقش/کاربر) ───────────
 
 class ContentTargetCreate(BaseModel):
@@ -97,6 +120,7 @@ class ContentCreate(BaseModel):
     title: str = Field(..., min_length=2, max_length=500)
     type: str = Field(..., description="course | article | podcast | book")
     description: Optional[str] = None
+    category_id: Optional[str] = Field(None, description="اختیاری — می‌تواند خالی باشد")
     thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     instructor_name: Optional[str] = None
@@ -126,6 +150,7 @@ class ContentCreate(BaseModel):
 class ContentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=2, max_length=500)
     description: Optional[str] = None
+    category_id: Optional[str] = None
     thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     instructor_name: Optional[str] = None
@@ -151,6 +176,8 @@ class ContentResponse(BaseModel):
     title: str
     type: str
     description: Optional[str] = None
+    category_id: Optional[str] = None
+    category_name: Optional[str] = None
     thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     instructor_name: Optional[str] = None

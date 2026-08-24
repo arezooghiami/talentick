@@ -68,6 +68,9 @@
         <button class="emp-filter-pill" onclick="MyContentPage.setType('podcast', this)">🎙️ پادکست</button>
         <button class="emp-filter-pill" onclick="MyContentPage.setType('book', this)">📚 کتاب</button>
       </div>
+      <select class="form-control" id="mcCategoryFilter" onchange="MyContentPage.setCategory()" style="max-width:200px;">
+        <option value="">همه دسته‌ها</option>
+      </select>
     </div>
 
     <div class="content-grid" id="mcGrid"></div>
@@ -94,6 +97,7 @@
   <script src="../assets/js/my_content.js?v=20260719b"></script>
   <script>
     EmployeeShell.init('content');
+    MyContentPage.loadCategories();
     MyContentPage.load();
   </script>
 </body>

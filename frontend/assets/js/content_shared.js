@@ -22,6 +22,7 @@ function renderContentCard(c) {
         <div class="content-card-title">${esc(c.title)}</div>
         <div class="content-card-meta">
           <span class="status-chip ${c.my_status}">${STATUS_LABEL_FA[c.my_status] || c.my_status}</span>
+          ${c.category_name ? `<span class="content-card-duration">🏷 ${esc(c.category_name)}</span>` : ''}
           ${c.total_duration_min ? `<span class="content-card-duration">⏱ ${fmtDuration(c.total_duration_min)}</span>` : ''}
         </div>
         <div class="content-card-progress">

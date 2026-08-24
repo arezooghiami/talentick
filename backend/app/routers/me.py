@@ -33,7 +33,7 @@ from app.dependencies import Employee
 from app.models.content import Content
 from app.models.quiz import Quiz
 from app.schemas.announcement import AnnouncementResponse
-from app.schemas.content import CONTENT_TYPES
+from app.schemas.content import CONTENT_TYPES, ContentCategoryResponse
 from app.schemas.department import DepartmentTreeNode
 from app.schemas.document import DocumentCategoryResponse, DocumentListResponse
 from app.schemas.me import (
@@ -127,6 +127,17 @@ async def _enforce_quiz_item_lock(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "این آزمون قفل است — ابتدا آیتم‌های قبلی را تکمیل کنید")
 
 
+@router.get("/contents/categories", response_model=list[ContentCategoryResponse], summary="دسته‌بندی‌های محتوا")
+async def list_my_content_categories(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    # محتوای Public دسته‌بندی ندارد — کاربر General (بدون سازمان) لیست خالی می‌گیرد
+    if current_user.org_id is None:
+        return []
+    return await content_service.list_categories(db, current_user.org_id)
+
+
 @router.get("/contents", response_model=MyContentListResponse, summary="فهرست محتواهای مجاز من")
 async def list_my_contents(
     current_user: Employee,
@@ -135,6 +146,7 @@ async def list_my_contents(
     page_size: int = Query(20, ge=1, le=100),
     search: str | None = Query(None),
     type: str | None = Query(None, description="course | article | podcast | book"),
+    category_id: str | None = Query(None),
 ):
     if type and type not in CONTENT_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"نوع محتوا نامعتبر — مقادیر مجاز: {', '.join(CONTENT_TYPES)}")
@@ -142,7 +154,7 @@ async def list_my_contents(
     items, total = await content_service.list_contents(
         db, current_user.org_id, page=page, page_size=page_size,
         search=search, type_filter=type, status_filter="published",
-        viewer=current_user, apply_visibility=True,
+        category_id=category_id, viewer=current_user, apply_visibility=True,
     )
     progress_map = await progress_service.get_content_progress_map(
         db, current_user.id, [c.id for c in items]

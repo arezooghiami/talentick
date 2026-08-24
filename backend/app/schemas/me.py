@@ -20,6 +20,8 @@ class MyContentResponse(BaseModel):
     title: str
     type: str
     description: Optional[str] = None
+    category_id: Optional[str] = None
+    category_name: Optional[str] = None
     thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     instructor_name: Optional[str] = None

@@ -471,7 +471,10 @@
       <div id="view-content" class="view">
         <div class="view-header">
           <div><div class="view-title">مدیریت محتوا</div><div class="view-subtitle" id="contentTotalLabel">در حال بارگذاری...</div></div>
-          <button class="btn btn-primary" data-roles="super_admin,org_admin" onclick="ContentPage.openCreate()">➕ محتوای جدید</button>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-secondary" data-roles="super_admin,org_admin" onclick="ContentPage.openCategoriesModal()">🏷 دسته‌بندی‌ها</button>
+            <button class="btn btn-primary" data-roles="super_admin,org_admin" onclick="ContentPage.openCreate()">➕ محتوای جدید</button>
+          </div>
         </div>
 
         <div id="contentTabs" class="tab-bar" style="margin-bottom:16px;">
@@ -487,7 +490,7 @@
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
               <input type="text" id="contentSearch" placeholder="جستجو در عنوان یا توضیحات..." oninput="ContentPage.searchDebounced()" />
             </div>
-            <select class="filter-select" id="contentOrgFilter" data-roles="super_admin" onchange="ContentPage.load(1)">
+            <select class="filter-select" id="contentOrgFilter" data-roles="super_admin" onchange="ContentPage.onOrgFilterChange()">
               <option value="">همه سازمان‌ها</option>
             </select>
             <select class="filter-select" id="contentStatusFilter" onchange="ContentPage.load(1)">
@@ -496,11 +499,14 @@
               <option value="published">منتشرشده</option>
               <option value="archived">بایگانی‌شده</option>
             </select>
+            <select class="filter-select" id="contentCategoryFilter" onchange="ContentPage.load(1)">
+              <option value="">همه دسته‌ها</option>
+            </select>
           </div>
           <div style="overflow-x:auto;">
             <table>
-              <thead><tr><th>عنوان</th><th class="th-org" data-roles="super_admin">سازمان</th><th>نوع</th><th>وضعیت</th><th>دسترسی</th><th>تعداد آیتم</th><th>تاریخ ایجاد</th><th>عملیات</th></tr></thead>
-              <tbody id="contentTableBody"><tr><td colspan="8" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+              <thead><tr><th>عنوان</th><th class="th-org" data-roles="super_admin">سازمان</th><th>نوع</th><th>دسته</th><th>وضعیت</th><th>دسترسی</th><th>تعداد آیتم</th><th>تاریخ ایجاد</th><th>عملیات</th></tr></thead>
+              <tbody id="contentTableBody"><tr><td colspan="9" class="loading-row">در حال بارگذاری...</td></tr></tbody>
             </table>
           </div>
           <div class="pagination" id="contentPagination"></div>
@@ -1030,6 +1036,45 @@
   </div>
 </div>
 
+<!-- ═══ MODAL: دسته‌بندی‌های محتوا (لیست + فرم ساخت/ویرایش در یک مودال) ═══ -->
+<div id="modal-content-categories" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header"><h3>دسته‌بندی‌های محتوا</h3><button class="btn btn-icon" onclick="closeModal('modal-content-categories')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group hidden" id="cc-manage-org-wrap" data-roles="super_admin">
+        <label class="form-label">سازمان</label>
+        <select id="cc-manage-org" class="form-control" onchange="ContentPage.onCategoryManageOrgChange()">
+          <option value="">— انتخاب سازمان —</option>
+        </select>
+      </div>
+
+      <!-- ─── نمای لیست ─────────────────────────────────────────── -->
+      <div id="cc-list-view">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+          <button class="btn btn-secondary" onclick="ContentPage.openCreateCategory()">➕ دسته جدید</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>نام دسته</th><th>تعداد محتوا</th><th>عملیات</th></tr></thead>
+            <tbody id="contentCategoriesTableBody"><tr><td colspan="3" class="loading-row">در حال بارگذاری...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── نمای فرم ساخت/ویرایش ──────────────────────────────── -->
+      <div id="cc-form-view" class="hidden">
+        <div class="form-section-title" id="cc-form-title">دسته جدید</div>
+        <input type="hidden" id="cc-id">
+        <div class="form-group"><label class="form-label">نام دسته <span class="required">*</span></label><input id="cc-name" class="form-control" placeholder="مثال: مدیریت"></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" id="btn-save-content-category" onclick="ContentPage.saveCategory()">ذخیره دسته</button>
+          <button class="btn btn-secondary" onclick="ContentPage.hideCategoryForm()">انصراف</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ MODAL: Create / Edit Document Category ═══ -->
 <div id="modal-doc-category" class="modal-overlay hidden">
   <div class="modal-box">
@@ -1519,6 +1564,13 @@
               <option value="advanced">پیشرفته</option>
             </select>
           </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">دسته‌بندی</label>
+          <select id="c-category" class="form-control" disabled>
+            <option value="">— بدون دسته —</option>
+          </select>
+          <span class="form-hint" id="c-category-hint">اختیاری — می‌تواند خالی بماند. برای مدیریت لیست دسته‌ها از جدول «دسته‌بندی‌های محتوا» در صفحه‌ی اصلی استفاده کنید.</span>
         </div>
         <div class="form-group"><label class="form-label">توضیحات</label><textarea id="c-desc" class="form-control" rows="3"></textarea></div>
         <div class="form-group"><label class="form-label">تگ‌ها</label><input id="c-tags" class="form-control" placeholder="مثال: مدیریت، رهبری، نرم‌افزار (با کاما جدا کنید)"></div>

@@ -50,6 +50,27 @@ CONTENT_LEVELS = ("beginner", "intermediate", "advanced")
 TARGET_TYPES = ("department", "position", "user")
 
 
+class ContentCategory(UUIDMixin, TimestampMixin, Base):
+    """دسته‌بندی محتوا — مثال: مدیریت، فروش، فنی. برای نمایش/فیلتر ساده‌تر در فرانت."""
+
+    __tablename__ = "content_categories"
+
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        comment="NULL یعنی دسته‌بندی Public/General"
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    contents: Mapped[list["Content"]] = relationship(back_populates="category")
+
+    def __repr__(self) -> str:
+        return f"<ContentCategory name={self.name!r}>"
+
+
 class Content(UUIDMixin, TimestampMixin, Base):
     """
     محتوای سازمانی — کانتینر اصلی.
@@ -68,6 +89,13 @@ class Content(UUIDMixin, TimestampMixin, Base):
         nullable=True,
         index=True,
         comment="کلید اصلی جداسازی سازمان‌ها — NULL یعنی محتوای Public/General (فقط super_admin می‌سازد، بدون targets)"
+    )
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("content_categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="دسته‌بندی محتوا — اختیاری، می‌تواند خالی باشد"
     )
 
     # ─── محتوا ────────────────────────────────────────────────────────────
@@ -149,6 +177,7 @@ class Content(UUIDMixin, TimestampMixin, Base):
     )
 
     # ─── Relationships ────────────────────────────────────────────────────
+    category: Mapped["ContentCategory | None"] = relationship(back_populates="contents")
     items: Mapped[list["ContentItem"]] = relationship(
         back_populates="content",
         cascade="all, delete-orphan",

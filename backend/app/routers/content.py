@@ -36,6 +36,9 @@ from app.schemas.content import (
     CONTENT_STATUSES,
     CONTENT_TYPES,
     ITEM_TYPES,
+    ContentCategoryCreate,
+    ContentCategoryResponse,
+    ContentCategoryUpdate,
     ContentCreate,
     ContentDetailResponse,
     ContentItemCreate,
@@ -107,6 +110,68 @@ async def _get_content_or_404(db: AsyncSession, content_id: str) -> Content:
     return content
 
 
+# ─── ContentCategory Routes ─────────────────────────────────────────────────
+
+@router.get("/categories", response_model=list[ContentCategoryResponse], summary="لیست دسته‌بندی‌های محتوا")
+async def list_categories(
+    current_user: OrgAdmin,
+    db: AsyncSession = Depends(get_db),
+    org_id: str | None = Query(None, description="فقط super_admin — خالی = همه سازمان‌ها"),
+):
+    target_org_id = _resolve_org_id(current_user, org_id)
+    return await content_service.list_categories(db, target_org_id)
+
+
+@router.post(
+    "/categories", response_model=ContentCategoryResponse, status_code=status.HTTP_201_CREATED,
+    summary="ساخت دسته‌بندی جدید",
+)
+async def create_category(
+    body: ContentCategoryCreate,
+    current_user: OrgAdmin,
+    db: AsyncSession = Depends(get_db),
+):
+    org_id = current_user.org_id
+    if current_user.role == "super_admin" and body.org_id:
+        org_id = uuid.UUID(body.org_id)
+    if org_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    category = await content_service.create_category(db, org_id, body)
+    return await content_service.category_to_response(db, category)
+
+
+@router.patch("/categories/{category_id}", response_model=ContentCategoryResponse, summary="ویرایش دسته‌بندی")
+async def update_category(
+    category_id: str,
+    body: ContentCategoryUpdate,
+    current_user: OrgAdmin,
+    db: AsyncSession = Depends(get_db),
+):
+    category = await content_service.get_category(db, category_id)
+    if not category:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "دسته یافت نشد")
+    _enforce_org_scope(current_user, category.org_id)
+    updated = await content_service.update_category(db, category, body)
+    return await content_service.category_to_response(db, updated)
+
+
+@router.delete(
+    "/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT,
+    summary="حذف دسته‌بندی",
+    description="محتوای این دسته حذف نمی‌شود — فقط category_id آن NULL می‌شود.",
+)
+async def delete_category(
+    category_id: str,
+    current_user: OrgAdmin,
+    db: AsyncSession = Depends(get_db),
+):
+    category = await content_service.get_category(db, category_id)
+    if not category:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "دسته یافت نشد")
+    _enforce_org_scope(current_user, category.org_id)
+    await content_service.delete_category(db, category)
+
+
 # ─── Content Routes ─────────────────────────────────────────────────────────
 
 @router.get("/", response_model=ContentListResponse, summary="لیست محتوای سازمان")
@@ -118,6 +183,7 @@ async def list_contents(
     search: str | None = Query(None),
     type: str | None = Query(None, description="course | article | podcast | book"),
     status_filter: str | None = Query(None, alias="status"),
+    category_id: str | None = Query(None),
     org_id: str | None = Query(None, description="فقط super_admin — خالی = همه سازمان‌ها"),
     sort_by: str = Query("created_at", description="created_at | updated_at | title | status | type"),
     sort_order: str = Query("desc", description="asc | desc"),
@@ -137,7 +203,7 @@ async def list_contents(
     items, total = await content_service.list_contents(
         db, target_org_id, page=page, page_size=page_size,
         search=search, type_filter=type, status_filter=status_filter,
-        sort_by=sort_by, sort_order=sort_order,
+        category_id=category_id, sort_by=sort_by, sort_order=sort_order,
         viewer=current_user if current_user.role == "employee" else None,
     )
     responses = [await content_service.content_to_response(db, c) for c in items]

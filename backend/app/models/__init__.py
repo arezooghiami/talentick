@@ -12,6 +12,7 @@ from app.models.announcement import Announcement, AnnouncementTarget  # noqa: F4
 from app.models.base import Base  # noqa: F401
 from app.models.content import (  # noqa: F401
     Content,
+    ContentCategory,
     ContentItem,
     ContentTarget,
     UserContentProgress,
@@ -58,6 +59,7 @@ __all__ = [
     "Invitation",
     # Content
     "Content",
+    "ContentCategory",
     "ContentItem",
     "ContentTarget",
     "UserContentProgress",

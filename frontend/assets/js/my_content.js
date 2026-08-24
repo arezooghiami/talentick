@@ -3,8 +3,23 @@
 // ════════════════════════════════════════════════════════════════════
 
 const MyContentPage = (() => {
-  const state = { page: 1, pageSize: 12, search: '', type: '' };
+  const state = { page: 1, pageSize: 12, search: '', type: '', categoryId: '' };
   let searchTimer = null;
+
+  async function loadCategories() {
+    const sel = document.getElementById('mcCategoryFilter');
+    if (!sel) return;
+    try {
+      const items = await api.get('/me/contents/categories');
+      sel.innerHTML = '<option value="">همه دسته‌ها</option>' +
+        (items || []).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    } catch { /* غیرحیاتی — فقط فیلتر است */ }
+  }
+
+  function setCategory() {
+    state.categoryId = document.getElementById('mcCategoryFilter').value;
+    load(1);
+  }
 
   async function load(page = state.page) {
     state.page = page;
@@ -15,6 +30,7 @@ const MyContentPage = (() => {
     const p = new URLSearchParams({ page, page_size: state.pageSize });
     if (state.search) p.set('search', state.search);
     if (state.type) p.set('type', state.type);
+    if (state.categoryId) p.set('category_id', state.categoryId);
 
     try {
       const res = await api.get(`/me/contents?${p}`);
@@ -46,5 +62,5 @@ const MyContentPage = (() => {
 
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
 
-  return { load, searchDebounced, setType };
+  return { load, searchDebounced, setType, setCategory, loadCategories };
 })();
