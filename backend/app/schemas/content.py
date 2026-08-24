@@ -194,6 +194,8 @@ class UploadResponse(BaseModel):
 
 class UploadUrlRequest(BaseModel):
     filename: str = Field(..., min_length=1, description="نام فایل — فقط برای تشخیص پسوند لازم است")
+    org_id: Optional[str] = Field(None, description="فقط super_admin — آپلود برای سازمان دلخواه (باید با org_id محتوای مقصد یکی باشد)")
+    is_public: bool = Field(False, description="فقط super_admin — آپلود برای محتوای Public (بدون سازمان)")
 
 
 class UploadUrlResponse(BaseModel):

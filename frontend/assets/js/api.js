@@ -102,8 +102,8 @@ const api = {
    * می‌فرستد. onProgress(percent:0-100) اختیاری است.
    * خروجی مثل api.upload یک آبجکت با فیلد url (مسیر پایدار داخلی) است.
    */
-  async uploadDirect(path, file, onProgress = null) {
-    const { upload_url, url } = await this.post(path, { filename: file.name });
+  async uploadDirect(path, file, onProgress = null, extra = {}) {
+    const { upload_url, url } = await this.post(path, { filename: file.name, ...extra });
 
     await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();

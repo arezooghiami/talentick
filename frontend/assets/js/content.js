@@ -428,11 +428,24 @@ const ContentPage = (() => {
     });
   }
 
+  // آدرس فایل روی مسیر سازمانِ صحیح ذخیره شود (نه سازمانِ کاربر آپلودکننده) —
+  // باید دقیقاً هم‌راستا با محاسبه‌ی org_id/is_public موجود در فرم basic باشد،
+  // وگرنه routers/files.py بعداً با 403 دسترسی به فایل را رد می‌کند.
+  function getContentUploadParams() {
+    const isPublic = App.isSuperAdmin && document.getElementById('c-is-public').checked;
+    if (isPublic) return { is_public: true };
+    if (App.isSuperAdmin) {
+      const orgId = document.getElementById('c-org-id').value;
+      if (orgId) return { org_id: orgId };
+    }
+    return {};
+  }
+
   async function uploadThumbnail(inputEl) {
     const file = inputEl.files?.[0];
     if (!file) return;
     try {
-      const res = await api.uploadDirect('/contents/upload', file, (pct) => setUploadName('c-thumb-name', `در حال آپلود... ${numFa(pct)}٪`, true));
+      const res = await api.uploadDirect('/contents/upload', file, (pct) => setUploadName('c-thumb-name', `در حال آپلود... ${numFa(pct)}٪`, true), getContentUploadParams());
       document.getElementById('c-thumb-url').value = res.url;
       setUploadName('c-thumb-name', file.name, true);
       renderThumbPreview(res.url);
@@ -740,7 +753,7 @@ const ContentPage = (() => {
     const file = inputEl.files?.[0];
     if (!file) return;
     try {
-      const res = await api.uploadDirect('/contents/upload', file, (pct) => setUploadName('i-upload-name', `در حال آپلود... ${numFa(pct)}٪`, true));
+      const res = await api.uploadDirect('/contents/upload', file, (pct) => setUploadName('i-upload-name', `در حال آپلود... ${numFa(pct)}٪`, true), getContentUploadParams());
       document.getElementById('i-media-url').value = res.url;
       setUploadName('i-upload-name', file.name, true);
       renderItemUploadPreview(res.url, document.getElementById('i-type').value);
@@ -817,7 +830,7 @@ const ContentPage = (() => {
       const label = `در حال آپلود ${numFa(done + failed + 1)} از ${numFa(files.length)}: ${file.name}`;
       progressEl.textContent = label;
       try {
-        const uploaded = await api.uploadDirect('/contents/upload', file, (pct) => { progressEl.textContent = `${label} (${numFa(pct)}٪)`; });
+        const uploaded = await api.uploadDirect('/contents/upload', file, (pct) => { progressEl.textContent = `${label} (${numFa(pct)}٪)`; }, getContentUploadParams());
         await api.post(`/contents/${state.contentId}/items`, {
           title: titleFromFilename(file.name),
           type: inferItemType(file.name),

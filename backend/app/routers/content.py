@@ -231,9 +231,21 @@ async def upload_content_file(
     current_user: OrgAdmin,
     payload: UploadUrlRequest,
 ):
-    org_id = current_user.org_id
-    if org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    # نکته: باید دقیقاً هم‌راستا با تعیین org_id در create_content باشد — وگرنه
+    # فایل زیر مسیر سازمانِ آپلودکننده ذخیره می‌شود در حالی که محتوا برای
+    # سازمان دیگر/Public ساخته می‌شود و routers/files.py بعداً با 403 رد
+    # می‌کند (فایل org-scoped است، نه بر اساس org_id واقعی محتوا).
+    if payload.is_public:
+        if current_user.role != "super_admin":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند برای محتوای Public آپلود کند")
+        org_id = None
+    else:
+        org_id = current_user.org_id
+        if current_user.role == "super_admin" and payload.org_id:
+            org_id = uuid.UUID(payload.org_id)
+        if org_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است — یا is_public=true بفرستید")
+
     result = await create_upload_url(request, payload.filename, org_id, subfolder="contents")
     return UploadUrlResponse(**result)
 
