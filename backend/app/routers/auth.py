@@ -8,6 +8,8 @@ Routes:
     POST /api/auth/refresh          → صدور access_token جدید با refresh_token معتبر
     POST /api/auth/logout           → باطل کردن session فعلی یا همه‌ی session ها
     GET  /api/auth/me               → پروفایل کامل کاربر لاگین‌شده
+    POST /api/auth/me/avatar        → آپلود/جایگزینی عکس پروفایل
+    DELETE /api/auth/me/avatar      → حذف عکس پروفایل
     POST /api/auth/forgot-password  → درخواست کد OTP پیامکی برای reset رمز
     POST /api/auth/reset-password   → تایید کد OTP + تنظیم رمز جدید (لاگین خودکار)
     POST /api/auth/welcome-complete → علامت‌گذاری دیده‌شدن ۳ صفحه‌ی welcome (فقط یک‌بار، اولین ورود)
@@ -25,13 +27,14 @@ Routes:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.exceptions import BadRequestError, UnauthorizedError
 from app.core.rate_limit import login_rate_limiter, otp_request_rate_limiter, otp_verify_rate_limiter
+from app.core.storage import upload_file
 from app.database import get_db
 from app.dependencies import CurrentUser
 from app.schemas.auth import (
@@ -49,6 +52,10 @@ from app.services import auth_service
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 _INVALID_CREDENTIALS_MSG = "شماره موبایل/ایمیل یا رمز عبور اشتباه است"
+
+# سقف حجم عکس پروفایل — جداگانه و بسیار کوچک‌تر از سقف عمومی آپلود محتوا
+# (core/storage.py:MAX_FILE_SIZE_MB) چون آواتار همیشه باید یک تصویر کوچک باشد.
+MAX_AVATAR_SIZE_MB = 5
 
 
 def _client_key(request: Request, identifier: str) -> str:
@@ -195,6 +202,51 @@ async def me(
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ) -> MeResponse:
+    return await auth_service.get_me(db, current_user)
+
+
+@router.post(
+    "/me/avatar",
+    response_model=MeResponse,
+    summary="آپلود/ویرایش عکس پروفایل",
+    description=f"""
+    عکس پروفایل کاربر لاگین‌شده را آپلود و تنظیم می‌کند — اگر قبلاً عکسی
+    ثبت شده باشد، جایگزین می‌شود.
+
+    فقط فایل تصویر (jpg/png/webp/gif) مجاز است و حجم آن نباید بیش از
+    {MAX_AVATAR_SIZE_MB} مگابایت باشد.
+    """,
+    responses={400: {"description": "فایل ارسالی تصویر نیست یا حجم آن بیش از حد مجاز است"}},
+)
+async def upload_my_avatar(
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(...),
+) -> MeResponse:
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "فایل باید تصویر باشد")
+
+    data = await file.read()
+    if len(data) > MAX_AVATAR_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"حجم تصویر نباید بیش از {MAX_AVATAR_SIZE_MB} مگابایت باشد")
+    await file.seek(0)
+
+    result = await upload_file(file, current_user.org_id, subfolder="avatars")
+    await auth_service.set_avatar(db, current_user, result["url"])
+    return await auth_service.get_me(db, current_user)
+
+
+@router.delete(
+    "/me/avatar",
+    response_model=MeResponse,
+    summary="حذف عکس پروفایل",
+    description="عکس پروفایل کاربر لاگین‌شده را حذف می‌کند — کاربر می‌تواند بدون عکس پروفایل هم بماند.",
+)
+async def delete_my_avatar(
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> MeResponse:
+    await auth_service.set_avatar(db, current_user, None)
     return await auth_service.get_me(db, current_user)
 
 

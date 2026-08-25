@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>پروفایل من — Talentick</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/admin.css?v=20260825" />
+  <style>
+    body {
+      background: linear-gradient(135deg, #6C4CF1 0%, #5636D6 100%);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .pf-card {
+      width: 100%; max-width: 460px; background: var(--card-bg); border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg); padding: 40px 36px;
+    }
+    .pf-title { font-size: 20px; font-weight: 800; color: var(--gray-800); margin-bottom: 6px; }
+    .pf-desc { font-size: 13px; color: var(--gray-500); line-height: 1.8; margin-bottom: 26px; }
+
+    .pf-avatar-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-bottom: 8px; }
+    .pf-avatar-shell { position: relative; width: 120px; height: 120px; }
+    .pf-avatar {
+      width: 120px; height: 120px; border-radius: 50%; overflow: hidden;
+      background: var(--gradient-brand, linear-gradient(135deg,#6C4CF1,#A855F7));
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 36px; font-weight: 700; border: 3px solid var(--card-bg); box-shadow: var(--shadow-md);
+    }
+    .pf-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pf-avatar-camera {
+      position: absolute; bottom: 0; left: 0; width: 36px; height: 36px; border-radius: 50%;
+      background: var(--primary); color: #fff; border: 3px solid var(--card-bg); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: background var(--transition);
+    }
+    .pf-avatar-camera:hover { background: var(--primary-dark); }
+    .pf-avatar-camera input { display: none; }
+    .pf-avatar-actions { display: flex; gap: 8px; }
+    .pf-btn-remove {
+      background: none; border: 1px solid var(--gray-200); color: #DC2626; border-radius: var(--radius-md);
+      padding: 6px 14px; font-family: 'Vazirmatn', sans-serif; font-size: 12.5px; cursor: pointer;
+      transition: background var(--transition);
+    }
+    .pf-btn-remove:hover:not(:disabled) { background: #FEF2F2; }
+    .pf-btn-remove:disabled { opacity: .5; cursor: not-allowed; }
+    .pf-hint { font-size: 11px; color: var(--gray-400); text-align: center; line-height: 1.8; }
+
+    .pf-confirm-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--gray-600); }
+    .pf-confirm-row button {
+      border: none; border-radius: var(--radius-md); padding: 5px 12px; font-family: 'Vazirmatn', sans-serif;
+      font-size: 12px; cursor: pointer; transition: opacity var(--transition);
+    }
+    .pf-confirm-row button:hover { opacity: .85; }
+    #pfConfirmYes { background: #DC2626; color: #fff; }
+    #pfConfirmNo { background: var(--gray-100); color: var(--gray-700); }
+
+    .pf-divider { height: 1px; background: var(--gray-200); margin: 26px 0; }
+
+    .pf-info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; font-size: 13px; }
+    .pf-info-row + .pf-info-row { border-top: 1px solid var(--gray-100); }
+    .pf-info-label { color: var(--gray-500); }
+    .pf-info-value { color: var(--gray-800); font-weight: 600; }
+
+    .alert-error {
+      background: #FEF2F2; border: 1px solid #FECACA; border-radius: var(--radius-md);
+      padding: 12px 14px; font-size: 13px; color: #DC2626; margin-bottom: 18px; display: none; align-items: center; gap: 8px;
+    }
+    .alert-error.show { display: flex; }
+
+    .pf-back { text-align: center; margin-top: 24px; }
+    .pf-back a { font-size: 12.5px; color: var(--gray-500); }
+    .pf-back a:hover { color: var(--primary); }
+
+    .pf-spinner-overlay {
+      position: absolute; inset: 0; border-radius: 50%; background: rgba(0,0,0,.35);
+      display: none; align-items: center; justify-content: center;
+    }
+    .pf-spinner-overlay.show { display: flex; }
+    .pf-spinner-overlay .spinner {
+      width: 22px; height: 22px; border: 2.5px solid rgba(255,255,255,.35); border-top-color: #fff;
+      border-radius: 50%; animation: pf-spin .6s linear infinite; display: inline-block;
+    }
+    @keyframes pf-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div class="pf-card">
+    <div class="pf-title">پروفایل من</div>
+    <div class="pf-desc">عکس پروفایل خود را آپلود، ویرایش یا حذف کنید — نداشتن عکس پروفایل هم مشکلی ندارد.</div>
+
+    <div class="alert-error" id="alertError"><span id="alertText"></span></div>
+
+    <div class="pf-avatar-wrap">
+      <div class="pf-avatar-shell">
+        <div class="pf-avatar" id="pfAvatar">—</div>
+        <div class="pf-spinner-overlay" id="pfSpinner"><div class="spinner"></div></div>
+        <label class="pf-avatar-camera" for="pfFileInput" title="آپلود/تغییر عکس">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <input type="file" id="pfFileInput" accept="image/png,image/jpeg,image/webp,image/gif" />
+        </label>
+      </div>
+      <div class="pf-avatar-actions" id="pfActionsDefault">
+        <button type="button" class="pf-btn-remove" id="pfRemoveBtn">حذف عکس پروفایل</button>
+      </div>
+      <div class="pf-confirm-row hidden" id="pfActionsConfirm">
+        <span>عکس پروفایل حذف شود؟</span>
+        <button type="button" id="pfConfirmYes">بله، حذف کن</button>
+        <button type="button" id="pfConfirmNo">انصراف</button>
+      </div>
+      <div class="pf-hint">فرمت‌های مجاز: JPG، PNG، WEBP، GIF — حداکثر ۵ مگابایت</div>
+    </div>
+
+    <div class="pf-divider"></div>
+
+    <div class="pf-info-row">
+      <span class="pf-info-label">نام و نام خانوادگی</span>
+      <span class="pf-info-value" id="pfFullName">—</span>
+    </div>
+    <div class="pf-info-row">
+      <span class="pf-info-label">شماره موبایل</span>
+      <span class="pf-info-value" id="pfPhone" dir="ltr">—</span>
+    </div>
+
+    <div class="pf-back">
+      <a href="#" id="backLink">بازگشت</a>
+    </div>
+  </div>
+
+  <script src="assets/js/config.js?v=20260825"></script>
+  <script src="assets/js/auth.js?v=20260825"></script>
+  <script src="assets/js/api.js?v=20260823"></script>
+  <script src="assets/js/utils.js?v=20260823"></script>
+  <script src="assets/js/profile.js?v=20260825"></script>
+</body>
+</html>

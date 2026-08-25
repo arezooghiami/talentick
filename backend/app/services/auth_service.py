@@ -379,6 +379,12 @@ async def reset_password_with_otp(
 
 # ─── Profile (GET /me) ──────────────────────────────────────────────────────
 
+async def set_avatar(db: AsyncSession, user: User, avatar_url: str | None) -> None:
+    """عکس پروفایل کاربر را تنظیم یا پاک می‌کند (avatar_url=None یعنی حذف عکس)."""
+    user.avatar_url = avatar_url
+    await db.commit()
+
+
 async def get_me(db: AsyncSession, user: User) -> dict:
     """پروفایل کامل کاربر لاگین‌شده — شامل نام سازمان/دپارتمان/سمت."""
     from sqlalchemy.orm import joinedload

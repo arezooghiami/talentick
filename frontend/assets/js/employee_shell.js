@@ -17,12 +17,10 @@ const EmployeeShell = {
   },
 
   _fillUser() {
-    const user = Auth.getUser();
-    if (!user) return;
-    const nameEl = document.getElementById('empUserName');
-    const avatarEl = document.getElementById('empUserAvatar');
-    if (nameEl) nameEl.textContent = user.full_name || '';
-    if (avatarEl) avatarEl.textContent = (user.full_name || '').split(' ').slice(0, 2).map(w => w[0]).join('');
+    // fillHeaderUser (utils.js) خودش هم از کش سریع پر می‌کند و هم با
+    // GET /auth/me عکس پروفایل به‌روز را می‌گیرد — نیازی به await نیست چون
+    // مراحل بعدی init به این وابسته نیستند.
+    fillHeaderUser();
   },
 
   _highlightNav(activePage) {

@@ -229,6 +229,43 @@ function initTabs(tabsEl) {
   if (buttons[0]) buttons[0].click();
 }
 
+// ─── Header avatar (عکس پروفایل یا حروف اول نام) ──────────────────
+// el: کانتینر آواتار (span.ds-avatar یا span.emp-user-avatar) — محتوایش را
+// یا با <img> عکس پروفایل (با data-src برای hydrateAuthedImages چون
+// /api/files/* نیازمند Authorization است) یا با حروف اول نام پر می‌کند.
+function renderAvatar(el, avatarUrl, fullName) {
+  if (!el) return;
+  if (avatarUrl) {
+    el.innerHTML = `<img data-src="${esc(avatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;">`;
+    hydrateAuthedImages(el);
+  } else {
+    el.innerHTML = '';
+    el.textContent = initials(fullName || '');
+  }
+}
+
+// نام/آواتار نوار بالای پرتال کارمند را پر می‌کند — ابتدا از کش (بدون تاخیر)
+// و سپس با GET /auth/me به‌روز می‌شود (چون avatar_url در tokenData لاگین
+// ذخیره نمی‌شود) و کش را هم برای دفعات بعد به‌روز می‌کند.
+async function fillHeaderUser() {
+  const cached = Auth.getUser();
+  if (!cached) return null;
+  const nameEl = document.getElementById('empUserName');
+  const avatarEl = document.getElementById('empUserAvatar');
+  if (nameEl) nameEl.textContent = cached.full_name || '';
+  renderAvatar(avatarEl, cached.avatar_url, cached.full_name);
+
+  try {
+    const me = await api.get('/auth/me');
+    Auth.updateCachedUser({ avatar_url: me.avatar_url, full_name: me.full_name });
+    if (nameEl) nameEl.textContent = me.full_name || '';
+    renderAvatar(avatarEl, me.avatar_url, me.full_name);
+    return me;
+  } catch {
+    return cached; // غیرحیاتی — اگر شکست بخورد، مقادیر کش‌شده باقی می‌ماند
+  }
+}
+
 // ─── Fill user info in sidebar ────────────────────────────────────
 function fillSidebarUser() {
   const user = Auth.getUser();

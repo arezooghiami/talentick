@@ -48,6 +48,14 @@ const Auth = {
     localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(user));
   },
 
+  /** ادغام فیلدهای جدید (مثل avatar_url/full_name از GET /auth/me) در کاربر کش‌شده — بدون نیاز به لاگین دوباره. */
+  updateCachedUser(patch) {
+    const user = this.getUser();
+    if (!user) return;
+    Object.assign(user, patch);
+    localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(user));
+  },
+
   clear() {
     localStorage.removeItem(CONFIG.TOKEN_KEY);
     localStorage.removeItem(CONFIG.REFRESH_TOKEN_KEY);

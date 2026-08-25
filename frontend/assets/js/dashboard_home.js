@@ -16,10 +16,7 @@ const DashboardHome = (() => {
     wireChrome();
     renderBanner([]);
 
-    const user = Auth.getUser();
-    setText('empUserName', user?.full_name || '');
-    const avatarEl = document.getElementById('empUserAvatar');
-    if (avatarEl) avatarEl.textContent = initials(user?.full_name || '');
+    fillHeaderUser();
 
     loadPointsAndLevel();
     loadOrg();

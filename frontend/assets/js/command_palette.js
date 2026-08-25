@@ -11,6 +11,7 @@ const CommandPalette = (() => {
     { label: 'سازمان من', icon: '🏢', href: '/organization/index.html', group: 'اصلی' },
     { label: 'چارت سازمانی', icon: '🌳', href: '/organization/index.html?tab=chart', group: 'سازمان' },
     { label: 'کتابخانه اسناد', icon: '📁', href: '/organization/index.html?tab=docs', group: 'سازمان' },
+    { label: 'پروفایل من', icon: '👤', href: '/profile.html', group: 'حساب کاربری' },
     { label: 'تغییر رمز عبور', icon: '🔒', href: '/change-password.html', group: 'حساب کاربری' },
     { label: 'خروج از حساب', icon: '🚪', action: () => Auth.logout(), group: 'حساب کاربری' },
   ];
