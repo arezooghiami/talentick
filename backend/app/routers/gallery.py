@@ -11,6 +11,10 @@ Routes:
   PATCH  /api/galleries/{id}      → ویرایش
   DELETE /api/galleries/{id}      → حذف
 
+مشاهده‌ی گالری‌های فعال برای کارمندان از routers/me.py
+(GET /api/me/galleries و GET /api/me/galleries/{id}) است — آنجا فقط
+گالری‌های is_active و متعلق به سازمان کاربر (یا Public) بازگردانده می‌شوند.
+
 دسترسی: مدیریت (ساخت/ویرایش/حذف/آپلود) org_admin به بالا — هم‌راستا با
 announcements.py. تعیین گالری Public/General فقط مجاز برای super_admin.
 

@@ -16,6 +16,10 @@ Routes (آزمون):
   GET  /api/me/quizzes/{id}/attempts                        → تاریخچه‌ی تلاش‌های من روی این آزمون
   GET  /api/me/quizzes/{id}/attempts/{attempt_id}           → جزئیات یک تلاش (شامل پاسخ صحیح/توضیح)
 
+Routes (گالری):
+  GET  /api/me/galleries                                   → گالری‌های فعال سازمانم + Public
+  GET  /api/me/galleries/{id}                               → جزئیات یک گالری (عکس‌ها)
+
 دسترسی: هر کاربر فعال (Employee و بالاتر) — همیشه از Permission Engine مرکزی
 (content_service.visibility_condition) استفاده می‌شود، صرف‌نظر از نقش کاربر،
 چون این صفحه شخصی («محتواهای من») است نه پنل مدیریت.
@@ -36,6 +40,7 @@ from app.schemas.announcement import AnnouncementResponse
 from app.schemas.content import CONTENT_TYPES, ContentCategoryResponse
 from app.schemas.department import DepartmentTreeNode
 from app.schemas.document import DocumentCategoryResponse, DocumentListResponse
+from app.schemas.gallery import GalleryDetailResponse, GalleryListResponse
 from app.schemas.me import (
     MyContentDetailResponse,
     MyContentItemResponse,
@@ -75,6 +80,7 @@ from app.services import (
     content_service,
     department_service,
     document_service,
+    gallery_service,
     onboarding_service,
     org_service,
     points_service,
@@ -340,6 +346,48 @@ async def list_my_announcements(
         viewer=current_user, apply_visibility=True, active_only=True,
     )
     return [await announcement_service.announcement_to_response(db, a) for a in items]
+
+
+# ─── Gallery Routes («گالری») ──────────────────────────────────────────────
+
+@router.get(
+    "/galleries", response_model=GalleryListResponse,
+    summary="گالری‌های فعال و مجاز من",
+    description="گالری‌های (مجموعه عکس) فعال سازمانم به‌علاوه‌ی گالری‌های Public — جدیدترین اول.",
+)
+async def list_my_galleries(
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: str | None = Query(None),
+):
+    items, total = await gallery_service.list_galleries(
+        db, current_user.org_id, page=page, page_size=page_size,
+        search=search, viewer=current_user, active_only=True,
+    )
+    responses = [await gallery_service.gallery_to_response(db, g) for g in items]
+    return GalleryListResponse(
+        items=responses, total=total, page=page, page_size=page_size,
+        total_pages=max(1, math.ceil(total / page_size)),
+    )
+
+
+@router.get(
+    "/galleries/{gallery_id}", response_model=GalleryDetailResponse,
+    summary="جزئیات یک گالری (عکس‌ها)",
+)
+async def get_my_gallery(
+    gallery_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    gallery = await gallery_service.get_gallery(db, gallery_id)
+    if not gallery or not gallery.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "گالری یافت نشد")
+    if gallery.org_id is not None and str(gallery.org_id) != str(current_user.org_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "گالری یافت نشد")
+    return await gallery_service.gallery_to_detail(db, gallery)
 
 
 # ─── Onboarding Routes («مسیر آنبوردینگ من») ──────────────────────────────
