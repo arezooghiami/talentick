@@ -117,9 +117,13 @@ async def list_categories(
     current_user: OrgAdmin,
     db: AsyncSession = Depends(get_db),
     org_id: str | None = Query(None, description="فقط super_admin — خالی = همه سازمان‌ها"),
+    scope: str = Query(
+        "all",
+        description="فقط وقتی org_id خالی است (super_admin): all = همه، public = فقط دسته‌بندی‌های عمومی",
+    ),
 ):
     target_org_id = _resolve_org_id(current_user, org_id)
-    return await content_service.list_categories(db, target_org_id)
+    return await content_service.list_categories(db, target_org_id, scope=scope)
 
 
 @router.post(
@@ -131,11 +135,15 @@ async def create_category(
     current_user: OrgAdmin,
     db: AsyncSession = Depends(get_db),
 ):
-    org_id = current_user.org_id
-    if current_user.role == "super_admin" and body.org_id:
-        org_id = uuid.UUID(body.org_id)
-    if org_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
+    # org admin: همیشه سازمان خودش.
+    # super_admin: org_id بدنه را می‌پذیرد؛ اگر خالی باشد → دسته‌بندی عمومی (Public)
+    # که برای محتوای همه‌ی سازمان‌ها قابل استفاده است.
+    if current_user.role == "super_admin":
+        org_id = uuid.UUID(body.org_id) if body.org_id else None
+    else:
+        org_id = current_user.org_id
+        if org_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است")
     category = await content_service.create_category(db, org_id, body)
     return await content_service.category_to_response(db, category)
 

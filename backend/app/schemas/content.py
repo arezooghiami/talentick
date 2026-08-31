@@ -25,7 +25,10 @@ TARGET_TYPES = ("department", "position", "user")
 class ContentCategoryCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
     order_index: int = 0
-    org_id: Optional[str] = Field(None, description="فقط super_admin — در router enforce می‌شود")
+    org_id: Optional[str] = Field(
+        None,
+        description="فقط super_admin — در router enforce می‌شود. خالی = دسته‌بندی عمومی (Public) که برای همه سازمان‌ها قابل استفاده است",
+    )
 
 
 class ContentCategoryUpdate(BaseModel):
@@ -38,6 +41,8 @@ class ContentCategoryResponse(BaseModel):
     name: str
     order_index: int
     content_count: int = 0
+    org_id: Optional[str] = None
+    is_public: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

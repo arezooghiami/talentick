@@ -23,6 +23,9 @@ const BULK_TYPE_BY_EXT = {
   jpg: 'image', jpeg: 'image', png: 'image', webp: 'image', gif: 'image',
 };
 
+// شناسه‌ی مجازی برای «دسته‌بندی عمومی» در انتخابگر سازمانِ مودال مدیریت دسته‌ها
+const PUBLIC_ORG = '__public__';
+
 const ContentPage = (() => {
   const state = {
     type: 'course', page: 1, search: '', status: '',
@@ -107,9 +110,9 @@ const ContentPage = (() => {
   // مودال باعث تغییر لیست محتوای پشت مودال نشود.
   async function openCategoriesModal() {
     if (App.isSuperAdmin) {
-      const preselect = document.getElementById('contentOrgFilter')?.value || '';
+      const preselect = document.getElementById('contentOrgFilter')?.value || PUBLIC_ORG;
       await populateCategoryManageOrgSelect(preselect);
-      state.categoryModalOrgId = preselect || null;
+      state.categoryModalOrgId = preselect;
     } else {
       state.categoryModalOrgId = App.homeOrgId;
     }
@@ -135,12 +138,13 @@ const ContentPage = (() => {
     if (!sel) return;
     const ok = await ensureOrgsLoaded();
     if (!ok) { sel.innerHTML = '<option value="">خطا در بارگذاری سازمان‌ها</option>'; return; }
-    sel.innerHTML = '<option value="">— انتخاب سازمان —</option>' +
+    sel.innerHTML =
+      `<option value="${PUBLIC_ORG}" ${selectedId === PUBLIC_ORG ? 'selected' : ''}>— عمومی (همه سازمان‌ها) —</option>` +
       state.orgs.map(o => `<option value="${o.id}" ${o.id === selectedId ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
   }
 
   function onCategoryManageOrgChange() {
-    state.categoryModalOrgId = document.getElementById('cc-manage-org').value || null;
+    state.categoryModalOrgId = document.getElementById('cc-manage-org').value || PUBLIC_ORG;
     showCategoryList();
     loadCategoriesModalList();
   }
@@ -153,26 +157,32 @@ const ContentPage = (() => {
       if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--gray-400);">ابتدا سازمان را از بالا انتخاب کنید</td></tr>`;
       return;
     }
+    const isPublic = orgId === PUBLIC_ORG;
     if (tbody) tbody.innerHTML = `<tr><td colspan="3" class="loading-row">در حال بارگذاری...</td></tr>`;
     try {
-      const items = await api.get(`/contents/categories?org_id=${orgId}`);
+      const url = isPublic ? '/contents/categories?scope=public' : `/contents/categories?org_id=${orgId}`;
+      const items = await api.get(url);
       state.modalCategories = items || [];
       if (!tbody) return;
       if (!state.modalCategories.length) {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--gray-400);">دسته‌ای ثبت نشده</td></tr>`;
         return;
       }
-      tbody.innerHTML = state.modalCategories.map(c => `
+      tbody.innerHTML = state.modalCategories.map(c => {
+        // در نمای یک سازمان، دسته‌های عمومی فقط برای اطلاع نشان داده می‌شوند
+        // (ویرایش/حذفشان از نمای «عمومی» انجام می‌شود).
+        const readOnly = c.is_public && !isPublic;
+        const actions = readOnly
+          ? '<span style="color:var(--gray-400);font-size:12px;">دستهٔ عمومی</span>'
+          : `<button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="ContentPage.openEditCategory('${c.id}')">ویرایش</button>
+             <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-content-category" data-id="${c.id}" data-title="${esc(c.name)}">حذف</button>`;
+        return `
         <tr>
-          <td style="font-weight:500;">${esc(c.name)}</td>
+          <td style="font-weight:500;">${esc(c.name)}${c.is_public ? ' <span class="badge" style="background:#EEF2FF;color:#4338CA;font-size:11px;padding:1px 6px;border-radius:6px;">عمومی</span>' : ''}</td>
           <td>${numFa(c.content_count)}</td>
-          <td>
-            <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="btn-action" style="background:var(--gray-100);color:var(--gray-700);" onclick="ContentPage.openEditCategory('${c.id}')">ویرایش</button>
-              <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-role="delete-content-category" data-id="${c.id}" data-title="${esc(c.name)}">حذف</button>
-            </div>
-          </td>
-        </tr>`).join('');
+          <td><div style="display:flex;gap:4px;flex-wrap:wrap;">${actions}</div></td>
+        </tr>`;
+      }).join('');
     } catch (e) {
       if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
     }
@@ -194,7 +204,8 @@ const ContentPage = (() => {
 
   function openCreateCategory() {
     if (!state.categoryModalOrgId) { toastError('ابتدا سازمان را از بالا انتخاب کنید'); return; }
-    document.getElementById('cc-form-title').textContent = 'دسته جدید';
+    document.getElementById('cc-form-title').textContent =
+      state.categoryModalOrgId === PUBLIC_ORG ? 'دستهٔ عمومی جدید' : 'دسته جدید';
     document.getElementById('cc-id').value = '';
     document.getElementById('cc-name').value = '';
     showCategoryForm();
@@ -214,7 +225,7 @@ const ContentPage = (() => {
     const name = document.getElementById('cc-name').value.trim();
     if (!name) { toastError('نام دسته اجباری است'); return; }
     const payload = { name };
-    if (!id) payload.org_id = state.categoryModalOrgId;
+    if (!id) payload.org_id = state.categoryModalOrgId === PUBLIC_ORG ? null : state.categoryModalOrgId;
 
     const btn = document.getElementById('btn-save-content-category');
     setLoading(btn, true);
@@ -244,15 +255,13 @@ const ContentPage = (() => {
   async function populateContentCategorySelect(orgId, selectedId) {
     const sel = document.getElementById('c-category');
     if (!sel) return;
-    if (!orgId) {
-      sel.innerHTML = '<option value="">— بدون دسته —</option>';
-      sel.disabled = true;
-      return;
-    }
     try {
-      const items = await api.get(`/contents/categories?org_id=${orgId}`);
+      // محتوای سازمانی: دسته‌های همان سازمان + دسته‌های عمومی.
+      // محتوای عمومی (بدون سازمان): فقط دسته‌های عمومی.
+      const url = orgId ? `/contents/categories?org_id=${orgId}` : '/contents/categories?scope=public';
+      const items = await api.get(url);
       sel.innerHTML = '<option value="">— بدون دسته —</option>' +
-        (items || []).map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+        (items || []).map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}${c.is_public ? ' (عمومی)' : ''}</option>`).join('');
       sel.disabled = false;
     } catch {
       sel.innerHTML = '<option value="">— بدون دسته —</option>';

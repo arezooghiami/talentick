@@ -35,23 +35,38 @@ from app.schemas.content import (
 
 # ─── ContentCategory ──────────────────────────────────────────────────────
 
-async def list_categories(db: AsyncSession, org_id: uuid.UUID | None) -> list[ContentCategoryResponse]:
-    """org_id=None فقط برای super_admin — دسته‌بندی‌های همه‌ی سازمان‌ها را برمی‌گرداند (مطابق list_contents)."""
+async def list_categories(
+    db: AsyncSession, org_id: uuid.UUID | None, *, scope: str = "all"
+) -> list[ContentCategoryResponse]:
+    """
+    دسته‌بندی‌های قابل استفاده برای محتوای یک سازمان.
+
+    - org_id مشخص: دسته‌بندی‌های همان سازمان + دسته‌بندی‌های عمومی (org_id IS NULL).
+      دسته‌بندی عمومی برای همه‌ی سازمان‌ها قابل استفاده است.
+    - org_id=None (فقط super_admin): بسته به scope —
+        * "all"    → همه‌ی دسته‌بندی‌ها (همه سازمان‌ها + عمومی)
+        * "public" → فقط دسته‌بندی‌های عمومی
+    """
     q = select(ContentCategory).order_by(ContentCategory.order_index, ContentCategory.created_at)
     if org_id is not None:
-        q = q.where(ContentCategory.org_id == org_id)
+        q = q.where(or_(ContentCategory.org_id == org_id, ContentCategory.org_id.is_(None)))
+    elif scope == "public":
+        q = q.where(ContentCategory.org_id.is_(None))
     result = await db.execute(q)
     categories = list(result.scalars().all())
 
+    # دسته‌بندی به یک سازمان تعلق دارد و محتوای هر سازمان فقط به دسته‌های خودش یا
+    # عمومی ارجاع می‌دهد؛ پس شمارش سراسری برای هر دسته درست است (بدون فیلتر org).
     counts_q = select(Content.category_id, func.count()).where(Content.category_id.is_not(None))
-    if org_id is not None:
-        counts_q = counts_q.where(Content.org_id == org_id)
     counts_result = await db.execute(counts_q.group_by(Content.category_id))
     counts = {str(cid): c for cid, c in counts_result.all()}
     return [
         ContentCategoryResponse(
             id=str(c.id), name=c.name, order_index=c.order_index,
-            content_count=counts.get(str(c.id), 0), created_at=c.created_at,
+            content_count=counts.get(str(c.id), 0),
+            org_id=str(c.org_id) if c.org_id else None,
+            is_public=c.org_id is None,
+            created_at=c.created_at,
         )
         for c in categories
     ]
@@ -63,7 +78,10 @@ async def category_to_response(db: AsyncSession, category: ContentCategory) -> C
     )).scalar_one()
     return ContentCategoryResponse(
         id=str(category.id), name=category.name, order_index=category.order_index,
-        content_count=count, created_at=category.created_at,
+        content_count=count,
+        org_id=str(category.org_id) if category.org_id else None,
+        is_public=category.org_id is None,
+        created_at=category.created_at,
     )
 
 
@@ -75,9 +93,24 @@ async def get_category(db: AsyncSession, category_id: str) -> ContentCategory | 
     return await db.get(ContentCategory, cid)
 
 
+async def _validate_category_for_org(
+    db: AsyncSession, category_id: str, org_id: uuid.UUID | None
+) -> None:
+    """
+    دسته انتخاب‌شده باید یا عمومی (org_id IS NULL) باشد یا متعلق به همان سازمان محتوا.
+    محتوای Public (org_id=None) فقط می‌تواند از دسته‌بندی عمومی استفاده کند.
+    """
+    category = await get_category(db, category_id)
+    if not category:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "دسته انتخاب‌شده معتبر نیست")
+    if category.org_id is not None and str(category.org_id) != str(org_id):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "دسته انتخاب‌شده معتبر نیست")
+
+
 async def create_category(
-    db: AsyncSession, org_id: uuid.UUID, data: ContentCategoryCreate
+    db: AsyncSession, org_id: uuid.UUID | None, data: ContentCategoryCreate
 ) -> ContentCategory:
+    """org_id=None → دسته‌بندی عمومی (Public) برای همه‌ی سازمان‌ها."""
     category = ContentCategory(
         id=uuid.uuid4(), org_id=org_id, name=data.name, order_index=data.order_index,
     )
@@ -536,17 +569,12 @@ async def get_content(db: AsyncSession, content_id: str) -> Content | None:
 async def create_content(
     db: AsyncSession, org_id: uuid.UUID | None, created_by: uuid.UUID, data: ContentCreate
 ) -> Content:
-    if org_id is None:
-        if data.targets:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
-        if data.category_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند دسته‌بندی سازمانی داشته باشد")
+    if org_id is None and data.targets:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
     if data.targets:
         await _validate_targets(db, org_id, data.targets)
     if data.category_id:
-        category = await get_category(db, data.category_id)
-        if not category or str(category.org_id) != str(org_id):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "دسته انتخاب‌شده معتبر نیست")
+        await _validate_category_for_org(db, data.category_id, org_id)
 
     content = Content(
         id=uuid.uuid4(),
@@ -582,19 +610,14 @@ async def create_content(
 
 
 async def update_content(db: AsyncSession, content: Content, data: ContentUpdate) -> Content:
-    if content.org_id is None:
-        if data.targets:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
-        if data.category_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند دسته‌بندی سازمانی داشته باشد")
+    if content.org_id is None and data.targets:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
 
     payload = data.model_dump(exclude_unset=True, exclude={"targets"})
     if "category_id" in payload:
         cid = payload["category_id"]
         if cid:
-            category = await get_category(db, cid)
-            if not category or str(category.org_id) != str(content.org_id):
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, "دسته انتخاب‌شده معتبر نیست")
+            await _validate_category_for_org(db, cid, content.org_id)
             payload["category_id"] = uuid.UUID(cid)
         else:
             payload["category_id"] = None

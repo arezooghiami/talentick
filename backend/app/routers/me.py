@@ -138,9 +138,10 @@ async def list_my_content_categories(
     current_user: Employee,
     db: AsyncSession = Depends(get_db),
 ):
-    # محتوای Public دسته‌بندی ندارد — کاربر General (بدون سازمان) لیست خالی می‌گیرد
+    # کاربر سازمانی: دسته‌های سازمان خودش + دسته‌های عمومی.
+    # کاربر General (بدون سازمان): فقط دسته‌های عمومی (برای فیلتر محتوای Public).
     if current_user.org_id is None:
-        return []
+        return await content_service.list_categories(db, None, scope="public")
     return await content_service.list_categories(db, current_user.org_id)
 
 
