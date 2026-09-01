@@ -640,9 +640,13 @@ const ContentPage = (() => {
   }
 
   // آدرس فایل روی مسیر سازمانِ صحیح ذخیره شود (نه سازمانِ کاربر آپلودکننده) —
-  // باید دقیقاً هم‌راستا با محاسبه‌ی org_id/is_public موجود در فرم basic باشد،
   // وگرنه routers/files.py بعداً با 403 دسترسی به فایل را رد می‌کند.
+  // اولویت با content_id است: بک‌اند مسیر را از org_id واقعی همان رکورد
+  // محتوا تعیین می‌کند. state.contentId همیشه پیش از هر آپلود ست شده
+  // (مرحله‌ی ۱ ویزارد محتوا را می‌سازد، و در ویرایش هم از قبل موجود است) —
+  // فرم ویرایش c-is-public/c-org-id را درست پر نمی‌کند، پس به آن‌ها تکیه نکن.
   function getContentUploadParams() {
+    if (state.contentId) return { content_id: state.contentId };
     const isPublic = App.isSuperAdmin && document.getElementById('c-is-public').checked;
     if (isPublic) return { is_public: true };
     if (App.isSuperAdmin) {

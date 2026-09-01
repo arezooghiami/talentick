@@ -304,12 +304,22 @@ async def upload_content_file(
     request: Request,
     current_user: OrgAdmin,
     payload: UploadUrlRequest,
+    db: AsyncSession = Depends(get_db),
 ):
-    # نکته: باید دقیقاً هم‌راستا با تعیین org_id در create_content باشد — وگرنه
-    # فایل زیر مسیر سازمانِ آپلودکننده ذخیره می‌شود در حالی که محتوا برای
-    # سازمان دیگر/Public ساخته می‌شود و routers/files.py بعداً با 403 رد
-    # می‌کند (فایل org-scoped است، نه بر اساس org_id واقعی محتوا).
-    if payload.is_public:
+    # مسیر ذخیره‌ی فایل (segment اول = org_id یا "public") باید *دقیقاً* با
+    # org_id واقعی محتوای مقصد یکی باشد — وگرنه فایل زیر مسیر سازمانِ
+    # آپلودکننده ذخیره می‌شود در حالی که محتوا Public/سازمانِ دیگر است و
+    # routers/files.py بعداً هنگام سرو فایل با 403 «دسترسی به این سازمان
+    # مجاز نیست» رد می‌کند (آن‌جا isolation فقط بر اساس segment مسیر چک
+    # می‌شود، نه org_id رکورد محتوا).
+    if payload.content_id:
+        # منبع معتبر: خودِ رکورد محتوا. org_id/is_public سمت کلاینت نادیده
+        # گرفته می‌شوند تا فرم ویرایش (که این فیلدها را درست پر نمی‌کند)
+        # نتواند فایل را زیر مسیر اشتباه بفرستد.
+        content = await _get_content_or_404(db, payload.content_id)
+        _enforce_org_scope(current_user, content.org_id)
+        org_id = content.org_id
+    elif payload.is_public:
         if current_user.role != "super_admin":
             raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند برای محتوای Public آپلود کند")
         org_id = None
@@ -318,7 +328,7 @@ async def upload_content_file(
         if current_user.role == "super_admin" and payload.org_id:
             org_id = uuid.UUID(payload.org_id)
         if org_id is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است — یا is_public=true بفرستید")
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id الزامی است — یا is_public=true / content_id بفرستید")
 
     result = await create_upload_url(request, payload.filename, org_id, subfolder="contents")
     return UploadUrlResponse(**result)

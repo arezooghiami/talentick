@@ -226,8 +226,17 @@ class UploadResponse(BaseModel):
 
 class UploadUrlRequest(BaseModel):
     filename: str = Field(..., min_length=1, description="نام فایل — فقط برای تشخیص پسوند لازم است")
-    org_id: Optional[str] = Field(None, description="فقط super_admin — آپلود برای سازمان دلخواه (باید با org_id محتوای مقصد یکی باشد)")
-    is_public: bool = Field(False, description="فقط super_admin — آپلود برای محتوای Public (بدون سازمان)")
+    content_id: Optional[str] = Field(
+        None,
+        description=(
+            "محتوای مقصد — اگر داده شود، مسیر ذخیره‌ی فایل از روی org_id واقعی همان "
+            "رکورد محتوا تعیین می‌شود (منبع معتبر) و org_id/is_public سمت کلاینت "
+            "نادیده گرفته می‌شوند. برای جلوگیری از ناهم‌خوانی مسیر فایل و محتوا "
+            "(که بعداً در routers/files.py به 403 منجر می‌شود) همیشه این را بفرستید."
+        ),
+    )
+    org_id: Optional[str] = Field(None, description="فقط super_admin — آپلود برای سازمان دلخواه (باید با org_id محتوای مقصد یکی باشد). فقط وقتی content_id داده نشده استفاده می‌شود")
+    is_public: bool = Field(False, description="فقط super_admin — آپلود برای محتوای Public (بدون سازمان). فقط وقتی content_id داده نشده استفاده می‌شود")
 
 
 class UploadUrlResponse(BaseModel):
