@@ -78,6 +78,8 @@ const HomePage = (() => {
       toggle('homeOnboardingSection', active.length > 0);
       if (!active.length) return;
       active.sort((a, b) => {
+        // ثبت‌نام‌شده‌ها بالاتر از برنامه‌های صرفاً قابل‌مشاهده
+        if (!!a.is_enrolled !== !!b.is_enrolled) return a.is_enrolled ? -1 : 1;
         if (a.deadline_at && b.deadline_at) return new Date(a.deadline_at) - new Date(b.deadline_at);
         if (a.deadline_at) return -1;
         if (b.deadline_at) return 1;
@@ -89,17 +91,23 @@ const HomePage = (() => {
 
   function renderOnboardingCard(e) {
     const pct = e.progress_pct || 0;
+    const href = e.enrollment_id
+      ? `/onboarding/detail.html?id=${e.enrollment_id}`
+      : `/onboarding/detail.html?program_id=${e.program_id}`;
     const deadlineHtml = e.deadline_at ? `<span class="onboarding-card-deadline">⏰ ${esc(deadlineLabel(e.deadline_at))}</span>` : '';
+    const line = e.is_enrolled
+      ? `${numFa(pct)}٪ پیش رفته‌اید — ${numFa(e.steps_completed)} از ${numFa(e.steps_total)} مرحله`
+      : `${numFa(e.steps_total)} مرحله — هنوز شروع نکرده‌اید`;
     return `
-      <a class="onboarding-card" href="/onboarding/detail.html?id=${e.enrollment_id}">
+      <a class="onboarding-card" href="${href}">
         <div class="onboarding-card-icon">🚀</div>
         <div class="onboarding-card-body">
           <h3>${esc(e.program_name)}</h3>
-          <p>${numFa(pct)}٪ پیش رفته‌اید — ${numFa(e.steps_completed)} از ${numFa(e.steps_total)} مرحله</p>
+          <p>${line}</p>
           <div class="progress-track"><div class="progress-fill" style="width:${pct}%;"></div></div>
           ${deadlineHtml}
         </div>
-        <span class="onboarding-card-cta">ادامه ‹</span>
+        <span class="onboarding-card-cta">${e.is_enrolled ? 'ادامه' : 'شروع'} ‹</span>
       </a>`;
   }
 

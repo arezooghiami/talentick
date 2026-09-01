@@ -149,15 +149,19 @@ const DashboardHome = (() => {
 
   function renderOnboardingCard(e) {
     const pct = e.progress_pct || 0;
+    const href = e.enrollment_id
+      ? `/onboarding/detail.html?id=${e.enrollment_id}`
+      : `/onboarding/detail.html?program_id=${e.program_id}`;
+    const metaLeft = e.is_enrolled ? `${numFa(pct)}٪ پیش رفته` : 'شروع نشده';
     return `
-      <a class="dash-course-card" href="/onboarding/detail.html?id=${e.enrollment_id}">
+      <a class="dash-course-card" href="${href}">
         <div class="dash-course-thumb" style="background:var(--gradient-brand);">🚀
           <div class="dash-course-progress-bar"><div class="dash-course-progress-fill" style="width:${pct}%"></div></div>
         </div>
         <div class="dash-course-body">
           <div class="dash-course-title">${esc(e.program_name)}</div>
           <div class="dash-course-meta">
-            <span class="dash-course-rating">${numFa(pct)}٪ پیش رفته</span>
+            <span class="dash-course-rating">${metaLeft}</span>
             <span class="dash-course-students">${numFa(e.steps_completed)}/${numFa(e.steps_total)} مرحله</span>
           </div>
         </div>

@@ -79,7 +79,11 @@ class OnboardingProgram(UUIDMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("departments.id", ondelete="SET NULL"),
         nullable=True,
-        comment="واحد هدف — null یعنی همه واحدها"
+        comment="واحد هدف (فقط مسیر یادگیری/learning) — null یعنی همه واحدها"
+    )
+    target_dept_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), nullable=False, default=list,
+        comment="واحدهای هدف (فقط employee_onboarding) — لیست خالی یعنی همه‌ی واحدهای سازمان می‌بینند"
     )
 
     # پیش‌فرض بودن — اگر true هر کارمند جدید خودکار ثبت‌نام می‌شود
@@ -226,6 +230,14 @@ class UserProgramEnrollment(UUIDMixin, TimestampMixin, Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
         comment="غیرفعال‌سازی نرم — وقتی ادمین ثبت‌نام Employee Onboarding را از فرم ویرایش کاربر برمی‌دارد"
+    )
+    is_mandatory: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False,
+        comment=(
+            "True یعنی این ثبت‌نام از مسیر «کارمند جدید» فرم کاربر است و کاربر تا "
+            "تکمیلش از داشبورد مسدود است (Gate). ثبت‌نام داوطلبانه‌ای که کاربر خودش "
+            "با باز/تکمیل کردن یک مرحله می‌سازد False است و هرگز گیت نمی‌کند."
+        ),
     )
     progress_pct: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0

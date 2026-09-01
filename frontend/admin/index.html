@@ -18,7 +18,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
   <!-- ─── سیستم طراحی واحد (مبنا: ظاهر super-admin.html سابق) ─── -->
   <link rel="stylesheet" href="../assets/css/admin.css?v=20260719a" />
-  <link rel="stylesheet" href="../assets/css/admin-components.css?v=20260822" />
+  <link rel="stylesheet" href="../assets/css/admin-components.css?v=20260901a" />
 </head>
 <body>
 <div class="admin-layout">
@@ -620,8 +620,8 @@
             </div>
             <div style="overflow-x:auto;">
               <table>
-                <thead><tr><th>نام مسیر</th><th>مراحل</th><th>ثبت‌نام‌شده</th><th>وضعیت</th><th>عملیات</th></tr></thead>
-                <tbody id="eoProgTableBody"><tr><td colspan="5" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr></tbody>
+                <thead><tr><th>نام مسیر</th><th>دسترسی (واحدها)</th><th>مراحل</th><th>ثبت‌نام‌شده</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <tbody id="eoProgTableBody"><tr><td colspan="6" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr></tbody>
               </table>
             </div>
             <div class="pagination" id="eoProgPagination"></div>
@@ -2038,8 +2038,29 @@
           <input type="checkbox" id="eop-is-active" style="width:16px;height:16px;" checked>
           <label class="form-label" for="eop-is-active" style="margin:0;">فعال</label>
         </div>
+
+        <hr class="form-divider">
+        <div class="form-section-title">دسترسی (کدام واحدها این آنبوردینگ را می‌بینند)</div>
+        <div class="form-group">
+          <label class="form-label">واحدهای هدف</label>
+          <div class="ms" id="eop-dept-ms">
+            <button type="button" class="ms-trigger" id="eop-dept-trigger" onclick="EmployeeOnboardingPage.toggleDeptDropdown()">
+              <span class="ms-values" id="eop-dept-values"><span class="ms-placeholder">در حال بارگذاری واحدها…</span></span>
+              <svg class="ms-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="ms-panel hidden" id="eop-dept-panel">
+              <div class="ms-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                <input type="text" id="eop-dept-search" placeholder="جستجوی واحد…" oninput="EmployeeOnboardingPage.filterDeptOptions()" autocomplete="off">
+              </div>
+              <div class="ms-options" id="eop-dept-options"></div>
+            </div>
+          </div>
+          <span class="form-hint">هیچ واحدی انتخاب نشود (یا «همه واحدها») = همه‌ی اعضای سازمان این آنبوردینگ و مراحلش را می‌بینند و می‌توانند داوطلبانه بگذرانند.</span>
+        </div>
+
         <div class="form-section-hint" style="margin-top:10px;">
-          این مسیر با انتخاب صریح ادمین در فرم ساخت/ویرایش کاربر (تیک «کارمند جدید») به هر کارمند اختصاص داده می‌شود — ثبت‌نام خودکار بر اساس نقش/واحد اینجا اعمال نمی‌شود.
+          «اجباری بودن» جداست: فقط وقتی کاربری با تیک «کارمند جدید» در فرم کاربر به این مسیر اختصاص داده شود، تا تکمیل آن از داشبورد مسدود است. دیدن داوطلبانه هرگز کاربر را قفل نمی‌کند.
         </div>
       </div>
 
@@ -2174,7 +2195,7 @@
 <script src="../assets/js/announcements_admin.js?v=20260715"></script>
 <script src="../assets/js/gallery.js?v=20260803"></script>
 <script src="../assets/js/onboarding_admin.js?v=20260801a"></script>
-<script src="../assets/js/employee_onboarding_admin.js?v=20260801a"></script>
+<script src="../assets/js/employee_onboarding_admin.js?v=20260901a"></script>
 <script src="../assets/js/tickets_admin.js?v=20260719a"></script>
 <script src="../assets/js/gamification_admin.js?v=20260720a"></script>
 <script src="../assets/js/rewards_admin.js?v=20260720a"></script>

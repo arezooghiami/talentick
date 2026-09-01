@@ -5,7 +5,7 @@
 // content/quiz) چون سیستم آنبوردینگ مستقل از ردیابی پیشرفت محتوا/آزمون است.
 
 const OnboardingDetailPage = (() => {
-  const state = { enrollmentId: null, detail: null, openStepId: null };
+  const state = { enrollmentId: null, programId: null, detail: null, openStepId: null };
 
   const STEP_TYPE_ICON = { content: '📚', quiz: '📝', document_upload: '📎', custom: '✅' };
   const STEP_TYPE_LABEL = { content: 'محتوای آموزشی', quiz: 'آزمون', document_upload: 'بارگذاری مدرک', custom: 'وظیفه' };
@@ -13,13 +13,17 @@ const OnboardingDetailPage = (() => {
   async function load() {
     const params = new URLSearchParams(location.search);
     state.enrollmentId = params.get('id');
-    if (!state.enrollmentId) {
-      showFatalError('شناسه‌ی ثبت‌نام مشخص نیست');
+    state.programId = params.get('program_id');
+    if (!state.enrollmentId && !state.programId) {
+      showFatalError('شناسه‌ی برنامه مشخص نیست');
       return;
     }
     try {
-      const detail = await api.get(`/me/onboarding/${state.enrollmentId}`);
+      const detail = state.enrollmentId
+        ? await api.get(`/me/onboarding/${state.enrollmentId}`)
+        : await api.get(`/me/onboarding/programs/${state.programId}`);
       state.detail = detail;
+      if (detail.enrollment_id) state.enrollmentId = detail.enrollment_id;
       render();
     } catch (e) {
       showFatalError(e.message || 'این برنامه یافت نشد یا دسترسی ندارید');
@@ -126,10 +130,21 @@ const OnboardingDetailPage = (() => {
       <button class="btn btn-secondary" data-role="close-viewer">بستن</button>`;
   }
 
+  function syncEnrollment(detail) {
+    // اولین اقدام روی یک برنامه‌ی صرفاً «قابل‌مشاهده» آن را به ثبت‌نام واقعی تبدیل می‌کند —
+    // از این پس با enrollment_id کار می‌کنیم تا رفرش صفحه هم درست بماند.
+    if (detail.enrollment_id && detail.enrollment_id !== state.enrollmentId) {
+      state.enrollmentId = detail.enrollment_id;
+      state.programId = null;
+      history.replaceState(null, '', `/onboarding/detail.html?id=${detail.enrollment_id}`);
+    }
+  }
+
   async function completeStep(stepId) {
     try {
       const detail = await api.post(`/me/onboarding/steps/${stepId}/complete`, {});
       state.detail = detail;
+      syncEnrollment(detail);
       render();
       toastSuccess('این مرحله به‌عنوان تکمیل‌شده ثبت شد');
       if (state.openStepId === stepId) closeViewer();
@@ -142,6 +157,7 @@ const OnboardingDetailPage = (() => {
     try {
       const detail = await api.post(`/me/onboarding/steps/${stepId}/skip`, {});
       state.detail = detail;
+      syncEnrollment(detail);
       render();
       toastInfo('این مرحله رد شد');
       if (state.openStepId === stepId) closeViewer();

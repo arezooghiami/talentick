@@ -33,7 +33,7 @@ const EmployeeOnboardingPage = (() => {
     // مسیرها
     progPage: 1, progSearch: '', progSearchTimer: null, progItems: [],
     progMode: null, programId: null, activeProgTab: 'basic', maxUnlockedProgTab: 'basic',
-    activeSteps: [], contentsForSelect: [], quizzesForSelect: [],
+    activeSteps: [], contentsForSelect: [], quizzesForSelect: [], depts: [], deptSel: new Set(),
     // کاتالوگ مدارک
     docTypes: [],
     // Monitoring
@@ -71,7 +71,7 @@ const EmployeeOnboardingPage = (() => {
   }
 
   function renderNoOrgSelected() {
-    document.getElementById('eoProgTableBody').innerHTML = '<tr><td colspan="5" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr>';
+    document.getElementById('eoProgTableBody').innerHTML = '<tr><td colspan="6" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr>';
     document.getElementById('eoDocTypesTableBody').innerHTML = '<tr><td colspan="7" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr>';
     document.getElementById('eoMonTableBody').innerHTML = '<tr><td colspan="6" class="loading-row">ابتدا سازمان را انتخاب کنید...</td></tr>';
   }
@@ -99,7 +99,7 @@ const EmployeeOnboardingPage = (() => {
     if (!state.orgId) return;
     state.progPage = page;
     const tbody = document.getElementById('eoProgTableBody');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading-row">در حال بارگذاری...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-row">در حال بارگذاری...</td></tr>';
     state.progSearch = document.getElementById('eoProgSearch').value.trim();
     const p = new URLSearchParams({ page, page_size: 20, org_id: state.orgId, purpose: 'employee_onboarding' });
     if (state.progSearch) p.set('search', state.progSearch);
@@ -108,13 +108,14 @@ const EmployeeOnboardingPage = (() => {
       state.progItems = res.items || [];
       setText('eoProgTotalLabel', `${numFa(res.total)} مسیر`);
       if (!state.progItems.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400);">هنوز مسیری تعریف نشده</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray-400);">هنوز مسیری تعریف نشده</td></tr>';
         document.getElementById('eoProgPagination').innerHTML = '';
         return;
       }
       tbody.innerHTML = state.progItems.map(p => `
         <tr>
           <td style="font-weight:600;">${esc(p.name)}</td>
+          <td>${eoTargetSummary(p)}</td>
           <td>${numFa(p.step_count)} مرحله</td>
           <td>${numFa(p.enrollment_count)} نفر</td>
           <td>${statusBadge(p.is_active)}</td>
@@ -127,8 +128,15 @@ const EmployeeOnboardingPage = (() => {
         </tr>`).join('');
       renderPagination('eoProgPagination', res.page, res.total_pages, loadPrograms);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</td></tr>`;
     }
+  }
+
+  function eoTargetSummary(p) {
+    const names = p.target_dept_names || [];
+    if (!names.length) return '<span style="color:var(--gray-400);">کل سازمان</span>';
+    if (names.length <= 3) return names.map(esc).join('، ');
+    return names.slice(0, 3).map(esc).join('، ') + ` <span style="color:var(--gray-400);">و ${numFa(names.length - 3)} واحد دیگر</span>`;
   }
 
   // ─── ویزارد: تب‌ها ──────────────────────────────────────────────
@@ -166,11 +174,142 @@ const EmployeeOnboardingPage = (() => {
     finish.classList.toggle('hidden', idx !== EOP_TAB_ORDER.length - 1);
   }
 
+  // ─── انتخاب چندتایی واحدهای هدف (multi-select dropdown) ─────────
+  // state.deptSel: Set از id واحدهای انتخاب‌شده. خالی «یا» کامل = «همه واحدها»
+  // (هنگام ذخیره target_dept_ids=[] فرستاده می‌شود). برای حالت «همه به‌جز یکی»،
+  // کاربر «انتخاب همه» را می‌زند و بعد یکی دو واحد را برمی‌دارد.
+
+  function eoDeptIsAll() {
+    const n = state.depts.length;
+    return n === 0 || state.deptSel.size === 0 || state.deptSel.size === n;
+  }
+
+  async function loadDeptsForEO(orgId, selectedIds = []) {
+    state.deptSel = new Set((selectedIds || []).map(String));
+    closeDeptDropdown();
+    document.getElementById('eop-dept-search').value = '';
+    if (!orgId) {
+      state.depts = [];
+      renderDeptValues();
+      renderDeptOptions();
+      return;
+    }
+    try {
+      state.depts = await api.get(`/departments/?org_id=${orgId}`) || [];
+    } catch {
+      state.depts = [];
+      document.getElementById('eop-dept-values').innerHTML =
+        '<span class="ms-placeholder" style="color:var(--danger);">خطا در بارگذاری واحدها</span>';
+      return;
+    }
+    renderDeptValues();
+    renderDeptOptions();
+  }
+
+  function renderDeptValues() {
+    const box = document.getElementById('eop-dept-values');
+    const sel = state.deptSel || new Set();
+    const total = state.depts.length;
+    if (!total) {
+      box.innerHTML = '<span class="ms-placeholder">این سازمان واحدی ندارد — همه می‌بینند</span>';
+      return;
+    }
+    if (eoDeptIsAll()) {
+      box.innerHTML = '<span class="ms-summary">همه واحدها</span>';
+      return;
+    }
+    const byId = new Map(state.depts.map(d => [String(d.id), d.name]));
+    const excluded = state.depts.filter(d => !sel.has(String(d.id)));
+    if (excluded.length <= 3) {
+      box.innerHTML = `<span class="ms-summary">همه به‌جز: ${excluded.map(d => esc(d.name)).join('، ')}</span>`;
+      return;
+    }
+    box.innerHTML = Array.from(sel).map(id => `
+      <span class="ms-tag" title="${esc(byId.get(id) || '')}">
+        <span>${esc(byId.get(id) || '—')}</span>
+        <span class="ms-tag-x" data-role="eo-dept-untag" data-id="${esc(id)}">✕</span>
+      </span>`).join('');
+  }
+
+  function renderDeptOptions() {
+    const box = document.getElementById('eop-dept-options');
+    const sel = state.deptSel || new Set();
+    if (!state.depts.length) {
+      box.innerHTML = '<div class="ms-empty">واحدی برای این سازمان ثبت نشده</div>';
+      return;
+    }
+    const isAll = eoDeptIsAll();
+    const q = (document.getElementById('eop-dept-search').value || '').trim();
+    const list = q ? state.depts.filter(d => (d.name || '').includes(q)) : state.depts;
+    const headRow = `
+      <div class="ms-option is-all">
+        <span>همه واحدها</span>
+        <span class="ms-option-meta" style="margin-inline-start:0;">(${numFa(state.depts.length)} واحد)</span>
+        ${isAll ? '' : '<button type="button" class="ms-reset" data-role="eo-dept-reset">بازنشانی به «همه»</button>'}
+      </div>`;
+    // در حالت «همه» همه‌ی چک‌باکس‌ها تیک‌خورده نمایش داده می‌شوند تا کاربر بتواند
+    // یکی دو تا را بردارد و به «همه به‌جز ...» برسد.
+    const rows = list.length
+      ? list.map(d => {
+          const checked = isAll || sel.has(String(d.id));
+          return `
+          <label class="ms-option">
+            <input type="checkbox" data-role="eo-dept-opt" value="${esc(d.id)}" ${checked ? 'checked' : ''}>
+            ${esc(d.name)}
+            <span class="ms-option-meta">${numFa(d.user_count || 0)} کاربر</span>
+          </label>`;
+        }).join('')
+      : '<div class="ms-empty">واحدی با این نام پیدا نشد</div>';
+    box.innerHTML = headRow + rows;
+  }
+
+  function toggleDeptDropdown() {
+    document.getElementById('eop-dept-ms').classList.contains('open') ? closeDeptDropdown() : openDeptDropdown();
+  }
+  function openDeptDropdown() {
+    document.getElementById('eop-dept-ms').classList.add('open');
+    document.getElementById('eop-dept-panel').classList.remove('hidden');
+    renderDeptOptions();
+    const s = document.getElementById('eop-dept-search');
+    setTimeout(() => s && s.focus(), 0);
+  }
+  function closeDeptDropdown() {
+    document.getElementById('eop-dept-ms').classList.remove('open');
+    document.getElementById('eop-dept-panel').classList.add('hidden');
+  }
+  function filterDeptOptions() { renderDeptOptions(); }
+
+  function onDeptOptionChange(e) {
+    const input = e.target.closest('input[data-role="eo-dept-opt"]');
+    if (!input) return;
+    const id = input.value;
+    if (eoDeptIsAll()) {
+      // از «همه» شروع کن، سپس این یکی را بردار/بگذار
+      state.deptSel = new Set(state.depts.map(d => String(d.id)));
+    }
+    if (input.checked) state.deptSel.add(id);
+    else state.deptSel.delete(id);
+    renderDeptValues();
+    renderDeptOptions();
+  }
+
+  function onDeptBulkClick(e) {
+    const btn = e.target.closest('[data-role="eo-dept-reset"]');
+    if (!btn) return;
+    e.stopPropagation();
+    state.deptSel = new Set();
+    document.getElementById('eop-dept-search').value = '';
+    renderDeptValues();
+    renderDeptOptions();
+  }
+
   function basicProgramPayload() {
     return {
       name: document.getElementById('eop-name').value.trim(),
       description: document.getElementById('eop-desc').value.trim() || null,
       purpose: 'employee_onboarding',
+      // «همه واحدها» (خالی یا کامل) → [] تا با افزودن واحد جدید هم «همه» بماند
+      target_dept_ids: eoDeptIsAll() ? [] : Array.from(state.deptSel),
       deadline_days: document.getElementById('eop-deadline').value ? parseInt(document.getElementById('eop-deadline').value, 10) : null,
       points_override: document.getElementById('eop-points').value !== '' ? parseInt(document.getElementById('eop-points').value, 10) : null,
       is_active: true,
@@ -216,11 +355,13 @@ const EmployeeOnboardingPage = (() => {
     document.getElementById('eop-deadline').value = '';
     document.getElementById('eop-points').value = '';
     document.getElementById('eop-is-active-wrap').classList.add('hidden');
+    document.getElementById('eop-dept-values').innerHTML = '<span class="ms-placeholder">در حال بارگذاری واحدها…</span>';
     state.activeSteps = [];
     renderSteps();
     setProgTabsUnlocked('basic');
     switchProgramTab('basic');
     openModal('modal-eo-program');
+    loadDeptsForEO(state.orgId);
   }
 
   async function openEditProgram(id) {
@@ -237,6 +378,7 @@ const EmployeeOnboardingPage = (() => {
     document.getElementById('eop-is-active').checked = !!detail.is_active;
     document.getElementById('eop-is-active-wrap').classList.remove('hidden');
 
+    await loadDeptsForEO(state.orgId, detail.target_dept_ids || []);
     await loadContentsAndQuizzesForSelect(state.orgId);
     setProgTabsUnlocked('steps');
     renderSteps();
@@ -678,6 +820,22 @@ const EmployeeOnboardingPage = (() => {
     if (btn) viewDetail(btn.dataset.id);
   });
 
+  // ─── Multi-select واحدهای هدف: تغییر گزینه‌ها، حذف تگ، بستن با کلیک بیرون ──
+  document.getElementById('eop-dept-options')?.addEventListener('change', onDeptOptionChange);
+  document.getElementById('eop-dept-options')?.addEventListener('click', onDeptBulkClick);
+  document.getElementById('eop-dept-values')?.addEventListener('click', (e) => {
+    const x = e.target.closest('[data-role="eo-dept-untag"]');
+    if (!x) return;
+    e.stopPropagation();               // تریگر را toggle نکن
+    state.deptSel.delete(x.dataset.id);
+    renderDeptValues();
+    renderDeptOptions();
+  });
+  document.addEventListener('click', (e) => {
+    const ms = document.getElementById('eop-dept-ms');
+    if (ms && ms.classList.contains('open') && !ms.contains(e.target)) closeDeptDropdown();
+  });
+
   return {
     init, onOrgChange, showTab,
     searchProgramsDebounced, openCreateProgram, openEditProgram, switchProgramTab, nextProgramTab,
@@ -685,5 +843,6 @@ const EmployeeOnboardingPage = (() => {
     openCreateStep, openEditStep, saveStep, removeStep, refreshStepConditionalFields,
     openCreateDocType, openEditDocType, onDocTypeInputTypeChange, onTemplateFileSelected, saveDocType, removeDocType,
     searchDebounced, loadMonitoring, viewDetail, previewDocFile, downloadDocFile,
+    toggleDeptDropdown, filterDeptOptions,
   };
 })();

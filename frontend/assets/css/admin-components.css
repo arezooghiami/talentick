@@ -200,6 +200,33 @@ textarea.form-control { resize: vertical; line-height: 1.7; }
 .chip-remove { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,.08); cursor: pointer; font-size: 11px; line-height: 1; transition: background .12s; }
 .chip-remove:hover { background: rgba(0,0,0,.16); }
 
+/* ─── Multi-select (dropdown انتخاب چندتایی — مثلاً واحدهای هدف آنبوردینگ) ─── */
+.ms { position: relative; }
+.ms-trigger { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 6px 12px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-md); background: var(--card-bg); font-family: 'Vazirmatn', sans-serif; font-size: 13px; color: var(--gray-800); cursor: pointer; text-align: start; transition: border-color .15s, box-shadow .15s; }
+.ms-trigger:hover { border-color: var(--gray-300); }
+.ms.open .ms-trigger { border-color: var(--primary); box-shadow: 0 0 0 3.5px var(--primary-light); }
+.ms-values { flex: 1; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-width: 0; }
+.ms-placeholder { color: var(--gray-400); }
+.ms-summary { font-weight: 600; color: var(--gray-700); }
+.ms-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 5px 3px 9px; background: var(--primary-light); color: var(--primary-darker); border-radius: 14px; font-size: 11.5px; font-weight: 600; max-width: 100%; }
+.ms-tag > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-tag-x { display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; background: rgba(0,0,0,.08); font-size: 10px; line-height: 1; transition: background .12s; }
+.ms-tag-x:hover { background: rgba(0,0,0,.18); }
+.ms-caret { width: 16px; height: 16px; flex-shrink: 0; color: var(--gray-400); transition: transform .15s; }
+.ms.open .ms-caret { transform: rotate(180deg); }
+.ms-panel { margin-top: 6px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-md); background: var(--card-bg); overflow: hidden; box-shadow: var(--shadow-sm); }
+.ms-search { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--gray-400); }
+.ms-search input { flex: 1; border: none; outline: none; background: transparent; font-family: 'Vazirmatn', sans-serif; font-size: 12.5px; color: var(--gray-800); }
+.ms-options { max-height: 216px; overflow-y: auto; padding: 4px; }
+.ms-option { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; color: var(--gray-700); transition: background .12s; }
+.ms-option:hover { background: var(--gray-50); }
+.ms-option input[type=checkbox] { width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
+.ms-option-meta { font-size: 11px; color: var(--gray-400); margin-inline-start: auto; }
+.ms-option.is-all { font-weight: 600; color: var(--gray-800); border-radius: 0; margin: 0 -4px 4px; padding-inline: 14px; border-bottom: 1px solid var(--border); cursor: default; }
+.ms-reset { margin-inline-start: auto; border: none; background: transparent; color: var(--primary); font-family: 'Vazirmatn', sans-serif; font-size: 11.5px; font-weight: 600; cursor: pointer; padding: 2px 4px; }
+.ms-reset:hover { text-decoration: underline; }
+.ms-empty { padding: 16px; text-align: center; font-size: 12px; color: var(--gray-400); }
+
 /* ─── Content items manager (داخل مودال آیتم‌ها) ───────────────────── */
 .content-items-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .item-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--gray-50); border: 1px solid var(--border); border-radius: var(--radius-md); transition: border-color .15s; }

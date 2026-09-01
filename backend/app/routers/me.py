@@ -395,14 +395,35 @@ async def get_my_gallery(
 
 @router.get(
     "/onboarding", response_model=list[MyEnrollmentResponse],
-    summary="برنامه‌های آشنایی که در آن‌ها ثبت‌نام شده‌ام",
-    description="برنامه‌های در حال انجام قبل از تکمیل‌شده‌ها، و هرکدام بر اساس جدیدترین تاریخ ثبت‌نام مرتب می‌شوند.",
+    summary="برنامه‌های آنبوردینگ من (ثبت‌نام‌شده + قابل‌مشاهده طبق واحد)",
+    description=(
+        "شامل برنامه‌هایی که در آن‌ها ثبت‌نام شده‌ام و همچنین مسیرهای «آنبوردینگ "
+        "کارمند» فعالی که طبق واحد سازمانی برایم قابل‌مشاهده‌اند ولی هنوز ثبت‌نام "
+        "نکرده‌ام (enrollment_id=null / is_enrolled=false). ترتیب: در حال انجام → "
+        "ثبت‌نام‌نشده → تکمیل‌شده."
+    ),
 )
 async def list_my_onboarding(
     current_user: Employee,
     db: AsyncSession = Depends(get_db),
 ):
     return await onboarding_service.get_my_enrollments(db, current_user)
+
+
+@router.get(
+    "/onboarding/programs/{program_id}", response_model=MyEnrollmentDetailResponse,
+    summary="پیش‌مشاهده‌ی یک مسیر آنبوردینگ که هنوز در آن ثبت‌نام نکرده‌ام",
+    description="فقط مسیرهای «آنبوردینگ کارمند» فعال و قابل‌مشاهده طبق واحد — همه‌ی مراحل با وضعیت not_started.",
+)
+async def preview_my_onboarding_program(
+    program_id: str,
+    current_user: Employee,
+    db: AsyncSession = Depends(get_db),
+):
+    detail = await onboarding_service.get_program_preview_for_user(db, current_user, program_id)
+    if not detail:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "برنامه یافت نشد")
+    return detail
 
 
 @router.get(
@@ -430,7 +451,7 @@ async def complete_onboarding_step(
     current_user: Employee,
     db: AsyncSession = Depends(get_db),
 ):
-    step_progress = await onboarding_service.get_step_progress_for_user(db, current_user, step_id)
+    step_progress = await onboarding_service.ensure_step_progress_for_user(db, current_user, step_id)
     if not step_progress:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "مرحله یافت نشد")
     await onboarding_service.set_step_status(db, step_progress, "completed", body.notes)
@@ -448,7 +469,7 @@ async def skip_onboarding_step(
     current_user: Employee,
     db: AsyncSession = Depends(get_db),
 ):
-    step_progress = await onboarding_service.get_step_progress_for_user(db, current_user, step_id)
+    step_progress = await onboarding_service.ensure_step_progress_for_user(db, current_user, step_id)
     if not step_progress:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "مرحله یافت نشد")
     await onboarding_service.set_step_status(db, step_progress, "skipped")

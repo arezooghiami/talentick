@@ -259,7 +259,12 @@ async def enroll_users(
         # برنامه‌ی Public (org_id=None) برای همه‌ی کاربران (هر سازمانی + General) باز است
         if program.org_id is not None and str(user.org_id) != str(program.org_id):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"کاربر یافت نشد یا متعلق به این سازمان نیست: {raw_id}")
-        await onboarding_service.enroll_user(db, program, user, enrolled_by=current_user.id)
+        # ثبت‌نام دستی ادمین در یک مسیر «آنبوردینگ کارمند» = اجباری (Gate فعال می‌شود)؛
+        # در «مسیر یادگیری» غیراجباری می‌ماند.
+        await onboarding_service.enroll_user(
+            db, program, user, enrolled_by=current_user.id,
+            is_mandatory=(program.purpose == "employee_onboarding"),
+        )
 
     items, total = await onboarding_service.list_enrollments(db, program, page=1, page_size=100)
     return EnrollmentListResponse(items=items, total=total, page=1, page_size=100, total_pages=1)

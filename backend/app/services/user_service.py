@@ -310,7 +310,9 @@ async def create_user(db: AsyncSession, data: UserCreateRequest, actor: User) ->
     # انجام شده؛ اینجا فقط idempotent enroll_user است که به‌ندرت خطا می‌دهد).
     if employee_onboarding_program is not None:
         try:
-            await onboarding_service.enroll_user(db, employee_onboarding_program, user, enrolled_by=actor.id)
+            await onboarding_service.enroll_user(
+                db, employee_onboarding_program, user, enrolled_by=actor.id, is_mandatory=True
+            )
         except Exception:
             logging.getLogger(__name__).exception(
                 "ثبت‌نام کاربر %s در مسیر Employee Onboarding ناموفق بود", user.id
@@ -402,7 +404,9 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
     if onboarding_program_id_provided:
         try:
             if employee_onboarding_program is not None:
-                await onboarding_service.enroll_user(db, employee_onboarding_program, user, enrolled_by=actor.id)
+                await onboarding_service.enroll_user(
+                    db, employee_onboarding_program, user, enrolled_by=actor.id, is_mandatory=True
+                )
             else:
                 await onboarding_service.unenroll_user_from_employee_onboarding(db, user)
         except Exception:

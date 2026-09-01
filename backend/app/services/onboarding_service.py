@@ -82,17 +82,23 @@ async def _validate_step_payload(
 
 
 async def _validate_program_payload(
-    db: AsyncSession, org_id: uuid.UUID | None, target_roles: list[str] | None, target_dept_id: str | None
+    db: AsyncSession,
+    org_id: uuid.UUID | None,
+    target_roles: list[str] | None,
+    target_dept_id: str | None,
+    target_dept_ids: list[str] | None = None,
 ) -> None:
     if target_roles:
         invalid = [r for r in target_roles if r not in VALID_ROLES]
         if invalid:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"نقش نامعتبر: {', '.join(invalid)}")
-    if org_id is None and target_dept_id:
+
+    all_dept_ids = [d for d in ([target_dept_id] if target_dept_id else []) + list(target_dept_ids or [])]
+    if org_id is None and all_dept_ids:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "برنامه‌ی Public نمی‌تواند واحد سازمانی هدف داشته باشد")
-    if target_dept_id:
+    for raw_id in all_dept_ids:
         try:
-            dept = await db.get(Department, uuid.UUID(target_dept_id))
+            dept = await db.get(Department, uuid.UUID(raw_id))
         except ValueError:
             dept = None
         if not dept or str(dept.org_id) != str(org_id):
@@ -132,6 +138,15 @@ async def program_to_response(db: AsyncSession, program: OnboardingProgram) -> O
     if program.target_dept_id:
         dept = await db.get(Department, program.target_dept_id)
         dept_name = dept.name if dept else None
+
+    dept_names: list[str] = []
+    if program.target_dept_ids:
+        dept_rows = (await db.execute(
+            select(Department).where(Department.id.in_(program.target_dept_ids))
+        )).scalars().all()
+        by_id = {str(d.id): d.name for d in dept_rows}
+        dept_names = [by_id[str(did)] for did in program.target_dept_ids if str(did) in by_id]
+
     creator_name = None
     if program.created_by:
         creator = await db.get(User, program.created_by)
@@ -156,6 +171,8 @@ async def program_to_response(db: AsyncSession, program: OnboardingProgram) -> O
         target_roles=program.target_roles or [],
         target_dept_id=str(program.target_dept_id) if program.target_dept_id else None,
         target_dept_name=dept_name,
+        target_dept_ids=[str(did) for did in (program.target_dept_ids or [])],
+        target_dept_names=dept_names,
         is_default=program.is_default,
         deadline_days=program.deadline_days,
         is_active=program.is_active,
@@ -216,7 +233,7 @@ async def get_program(db: AsyncSession, program_id: str) -> OnboardingProgram | 
 async def create_program(
     db: AsyncSession, org_id: uuid.UUID | None, created_by: uuid.UUID, data: OnboardingProgramCreate
 ) -> OnboardingProgram:
-    await _validate_program_payload(db, org_id, data.target_roles, data.target_dept_id)
+    await _validate_program_payload(db, org_id, data.target_roles, data.target_dept_id, data.target_dept_ids)
     program = OnboardingProgram(
         id=uuid.uuid4(),
         org_id=org_id,
@@ -225,6 +242,7 @@ async def create_program(
         description=data.description,
         target_roles=data.target_roles or [],
         target_dept_id=uuid.UUID(data.target_dept_id) if data.target_dept_id else None,
+        target_dept_ids=[uuid.UUID(x) for x in (data.target_dept_ids or [])],
         is_default=data.is_default,
         deadline_days=data.deadline_days,
         is_active=data.is_active,
@@ -247,8 +265,17 @@ async def update_program(
     resolved_dept_id = program.target_dept_id
     if target_dept_id != "__unset__":
         resolved_dept_id = uuid.UUID(target_dept_id) if target_dept_id else None
+
+    dept_ids_provided = "target_dept_ids" in payload
+    resolved_dept_ids = (
+        [uuid.UUID(x) for x in (payload["target_dept_ids"] or [])]
+        if dept_ids_provided
+        else list(program.target_dept_ids or [])
+    )
     await _validate_program_payload(
-        db, program.org_id, target_roles, str(resolved_dept_id) if resolved_dept_id else None
+        db, program.org_id, target_roles,
+        str(resolved_dept_id) if resolved_dept_id else None,
+        [str(d) for d in resolved_dept_ids],
     )
 
     for field in ("name", "description", "is_default", "deadline_days", "is_active", "points_override"):
@@ -258,6 +285,8 @@ async def update_program(
         program.target_roles = payload["target_roles"] or []
     if "target_dept_id" in payload:
         program.target_dept_id = resolved_dept_id
+    if dept_ids_provided:
+        program.target_dept_ids = resolved_dept_ids
 
     await db.commit()
     await db.refresh(program)
@@ -345,6 +374,21 @@ def is_program_visible_to_user(program: OnboardingProgram, user: User) -> bool:
     return True
 
 
+def employee_onboarding_visible_to_user(program: OnboardingProgram, user: User) -> bool:
+    """
+    آیا این مسیرِ آنبوردینگ کارمند (purpose=employee_onboarding) طبق واحد برای
+    این کاربر قابل‌مشاهده است — یعنی می‌تواند آن را در GET /api/me/onboarding
+    ببیند و داوطلبانه بگذراند (مستقل از انتساب اجباری «کارمند جدید»).
+
+    target_dept_ids خالی = همه‌ی اعضای سازمان. در غیر این صورت واحد کاربر باید
+    در لیست باشد. کاربر بدون واحد (dept_id=None) فقط مسیرهای بدون هدف‌گذاری
+    واحد را می‌بیند.
+    """
+    if not program.target_dept_ids:
+        return True
+    return str(user.dept_id) in {str(d) for d in program.target_dept_ids}
+
+
 async def auto_enroll_new_user(db: AsyncSession, user: User) -> None:
     """
     وقتی کاربر جدید ساخته می‌شود، در تمام مسیرهای یادگیری (purpose=learning)
@@ -417,6 +461,7 @@ async def get_employee_onboarding_gate_status(db: AsyncSession, user_id: uuid.UU
         .where(
             UserProgramEnrollment.user_id == user_id,
             OnboardingProgram.purpose == "employee_onboarding",
+            UserProgramEnrollment.is_mandatory.is_(True),
             UserProgramEnrollment.completed_at.is_(None),
             UserProgramEnrollment.cancelled_at.is_(None),
         )
@@ -448,9 +493,21 @@ async def unenroll_user_from_employee_onboarding(db: AsyncSession, user: User) -
 
 
 async def enroll_user(
-    db: AsyncSession, program: OnboardingProgram, user: User, enrolled_by: uuid.UUID | None
+    db: AsyncSession,
+    program: OnboardingProgram,
+    user: User,
+    enrolled_by: uuid.UUID | None,
+    *,
+    is_mandatory: bool = False,
 ) -> UserProgramEnrollment:
-    """ثبت‌نام یک کاربر در یک برنامه — idempotent (اگر از قبل ثبت‌نام باشد، همان را برمی‌گرداند)."""
+    """
+    ثبت‌نام یک کاربر در یک برنامه — idempotent (اگر از قبل ثبت‌نام باشد، همان را برمی‌گرداند).
+
+    is_mandatory=True یعنی ثبت‌نام از مسیر «کارمند جدید» فرم کاربر است و Gate
+    داشبورد را فعال می‌کند. اگر ثبت‌نام موجودی که داوطلبانه بوده حالا با
+    is_mandatory=True دوباره enroll شود، پرچمش ارتقا می‌یابد (ولی هرگز پایین
+    نمی‌آید — یک ثبت‌نام اجباری با enroll داوطلبانه‌ی بعدی اجباری می‌ماند).
+    """
     existing = (await db.execute(
         select(UserProgramEnrollment).where(
             UserProgramEnrollment.program_id == program.id,
@@ -458,11 +515,19 @@ async def enroll_user(
         )
     )).scalar_one_or_none()
     if existing:
+        dirty = False
         if existing.cancelled_at is not None:
             # قبلاً لغو نرم شده بود — با انتخاب دوباره‌ی همین مسیر توسط ادمین
             # فعال می‌شود (تاریخچه‌ی UserStepProgress دست‌نخورده می‌ماند).
             existing.cancelled_at = None
             existing.enrolled_by = enrolled_by
+            dirty = True
+        if is_mandatory and not existing.is_mandatory:
+            existing.is_mandatory = True
+            if existing.enrolled_by is None:
+                existing.enrolled_by = enrolled_by
+            dirty = True
+        if dirty:
             await db.commit()
             await db.refresh(existing)
         return existing
@@ -476,6 +541,7 @@ async def enroll_user(
         enrolled_by=enrolled_by,
         enrolled_at=now,
         deadline_at=now + timedelta(days=program.deadline_days) if program.deadline_days else None,
+        is_mandatory=is_mandatory,
         progress_pct=0,
     )
     db.add(enrollment)
@@ -559,40 +625,55 @@ async def list_enrollments(
 # ─── Enrollment — نمای شخصی کارمند («مسیر آنبوردینگ من») ──────────────────
 
 async def get_my_enrollments(db: AsyncSession, user: User) -> list[MyEnrollmentResponse]:
+    """
+    برنامه‌های آنبوردینگ «من» — ترکیبی از:
+
+    ۱. برنامه‌هایی که واقعاً در آن‌ها ثبت‌نام شده‌ام (هر purpose).
+    ۲. مسیرهای «آنبوردینگ کارمند» (purpose=employee_onboarding) فعالی که طبق
+       واحد برایم قابل‌مشاهده‌اند ولی هنوز ثبت‌نام نکرده‌ام — به‌صورت ورودی
+       «ثبت‌نام‌نشده» (enrollment_id=None). با اولین اقدام روی یک مرحله به‌صورت
+       داوطلبانه ثبت‌نام می‌شوم (is_mandatory=false — هرگز Gate نمی‌کند).
+
+    ترتیب: در حال انجام → ثبت‌نام‌نشده → تکمیل‌شده.
+    """
     rows = (await db.execute(
         select(UserProgramEnrollment, OnboardingProgram)
         .join(OnboardingProgram, OnboardingProgram.id == UserProgramEnrollment.program_id)
         .where(UserProgramEnrollment.user_id == user.id)
         .order_by(UserProgramEnrollment.completed_at.is_not(None), UserProgramEnrollment.enrolled_at.desc())
     )).all()
-    if not rows:
-        return []
+    enrolled_program_ids = {p.id for _, p in rows}
 
-    enrollment_ids = [e.id for e, _ in rows]
-    steps_total_result = await db.execute(
-        select(ProgramStep.program_id, func.count())
-        .where(ProgramStep.program_id.in_([p.id for _, p in rows]))
-        .group_by(ProgramStep.program_id)
-    )
-    steps_total_map = {pid: cnt for pid, cnt in steps_total_result.all()}
-
-    completed_result = await db.execute(
-        select(
-            UserStepProgress.enrollment_id,
-            func.count().filter(UserStepProgress.status.in_(("completed", "skipped"))),
+    steps_total_map: dict = {}
+    completed_map: dict = {}
+    if rows:
+        enrollment_ids = [e.id for e, _ in rows]
+        steps_total_result = await db.execute(
+            select(ProgramStep.program_id, func.count())
+            .where(ProgramStep.program_id.in_([p.id for _, p in rows]))
+            .group_by(ProgramStep.program_id)
         )
-        .where(UserStepProgress.enrollment_id.in_(enrollment_ids))
-        .group_by(UserStepProgress.enrollment_id)
-    )
-    completed_map = {eid: cnt for eid, cnt in completed_result.all()}
+        steps_total_map = {pid: cnt for pid, cnt in steps_total_result.all()}
 
-    return [
+        completed_result = await db.execute(
+            select(
+                UserStepProgress.enrollment_id,
+                func.count().filter(UserStepProgress.status.in_(("completed", "skipped"))),
+            )
+            .where(UserStepProgress.enrollment_id.in_(enrollment_ids))
+            .group_by(UserStepProgress.enrollment_id)
+        )
+        completed_map = {eid: cnt for eid, cnt in completed_result.all()}
+
+    enrolled_items = [
         MyEnrollmentResponse(
             enrollment_id=str(e.id),
             program_id=str(p.id),
             program_purpose=p.purpose,
             program_name=p.name,
             program_description=p.description,
+            is_enrolled=True,
+            is_mandatory=e.is_mandatory,
             enrolled_at=e.enrolled_at,
             deadline_at=e.deadline_at,
             completed_at=e.completed_at,
@@ -602,6 +683,48 @@ async def get_my_enrollments(db: AsyncSession, user: User) -> list[MyEnrollmentR
         )
         for e, p in rows
     ]
+
+    # ─── مسیرهای employee_onboarding قابل‌مشاهده که هنوز ثبت‌نام نشده‌ام ───
+    virtual_items: list[MyEnrollmentResponse] = []
+    if user.org_id is not None:
+        candidate_result = await db.execute(
+            select(OnboardingProgram).where(
+                OnboardingProgram.org_id == user.org_id,
+                OnboardingProgram.purpose == "employee_onboarding",
+                OnboardingProgram.is_active.is_(True),
+            )
+        )
+        candidates = [
+            p for p in candidate_result.scalars().all()
+            if p.id not in enrolled_program_ids and employee_onboarding_visible_to_user(p, user)
+        ]
+        if candidates:
+            vsteps_result = await db.execute(
+                select(ProgramStep.program_id, func.count())
+                .where(ProgramStep.program_id.in_([p.id for p in candidates]))
+                .group_by(ProgramStep.program_id)
+            )
+            vsteps_map = {pid: cnt for pid, cnt in vsteps_result.all()}
+            candidates.sort(key=lambda p: p.created_at, reverse=True)
+            virtual_items = [
+                MyEnrollmentResponse(
+                    enrollment_id=None,
+                    program_id=str(p.id),
+                    program_purpose=p.purpose,
+                    program_name=p.name,
+                    program_description=p.description,
+                    is_enrolled=False,
+                    is_mandatory=False,
+                    progress_pct=0,
+                    steps_total=vsteps_map.get(p.id, 0),
+                    steps_completed=0,
+                )
+                for p in candidates
+            ]
+
+    active = [i for i in enrolled_items if i.completed_at is None]
+    completed = [i for i in enrolled_items if i.completed_at is not None]
+    return active + virtual_items + completed
 
 
 async def get_enrollment_for_user(db: AsyncSession, user: User, enrollment_id: str) -> UserProgramEnrollment | None:
@@ -615,19 +738,10 @@ async def get_enrollment_for_user(db: AsyncSession, user: User, enrollment_id: s
     return enrollment
 
 
-async def get_my_enrollment_detail(db: AsyncSession, enrollment: UserProgramEnrollment) -> MyEnrollmentDetailResponse:
-    program = await db.get(OnboardingProgram, enrollment.program_id)
-    steps_result = await db.execute(
-        select(ProgramStep).where(ProgramStep.program_id == enrollment.program_id).order_by(ProgramStep.order_index)
-    )
-    steps = steps_result.scalars().all()
-
-    progress_result = await db.execute(
-        select(UserStepProgress).where(UserStepProgress.enrollment_id == enrollment.id)
-    )
-    progress_map = {p.step_id: p for p in progress_result.scalars().all()}
-
-    step_responses = []
+async def _build_step_progress_responses(
+    db: AsyncSession, steps, progress_map: dict
+) -> list[MyStepProgressResponse]:
+    out: list[MyStepProgressResponse] = []
     for step in steps:
         p = progress_map.get(step.id)
         content_title = None
@@ -638,7 +752,7 @@ async def get_my_enrollment_detail(db: AsyncSession, enrollment: UserProgramEnro
         if step.quiz_id:
             quiz = await db.get(Quiz, step.quiz_id)
             quiz_title = quiz.title if quiz else None
-        step_responses.append(MyStepProgressResponse(
+        out.append(MyStepProgressResponse(
             step_id=str(step.id),
             title=step.title,
             description=step.description,
@@ -653,6 +767,21 @@ async def get_my_enrollment_detail(db: AsyncSession, enrollment: UserProgramEnro
             notes=p.notes if p else None,
             completed_at=p.completed_at if p else None,
         ))
+    return out
+
+
+async def get_my_enrollment_detail(db: AsyncSession, enrollment: UserProgramEnrollment) -> MyEnrollmentDetailResponse:
+    program = await db.get(OnboardingProgram, enrollment.program_id)
+    steps_result = await db.execute(
+        select(ProgramStep).where(ProgramStep.program_id == enrollment.program_id).order_by(ProgramStep.order_index)
+    )
+    steps = steps_result.scalars().all()
+
+    progress_result = await db.execute(
+        select(UserStepProgress).where(UserStepProgress.enrollment_id == enrollment.id)
+    )
+    progress_map = {p.step_id: p for p in progress_result.scalars().all()}
+    step_responses = await _build_step_progress_responses(db, steps, progress_map)
 
     return MyEnrollmentDetailResponse(
         enrollment_id=str(enrollment.id),
@@ -660,12 +789,52 @@ async def get_my_enrollment_detail(db: AsyncSession, enrollment: UserProgramEnro
         program_purpose=program.purpose,
         program_name=program.name,
         program_description=program.description,
+        is_enrolled=True,
+        is_mandatory=enrollment.is_mandatory,
         enrolled_at=enrollment.enrolled_at,
         deadline_at=enrollment.deadline_at,
         completed_at=enrollment.completed_at,
         progress_pct=enrollment.progress_pct,
         steps_total=len(steps),
         steps_completed=sum(1 for s in step_responses if s.status in ("completed", "skipped")),
+        steps=step_responses,
+    )
+
+
+async def get_program_preview_for_user(
+    db: AsyncSession, user: User, program_id: str
+) -> MyEnrollmentDetailResponse | None:
+    """
+    نمای «پیش‌مشاهده»ی یک مسیر آنبوردینگ کارمند برای کاربری که هنوز ثبت‌نام
+    نکرده — همه‌ی مراحل با وضعیت not_started و enrollment_id=None. None اگر
+    برنامه وجود ندارد / employee_onboarding نیست / غیرفعال است / سازمانش
+    نمی‌خواند / طبق واحد قابل‌مشاهده نیست.
+    """
+    program = await get_program(db, program_id)
+    if not program or program.purpose != "employee_onboarding" or not program.is_active:
+        return None
+    if str(program.org_id) != str(user.org_id):
+        return None
+    if not employee_onboarding_visible_to_user(program, user):
+        return None
+
+    steps_result = await db.execute(
+        select(ProgramStep).where(ProgramStep.program_id == program.id).order_by(ProgramStep.order_index)
+    )
+    steps = steps_result.scalars().all()
+    step_responses = await _build_step_progress_responses(db, steps, {})
+
+    return MyEnrollmentDetailResponse(
+        enrollment_id=None,
+        program_id=str(program.id),
+        program_purpose=program.purpose,
+        program_name=program.name,
+        program_description=program.description,
+        is_enrolled=False,
+        is_mandatory=False,
+        progress_pct=0,
+        steps_total=len(steps),
+        steps_completed=0,
         steps=step_responses,
     )
 
@@ -680,6 +849,35 @@ async def get_step_progress_for_user(db: AsyncSession, user: User, step_id: str)
             UserStepProgress.step_id == sid, UserStepProgress.user_id == user.id
         )
     )).scalar_one_or_none()
+
+
+async def ensure_step_progress_for_user(
+    db: AsyncSession, user: User, step_id: str
+) -> UserStepProgress | None:
+    """
+    رکورد پیشرفت کاربر روی یک مرحله را برمی‌گرداند و اگر وجود نداشته باشد،
+    در صورتی که برنامه‌ی مرحله یک مسیر آنبوردینگ کارمندِ فعال و قابل‌مشاهده
+    طبق واحد باشد، کاربر را به‌صورت داوطلبانه (is_mandatory=False، هرگز Gate
+    نمی‌کند) ثبت‌نام می‌کند و رکورد تازه را برمی‌گرداند. None یعنی مرحله
+    وجود ندارد یا برنامه برای کاربر مجاز نیست.
+    """
+    existing = await get_step_progress_for_user(db, user, step_id)
+    if existing:
+        return existing
+
+    step = await get_step(db, step_id)
+    if not step:
+        return None
+    program = await db.get(OnboardingProgram, step.program_id)
+    if not program or program.purpose != "employee_onboarding" or not program.is_active:
+        return None
+    if str(program.org_id) != str(user.org_id):
+        return None
+    if not employee_onboarding_visible_to_user(program, user):
+        return None
+
+    await enroll_user(db, program, user, enrolled_by=None, is_mandatory=False)
+    return await get_step_progress_for_user(db, user, step_id)
 
 
 async def set_step_status(

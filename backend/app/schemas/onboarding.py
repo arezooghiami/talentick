@@ -71,7 +71,11 @@ class OnboardingProgramCreate(BaseModel):
     target_roles: list[str] = Field(
         default_factory=list, description="خالی یعنی همه‌ی نقش‌ها"
     )
-    target_dept_id: Optional[str] = Field(None, description="خالی یعنی همه‌ی واحدها")
+    target_dept_id: Optional[str] = Field(None, description="فقط مسیر یادگیری — خالی یعنی همه‌ی واحدها")
+    target_dept_ids: list[str] = Field(
+        default_factory=list,
+        description="فقط آنبوردینگ کارمند — واحدهای هدف؛ لیست خالی یعنی همه‌ی اعضای سازمان می‌بینند",
+    )
     is_default: bool = Field(
         False, description="ثبت‌نام خودکار برای هر کارمند جدیدی که با این نقش/واحد ساخته می‌شود"
     )
@@ -90,7 +94,10 @@ class OnboardingProgramUpdate(BaseModel):
     description: Optional[str] = None
     target_roles: Optional[list[str]] = None
     target_dept_id: Optional[str] = Field(
-        None, description='رشته خالی "" یعنی پاک‌کردن (همه واحدها) — ارسال‌نشدن یعنی بدون تغییر'
+        None, description='فقط مسیر یادگیری — رشته خالی "" یعنی پاک‌کردن (همه واحدها)، ارسال‌نشدن یعنی بدون تغییر'
+    )
+    target_dept_ids: Optional[list[str]] = Field(
+        None, description="فقط آنبوردینگ کارمند — لیست کامل واحدهای هدف؛ ارسال‌نشدن یعنی بدون تغییر"
     )
     is_default: Optional[bool] = None
     deadline_days: Optional[int] = Field(None, ge=1)
@@ -108,6 +115,8 @@ class OnboardingProgramResponse(BaseModel):
     target_roles: list[str] = Field(default_factory=list)
     target_dept_id: Optional[str] = None
     target_dept_name: Optional[str] = None
+    target_dept_ids: list[str] = Field(default_factory=list)
+    target_dept_names: list[str] = Field(default_factory=list)
     is_default: bool
     deadline_days: Optional[int] = None
     is_active: bool
@@ -183,12 +192,16 @@ class MyStepProgressResponse(BaseModel):
 
 
 class MyEnrollmentResponse(BaseModel):
-    enrollment_id: str
+    # enrollment_id=None یعنی کاربر هنوز ثبت‌نام نکرده و مسیر فقط طبق واحد
+    # برایش قابل‌مشاهده است — با اولین اقدام روی یک مرحله خودکار ثبت‌نام می‌شود.
+    enrollment_id: Optional[str] = None
     program_id: str
     program_purpose: str = "learning"
     program_name: str
     program_description: Optional[str] = None
-    enrolled_at: datetime
+    is_enrolled: bool = False
+    is_mandatory: bool = False
+    enrolled_at: Optional[datetime] = None
     deadline_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     progress_pct: int
