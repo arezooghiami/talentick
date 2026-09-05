@@ -31,6 +31,7 @@ const ContentPage = (() => {
     type: 'course', page: 1, search: '', status: '',
     items: [], total: 0, totalPages: 1,
     categories: [], modalCategories: [], categoryModalOrgId: null,
+    categoryOptions: [], selectedCategories: new Set(),
     // ویزارد محتوا
     mode: null, contentId: null, activeTab: 'basic', maxUnlockedTab: 'basic',
     activeItems: [], quizzesLoaded: false,
@@ -250,23 +251,88 @@ const ContentPage = (() => {
     });
   }
 
-  // انتخابگر دسته‌ی داخل ویزارد محتوا — مستقل از فیلتر بالای صفحه، چون
-  // سازمانِ محتوا (c-org-id) می‌تواند با سازمانِ انتخاب‌شده در فیلتر فرق کند.
-  async function populateContentCategorySelect(orgId, selectedId) {
-    const sel = document.getElementById('c-category');
-    if (!sel) return;
+  // دراپ‌داون چندانتخابی و قابل‌جستجوی دسته‌بندی داخل ویزارد محتوا — مستقل از
+  // فیلتر بالای صفحه، چون سازمانِ محتوا (c-org-id) می‌تواند با سازمانِ
+  // انتخاب‌شده در فیلتر فرق کند. یک محتوا می‌تواند صفر، یک یا چند دسته داشته
+  // باشد. با تعداد زیاد دسته، جستجو به‌جای اسکرول در چک‌باکس‌ها راحت‌تر است
+  // (همان کامپوننت .ms استفاده‌شده برای واحدهای هدف آنبوردینگ).
+  async function loadCategoryOptions(orgId) {
+    closeCategoryDropdown();
+    const searchEl = document.getElementById('c-category-search');
+    if (searchEl) searchEl.value = '';
     try {
       // محتوای سازمانی: دسته‌های همان سازمان + دسته‌های عمومی.
       // محتوای عمومی (بدون سازمان): فقط دسته‌های عمومی.
       const url = orgId ? `/contents/categories?org_id=${orgId}` : '/contents/categories?scope=public';
       const items = await api.get(url);
-      sel.innerHTML = '<option value="">— بدون دسته —</option>' +
-        (items || []).map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}${c.is_public ? ' (عمومی)' : ''}</option>`).join('');
-      sel.disabled = false;
+      state.categoryOptions = items || [];
     } catch {
-      sel.innerHTML = '<option value="">— بدون دسته —</option>';
-      sel.disabled = true;
+      state.categoryOptions = [];
     }
+    renderCategoryValues();
+    renderCategoryOptions();
+  }
+
+  function renderCategoryValues() {
+    const box = document.getElementById('c-category-values');
+    if (!box) return;
+    if (!state.categoryOptions.length) {
+      box.innerHTML = '<span class="ms-placeholder">دسته‌ای ثبت نشده</span>';
+      return;
+    }
+    if (!state.selectedCategories.size) {
+      box.innerHTML = '<span class="ms-placeholder">— بدون دسته —</span>';
+      return;
+    }
+    const byId = new Map(state.categoryOptions.map(c => [c.id, c.name]));
+    box.innerHTML = Array.from(state.selectedCategories).map(id => `
+      <span class="ms-tag" title="${esc(byId.get(id) || '')}">
+        <span>${esc(byId.get(id) || '—')}</span>
+        <span class="ms-tag-x" data-role="c-category-untag" data-id="${esc(id)}">✕</span>
+      </span>`).join('');
+  }
+
+  function renderCategoryOptions() {
+    const box = document.getElementById('c-category-options');
+    if (!box) return;
+    if (!state.categoryOptions.length) {
+      box.innerHTML = '<div class="ms-empty">دسته‌ای ثبت نشده</div>';
+      return;
+    }
+    const q = (document.getElementById('c-category-search')?.value || '').trim();
+    const list = q ? state.categoryOptions.filter(c => (c.name || '').includes(q)) : state.categoryOptions;
+    box.innerHTML = list.length
+      ? list.map(c => `
+        <label class="ms-option">
+          <input type="checkbox" data-role="c-category-opt" value="${esc(c.id)}" ${state.selectedCategories.has(c.id) ? 'checked' : ''}>
+          ${esc(c.name)}
+          ${c.is_public ? '<span class="ms-option-meta">عمومی</span>' : ''}
+        </label>`).join('')
+      : '<div class="ms-empty">دسته‌ای با این نام پیدا نشد</div>';
+  }
+
+  function toggleCategoryDropdown() {
+    document.getElementById('c-category-ms').classList.contains('open') ? closeCategoryDropdown() : openCategoryDropdown();
+  }
+  function openCategoryDropdown() {
+    document.getElementById('c-category-ms').classList.add('open');
+    document.getElementById('c-category-panel').classList.remove('hidden');
+    renderCategoryOptions();
+    const s = document.getElementById('c-category-search');
+    setTimeout(() => s && s.focus(), 0);
+  }
+  function closeCategoryDropdown() {
+    document.getElementById('c-category-ms')?.classList.remove('open');
+    document.getElementById('c-category-panel')?.classList.add('hidden');
+  }
+  function filterCategoryOptions() { renderCategoryOptions(); }
+
+  function onCategoryOptionChange(e) {
+    const input = e.target.closest('input[data-role="c-category-opt"]');
+    if (!input) return;
+    if (input.checked) state.selectedCategories.add(input.value);
+    else state.selectedCategories.delete(input.value);
+    renderCategoryValues();
   }
 
   // ─── Tabs / Load (لیست محتوا) ───────────────────────────────────
@@ -332,7 +398,7 @@ const ContentPage = (() => {
         <td style="font-weight:600;">${esc(c.title)}</td>
         ${App.isSuperAdmin ? `<td class="th-org">${c.org_name ? esc(c.org_name) : '<span style="color:var(--gray-400);">عمومی</span>'}</td>` : ''}
         <td>${typeBadge(c.type)}</td>
-        <td style="color:var(--gray-500);">${c.category_name ? esc(c.category_name) : '—'}</td>
+        <td style="color:var(--gray-500);">${(c.categories && c.categories.length) ? esc(c.categories.map(x => x.name).join('، ')) : '—'}</td>
         <td>${statusBadge(c.status)}</td>
         <td>${accessBadges(c)}</td>
         <td>${numFa(c.total_items_count)} آیتم</td>
@@ -459,6 +525,7 @@ const ContentPage = (() => {
     state.selectedPositions = new Set();
     state.selectedUsers = new Map();
     state.userSearchResults = [];
+    state.selectedCategories = new Set();
     document.getElementById('c-target-user-search').value = '';
     renderUserChips();
     document.getElementById('c-target-users').innerHTML = '<div class="checkbox-scroll-box-empty">برای جستجو تایپ کنید</div>';
@@ -474,7 +541,7 @@ const ContentPage = (() => {
       title: document.getElementById('c-title').value.trim(),
       type: document.getElementById('c-type').value,
       description: document.getElementById('c-desc').value.trim() || null,
-      category_id: document.getElementById('c-category').value || null,
+      category_ids: Array.from(state.selectedCategories),
       level: document.getElementById('c-level').value || null,
       author: document.getElementById('c-author').value.trim() || null,
       tags: parseTagsInput(),
@@ -485,7 +552,7 @@ const ContentPage = (() => {
     return {
       title: document.getElementById('c-title').value.trim(),
       description: document.getElementById('c-desc').value.trim() || null,
-      category_id: document.getElementById('c-category').value || null,
+      category_ids: Array.from(state.selectedCategories),
       level: document.getElementById('c-level').value || null,
       author: document.getElementById('c-author').value.trim() || null,
       tags: parseTagsInput(),
@@ -536,11 +603,11 @@ const ContentPage = (() => {
       state.targetOrgId = null;
       renderDeptCheckboxes(true);
       renderPositionCheckboxes(true);
-      await populateContentCategorySelect(null, '');
+      await loadCategoryOptions(null);
     } else {
       state.targetOrgId = App.homeOrgId;
       await loadTargetingLists(state.targetOrgId);
-      await populateContentCategorySelect(state.targetOrgId, '');
+      await loadCategoryOptions(state.targetOrgId);
     }
 
     setTabsUnlocked('basic');
@@ -598,7 +665,8 @@ const ContentPage = (() => {
     }
     renderUserChips();
     await loadTargetingLists(c.org_id);
-    await populateContentCategorySelect(c.org_id, c.category_id || '');
+    state.selectedCategories = new Set((c.categories || []).map(x => x.id));
+    await loadCategoryOptions(c.org_id);
 
     state.activeItems = c.items || [];
     renderItems();
@@ -685,11 +753,11 @@ const ContentPage = (() => {
     if (!orgId) {
       renderDeptCheckboxes(true);
       renderPositionCheckboxes(true);
-      await populateContentCategorySelect(null, '');
+      await loadCategoryOptions(null);
       return;
     }
     await loadTargetingLists(orgId);
-    await populateContentCategorySelect(orgId, '');
+    await loadCategoryOptions(orgId);
   }
 
   // ─── محتوای Public (بدون سازمان) — فقط super_admin، فقط در حالت ساخت ──
@@ -699,11 +767,11 @@ const ContentPage = (() => {
     if (checked) {
       resetTargetSelections();
       state.targetOrgId = null;
-      populateContentCategorySelect(null, '');
+      loadCategoryOptions(null);
     } else {
       const orgId = document.getElementById('c-org-id').value;
-      if (orgId) { loadTargetingLists(orgId); populateContentCategorySelect(orgId, ''); }
-      else { renderDeptCheckboxes(true); renderPositionCheckboxes(true); populateContentCategorySelect(null, ''); }
+      if (orgId) { loadTargetingLists(orgId); loadCategoryOptions(orgId); }
+      else { renderDeptCheckboxes(true); renderPositionCheckboxes(true); loadCategoryOptions(null); }
     }
   }
 
@@ -1126,6 +1194,21 @@ const ContentPage = (() => {
     if (dlBtn) downloadItem(dlBtn.dataset.id);
   });
 
+  // ─── دراپ‌داون چندانتخابی دسته‌بندی: تغییر گزینه‌ها، حذف تگ، بستن با کلیک بیرون ──
+  document.getElementById('c-category-options')?.addEventListener('change', onCategoryOptionChange);
+  document.getElementById('c-category-values')?.addEventListener('click', (e) => {
+    const x = e.target.closest('[data-role="c-category-untag"]');
+    if (!x) return;
+    e.stopPropagation(); // تریگر را toggle نکن
+    state.selectedCategories.delete(x.dataset.id);
+    renderCategoryValues();
+    renderCategoryOptions();
+  });
+  document.addEventListener('click', (e) => {
+    const ms = document.getElementById('c-category-ms');
+    if (ms && ms.classList.contains('open') && !ms.contains(e.target)) closeCategoryDropdown();
+  });
+
   return {
     goto, setType, load, searchDebounced, onOrgFilterChange,
     openCategoriesModal, onCategoryManageOrgChange,
@@ -1135,6 +1218,7 @@ const ContentPage = (() => {
     loadItems, toggleItemFields, openCreateItem, openEditItem, uploadItemMedia, saveItem, removeItem,
     moveItemUp, moveItemDown, pickBulkFiles, uploadBulkFiles, downloadItem, downloadCurrentItemMedia,
     onOrgChange, onPublicToggle, toggleDeptTarget, togglePositionTarget,
+    toggleCategoryDropdown, filterCategoryOptions,
     searchTargetUsers, toggleUserTarget, removeUserChip,
   };
 })();

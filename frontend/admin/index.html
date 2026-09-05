@@ -1566,11 +1566,21 @@
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">دسته‌بندی</label>
-          <select id="c-category" class="form-control" disabled>
-            <option value="">— بدون دسته —</option>
-          </select>
-          <span class="form-hint" id="c-category-hint">اختیاری — می‌تواند خالی بماند. برای مدیریت لیست دسته‌ها از جدول «دسته‌بندی‌های محتوا» در صفحه‌ی اصلی استفاده کنید.</span>
+          <label class="form-label">دسته‌بندی‌ها</label>
+          <div class="ms" id="c-category-ms">
+            <button type="button" class="ms-trigger" id="c-category-trigger" onclick="ContentPage.toggleCategoryDropdown()">
+              <span class="ms-values" id="c-category-values"><span class="ms-placeholder">— بدون دسته —</span></span>
+              <svg class="ms-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="ms-panel hidden" id="c-category-panel">
+              <div class="ms-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                <input type="text" id="c-category-search" placeholder="جستجوی دسته…" oninput="ContentPage.filterCategoryOptions()" autocomplete="off">
+              </div>
+              <div class="ms-options" id="c-category-options"></div>
+            </div>
+          </div>
+          <span class="form-hint">اختیاری — می‌توانید صفر، یک یا چند دسته انتخاب کنید. برای مدیریت لیست دسته‌ها از جدول «دسته‌بندی‌های محتوا» در صفحه‌ی اصلی استفاده کنید.</span>
         </div>
         <div class="form-group"><label class="form-label">توضیحات</label><textarea id="c-desc" class="form-control" rows="3"></textarea></div>
         <div class="form-group"><label class="form-label">تگ‌ها</label><input id="c-tags" class="form-control" placeholder="مثال: مدیریت، رهبری، نرم‌افزار (با کاما جدا کنید)"></div>

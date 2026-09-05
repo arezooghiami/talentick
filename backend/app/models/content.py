@@ -18,9 +18,11 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
+    Column,
     ForeignKey,
     Integer,
     String,
+    Table,
     Text,
     UniqueConstraint,
 )
@@ -50,6 +52,23 @@ CONTENT_LEVELS = ("beginner", "intermediate", "advanced")
 TARGET_TYPES = ("department", "position", "user")
 
 
+# جدول واسط many-to-many — یک محتوا می‌تواند عضو چند دسته باشد و برعکس.
+content_category_links = Table(
+    "content_category_links",
+    Base.metadata,
+    Column(
+        "content_id", UUID(as_uuid=True),
+        ForeignKey("contents.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "category_id", UUID(as_uuid=True),
+        ForeignKey("content_categories.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
 class ContentCategory(UUIDMixin, TimestampMixin, Base):
     """دسته‌بندی محتوا — مثال: مدیریت، فروش، فنی. برای نمایش/فیلتر ساده‌تر در فرانت."""
 
@@ -65,7 +84,9 @@ class ContentCategory(UUIDMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    contents: Mapped[list["Content"]] = relationship(back_populates="category")
+    contents: Mapped[list["Content"]] = relationship(
+        secondary=content_category_links, back_populates="categories"
+    )
 
     def __repr__(self) -> str:
         return f"<ContentCategory name={self.name!r}>"
@@ -90,14 +111,6 @@ class Content(UUIDMixin, TimestampMixin, Base):
         index=True,
         comment="کلید اصلی جداسازی سازمان‌ها — NULL یعنی محتوای Public/General (فقط super_admin می‌سازد، بدون targets)"
     )
-    category_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("content_categories.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-        comment="دسته‌بندی محتوا — اختیاری، می‌تواند خالی باشد"
-    )
-
     # ─── محتوا ────────────────────────────────────────────────────────────
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     type: Mapped[str] = mapped_column(
@@ -177,7 +190,9 @@ class Content(UUIDMixin, TimestampMixin, Base):
     )
 
     # ─── Relationships ────────────────────────────────────────────────────
-    category: Mapped["ContentCategory | None"] = relationship(back_populates="contents")
+    categories: Mapped[list["ContentCategory"]] = relationship(
+        secondary=content_category_links, back_populates="contents"
+    )
     items: Mapped[list["ContentItem"]] = relationship(
         back_populates="content",
         cascade="all, delete-orphan",

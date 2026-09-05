@@ -12,6 +12,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.content import ContentCategoryBrief
+
 
 class MyContentResponse(BaseModel):
     """یک ردیف در فهرست «محتواهای من» — شامل اطلاعات محتوا + پیشرفت شخصی کاربر."""
@@ -20,8 +22,7 @@ class MyContentResponse(BaseModel):
     title: str
     type: str
     description: Optional[str] = None
-    category_id: Optional[str] = None
-    category_name: Optional[str] = None
+    categories: list[ContentCategoryBrief] = Field(default_factory=list)
     thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     instructor_name: Optional[str] = None

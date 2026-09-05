@@ -48,6 +48,14 @@ class ContentCategoryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ContentCategoryBrief(BaseModel):
+    """نمایش خلاصه‌ی یک دسته روی محتوا — فقط شناسه و نام."""
+    id: str
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 # ─── ContentTarget (هدف انتشار: سازمان/دپارتمان/پست/نقش/کاربر) ───────────
 
 class ContentTargetCreate(BaseModel):
@@ -125,7 +133,10 @@ class ContentCreate(BaseModel):
     title: str = Field(..., min_length=2, max_length=500)
     type: str = Field(..., description="course | article | podcast | book")
     description: Optional[str] = None
-    category_id: Optional[str] = Field(None, description="اختیاری — می‌تواند خالی باشد")
+    category_ids: list[str] = Field(
+        default_factory=list,
+        description="اختیاری — می‌تواند خالی، یک یا چند دسته باشد",
+    )
     thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     instructor_name: Optional[str] = None
@@ -155,7 +166,10 @@ class ContentCreate(BaseModel):
 class ContentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=2, max_length=500)
     description: Optional[str] = None
-    category_id: Optional[str] = None
+    category_ids: Optional[list[str]] = Field(
+        None,
+        description="اگر ارسال شود، تمام دسته‌های قبلی جایگزین می‌شوند. ارسال‌نشدن = بدون تغییر. آرایه خالی [] = پاک کردن همه دسته‌ها.",
+    )
     thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     instructor_name: Optional[str] = None
@@ -181,8 +195,7 @@ class ContentResponse(BaseModel):
     title: str
     type: str
     description: Optional[str] = None
-    category_id: Optional[str] = None
-    category_name: Optional[str] = None
+    categories: list[ContentCategoryBrief] = Field(default_factory=list)
     thumbnail_url: Optional[str] = None
     author: Optional[str] = None
     instructor_name: Optional[str] = None

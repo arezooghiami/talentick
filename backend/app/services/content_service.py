@@ -14,10 +14,18 @@ from sqlalchemy import String as sa_String
 from sqlalchemy import and_, cast as sa_cast, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.content import TARGET_TYPES, Content, ContentCategory, ContentItem, ContentTarget
+from app.models.content import (
+    TARGET_TYPES,
+    Content,
+    ContentCategory,
+    ContentItem,
+    ContentTarget,
+    content_category_links,
+)
 from app.models.organization import Department, Organization, Position
 from app.models.user import User
 from app.schemas.content import (
+    ContentCategoryBrief,
     ContentCategoryCreate,
     ContentCategoryResponse,
     ContentCategoryUpdate,
@@ -57,8 +65,10 @@ async def list_categories(
 
     # دسته‌بندی به یک سازمان تعلق دارد و محتوای هر سازمان فقط به دسته‌های خودش یا
     # عمومی ارجاع می‌دهد؛ پس شمارش سراسری برای هر دسته درست است (بدون فیلتر org).
-    counts_q = select(Content.category_id, func.count()).where(Content.category_id.is_not(None))
-    counts_result = await db.execute(counts_q.group_by(Content.category_id))
+    counts_q = select(
+        content_category_links.c.category_id, func.count(content_category_links.c.content_id)
+    ).group_by(content_category_links.c.category_id)
+    counts_result = await db.execute(counts_q)
     counts = {str(cid): c for cid, c in counts_result.all()}
     return [
         ContentCategoryResponse(
@@ -74,7 +84,9 @@ async def list_categories(
 
 async def category_to_response(db: AsyncSession, category: ContentCategory) -> ContentCategoryResponse:
     count = (await db.execute(
-        select(func.count()).select_from(Content).where(Content.category_id == category.id)
+        select(func.count()).select_from(content_category_links).where(
+            content_category_links.c.category_id == category.id
+        )
     )).scalar_one()
     return ContentCategoryResponse(
         id=str(category.id), name=category.name, order_index=category.order_index,
@@ -105,6 +117,45 @@ async def _validate_category_for_org(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "دسته انتخاب‌شده معتبر نیست")
     if category.org_id is not None and str(category.org_id) != str(org_id):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "دسته انتخاب‌شده معتبر نیست")
+
+
+async def _validate_category_ids_for_org(
+    db: AsyncSession, category_ids: list[str], org_id: uuid.UUID | None
+) -> list[uuid.UUID]:
+    """هر دسته را برای سازمان محتوا اعتبارسنجی می‌کند و لیست UUIDهای یکتا را برمی‌گرداند."""
+    result: list[uuid.UUID] = []
+    seen: set[str] = set()
+    for cid in category_ids:
+        if cid in seen:
+            continue
+        seen.add(cid)
+        await _validate_category_for_org(db, cid, org_id)
+        result.append(uuid.UUID(cid))
+    return result
+
+
+async def _categories_for_content(db: AsyncSession, content_id: uuid.UUID) -> list[ContentCategory]:
+    result = await db.execute(
+        select(ContentCategory)
+        .join(content_category_links, content_category_links.c.category_id == ContentCategory.id)
+        .where(content_category_links.c.content_id == content_id)
+        .order_by(ContentCategory.order_index, ContentCategory.name)
+    )
+    return list(result.scalars().all())
+
+
+async def _set_content_categories(
+    db: AsyncSession, content_id: uuid.UUID, category_uuids: list[uuid.UUID]
+) -> None:
+    """تمام دسته‌های قبلی این محتوا را پاک و دسته‌های جدید را جایگزین می‌کند."""
+    await db.execute(
+        content_category_links.delete().where(content_category_links.c.content_id == content_id)
+    )
+    if category_uuids:
+        await db.execute(
+            content_category_links.insert(),
+            [{"content_id": content_id, "category_id": cid} for cid in category_uuids],
+        )
 
 
 async def create_category(
@@ -160,10 +211,7 @@ async def content_to_response(db: AsyncSession, content: Content) -> ContentResp
         creator = await db.get(User, content.created_by)
         created_by_name = creator.full_name if creator else None
     org = await db.get(Organization, content.org_id) if content.org_id else None
-    category_name = None
-    if content.category_id:
-        category = await db.get(ContentCategory, content.category_id)
-        category_name = category.name if category else None
+    categories = await _categories_for_content(db, content.id)
     target_count = (await db.execute(
         select(func.count()).select_from(ContentTarget).where(ContentTarget.content_id == content.id)
     )).scalar_one()
@@ -174,8 +222,7 @@ async def content_to_response(db: AsyncSession, content: Content) -> ContentResp
         title=content.title,
         type=content.type,
         description=content.description,
-        category_id=str(content.category_id) if content.category_id else None,
-        category_name=category_name,
+        categories=[ContentCategoryBrief(id=str(c.id), name=c.name) for c in categories],
         thumbnail_url=content.thumbnail_url,
         author=content.author,
         instructor_name=content.instructor_name,
@@ -540,9 +587,17 @@ async def list_contents(
         q = q.where(Content.status == status_filter)
     if category_id:
         try:
-            q = q.where(Content.category_id == uuid.UUID(category_id))
+            cid = uuid.UUID(category_id)
         except ValueError:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "شناسه دسته نامعتبر است")
+        q = q.where(
+            exists(
+                select(content_category_links.c.content_id).where(
+                    content_category_links.c.content_id == Content.id,
+                    content_category_links.c.category_id == cid,
+                )
+            )
+        )
     if viewer is not None and (apply_visibility or viewer.role == "employee"):
         q = q.where(visibility_condition(viewer))
 
@@ -573,13 +628,11 @@ async def create_content(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
     if data.targets:
         await _validate_targets(db, org_id, data.targets)
-    if data.category_id:
-        await _validate_category_for_org(db, data.category_id, org_id)
+    category_uuids = await _validate_category_ids_for_org(db, data.category_ids, org_id)
 
     content = Content(
         id=uuid.uuid4(),
         org_id=org_id,
-        category_id=uuid.UUID(data.category_id) if data.category_id else None,
         title=data.title,
         type=data.type,
         description=data.description,
@@ -603,6 +656,8 @@ async def create_content(
 
     if data.targets:
         await _create_targets(db, org_id, content.id, data.targets)
+    if category_uuids:
+        await _set_content_categories(db, content.id, category_uuids)
 
     await db.commit()
     await db.refresh(content)
@@ -613,14 +668,7 @@ async def update_content(db: AsyncSession, content: Content, data: ContentUpdate
     if content.org_id is None and data.targets:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای Public نمی‌تواند هدف‌گذاری (targets) داشته باشد")
 
-    payload = data.model_dump(exclude_unset=True, exclude={"targets"})
-    if "category_id" in payload:
-        cid = payload["category_id"]
-        if cid:
-            await _validate_category_for_org(db, cid, content.org_id)
-            payload["category_id"] = uuid.UUID(cid)
-        else:
-            payload["category_id"] = None
+    payload = data.model_dump(exclude_unset=True, exclude={"targets", "category_ids"})
     for field, value in payload.items():
         setattr(content, field, value)
     await db.commit()
@@ -628,6 +676,11 @@ async def update_content(db: AsyncSession, content: Content, data: ContentUpdate
 
     if data.targets is not None:
         await replace_targets(db, content, data.targets)
+
+    if data.category_ids is not None:
+        category_uuids = await _validate_category_ids_for_org(db, data.category_ids, content.org_id)
+        await _set_content_categories(db, content.id, category_uuids)
+        await db.commit()
 
     return content
 
