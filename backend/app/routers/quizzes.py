@@ -106,6 +106,10 @@ async def list_quizzes(
         "all",
         description="فقط وقتی org_id خالی است (super_admin): all = همه، public = فقط آزمون‌های عمومی",
     ),
+    include_public: bool = Query(
+        False,
+        description="وقتی org_id مشخص است: آزمون‌های عمومی (بدون سازمان) هم در نتیجه بیایند",
+    ),
     sort_by: str = Query("created_at", description="created_at | updated_at | title"),
     sort_order: str = Query("desc", description="asc | desc"),
 ) -> QuizListResponse:
@@ -116,7 +120,7 @@ async def list_quizzes(
     items, total = await quiz_service.list_quizzes(
         db, target_org_id, page=page, page_size=page_size,
         search=search, is_active=is_active, sort_by=sort_by, sort_order=sort_order,
-        scope=scope,
+        scope=scope, include_public=include_public,
     )
     responses = [await quiz_service.quiz_to_response(db, q) for q in items]
     return QuizListResponse(

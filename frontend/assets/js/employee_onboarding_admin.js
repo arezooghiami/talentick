@@ -415,10 +415,13 @@ const EmployeeOnboardingPage = (() => {
 
   // ─── مراحل ──────────────────────────────────────────────────────
   async function loadContentsAndQuizzesForSelect(orgId) {
+    if (!orgId) { state.contentsForSelect = []; state.quizzesForSelect = []; return; }
+    // include_public=true تا آزمون/محتوای عمومی (بدون سازمان — که super_admin
+    // می‌سازد) هم در دراپ‌داون مراحل قابل انتخاب باشد، نه فقط موارد همین سازمان.
     try {
       const [contentsRes, quizzesRes] = await Promise.all([
-        api.get(`/contents/?org_id=${orgId}&status=published&page_size=100`),
-        api.get(`/quizzes/?org_id=${orgId}&page_size=100`),
+        api.get(`/contents/?org_id=${orgId}&include_public=true&status=published&page_size=100`),
+        api.get(`/quizzes/?org_id=${orgId}&include_public=true&page_size=100`),
       ]);
       state.contentsForSelect = contentsRes.items || [];
       state.quizzesForSelect = quizzesRes.items || [];

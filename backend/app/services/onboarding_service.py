@@ -60,6 +60,8 @@ async def _validate_step_payload(
     if step_type not in STEP_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"نوع مرحله نامعتبر — مقادیر مجاز: {', '.join(STEP_TYPES)}")
 
+    # محتوا/آزمونِ عمومی (org_id IS NULL) در هر برنامه‌ای — سازمانی یا عمومی —
+    # قابل استفاده است؛ منبع سازمانی فقط در برنامه‌ی همان سازمان.
     if step_type == "content":
         if not content_id:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "برای مرحله‌ی نوع «محتوا» انتخاب محتوا اجباری است")
@@ -67,7 +69,7 @@ async def _validate_step_payload(
             content = await db.get(Content, uuid.UUID(content_id))
         except ValueError:
             content = None
-        if not content or str(content.org_id) != str(org_id):
+        if not content or (content.org_id is not None and str(content.org_id) != str(org_id)):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "محتوای انتخاب‌شده معتبر نیست")
 
     if step_type == "quiz":
@@ -77,7 +79,7 @@ async def _validate_step_payload(
             quiz = await db.get(Quiz, uuid.UUID(quiz_id))
         except ValueError:
             quiz = None
-        if not quiz or str(quiz.org_id) != str(org_id):
+        if not quiz or (quiz.org_id is not None and str(quiz.org_id) != str(org_id)):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "آزمون انتخاب‌شده معتبر نیست")
 
 

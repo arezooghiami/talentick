@@ -18,7 +18,7 @@ import random
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -146,10 +146,17 @@ async def list_quizzes(
     sort_by: str = "created_at",
     sort_order: str = "desc",
     scope: str = "all",
+    include_public: bool = False,
 ) -> tuple[list[Quiz], int]:
     q = select(Quiz)
     if org_id is not None:
-        q = q.where(Quiz.org_id == org_id)
+        # include_public: علاوه بر آزمون‌های همین سازمان، آزمون‌های عمومی
+        # (org_id IS NULL) هم برگردانده می‌شوند — برای انتخاب آزمون در
+        # مراحل آنبوردینگ که ممکن است به یک آزمون عمومی ارجاع دهند.
+        if include_public:
+            q = q.where(or_(Quiz.org_id == org_id, Quiz.org_id.is_(None)))
+        else:
+            q = q.where(Quiz.org_id == org_id)
     elif scope == "public":
         q = q.where(Quiz.org_id.is_(None))
     if search:

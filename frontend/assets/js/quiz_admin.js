@@ -55,7 +55,7 @@ const QuizAdminPage = (() => {
     const canEdit = App.isSuperAdmin || App.isOrgAdmin;
     tbody.innerHTML = state.items.map(q => `
       <tr>
-        <td style="font-weight:600;">${esc(q.title)}${q.is_onboarding ? ' <span class="badge badge-admin">ورودی</span>' : ''}</td>
+        <td style="font-weight:600;">${esc(q.title)}${q.is_onboarding ? ' <span class="badge badge-admin">ورودی</span>' : ''}${App.isSuperAdmin && !q.org_id ? ' <span class="badge badge-manager">عمومی</span>' : ''}</td>
         <td>${numFa(q.question_count)} سوال</td>
         <td>${numFa(q.pass_score)}٪</td>
         <td style="color:var(--gray-500);">${q.max_attempts ? numFa(q.max_attempts) + ' بار' : 'نامحدود'}</td>
@@ -72,6 +72,19 @@ const QuizAdminPage = (() => {
   }
 
   // ─── Create / Edit Quiz ─────────────────────────────────────────
+  // انتخاب سازمانِ آزمون — فقط برای super_admin و فقط هنگام ساخت (بعد از ساخت
+  // قابل تغییر نیست). خالی = آزمون عمومی (is_public) برای همه‌ی سازمان‌ها.
+  async function loadOrgsForQuizSelect() {
+    const sel = document.getElementById('qz-org-id');
+    try {
+      const res = await api.get('/orgs/');
+      const orgs = Array.isArray(res) ? res : (res.items || []);
+      const own = App.currentUser && App.currentUser.org_id;
+      sel.innerHTML = '<option value="">— عمومی (همه‌ی سازمان‌ها) —</option>' +
+        orgs.map(o => `<option value="${o.id}" ${o.id === own ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
+    } catch { /* dropdown فقط گزینه‌ی «عمومی» را نگه می‌دارد */ }
+  }
+
   function openCreate() {
     document.getElementById('quizModalTitle').textContent = 'آزمون جدید';
     document.getElementById('qz-id').value = '';
@@ -85,6 +98,9 @@ const QuizAdminPage = (() => {
     document.getElementById('qz-shuffle-o').checked = false;
     document.getElementById('qz-onboarding').checked = false;
     document.getElementById('qz-active-wrap').classList.add('hidden');
+    const orgWrap = document.getElementById('qz-org-wrap');
+    if (App.isSuperAdmin) { orgWrap.classList.remove('hidden'); loadOrgsForQuizSelect(); }
+    else orgWrap.classList.add('hidden');
     openModal('modal-quiz');
   }
 
@@ -104,6 +120,8 @@ const QuizAdminPage = (() => {
     document.getElementById('qz-onboarding').checked = !!q.is_onboarding;
     document.getElementById('qz-active').checked = !!q.is_active;
     document.getElementById('qz-active-wrap').classList.remove('hidden');
+    // سازمانِ آزمون بعد از ساخت قابل تغییر نیست — انتخاب‌گر پنهان می‌ماند.
+    document.getElementById('qz-org-wrap').classList.add('hidden');
     openModal('modal-quiz');
   }
 
@@ -130,6 +148,13 @@ const QuizAdminPage = (() => {
       is_onboarding: document.getElementById('qz-onboarding').checked,
     };
     if (id) payload.is_active = document.getElementById('qz-active').checked;
+
+    // فقط هنگام ساخت و فقط super_admin: سازمانِ مقصد یا «عمومی».
+    if (!id && App.isSuperAdmin) {
+      const orgId = document.getElementById('qz-org-id').value;
+      if (orgId) payload.org_id = orgId;
+      else payload.is_public = true;
+    }
 
     const btn = document.getElementById('btn-save-quiz');
     setLoading(btn, true);
