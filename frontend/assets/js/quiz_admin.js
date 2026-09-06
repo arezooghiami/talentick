@@ -74,14 +74,16 @@ const QuizAdminPage = (() => {
   // ─── Create / Edit Quiz ─────────────────────────────────────────
   // انتخاب سازمانِ آزمون — فقط برای super_admin و فقط هنگام ساخت (بعد از ساخت
   // قابل تغییر نیست). خالی = آزمون عمومی (is_public) برای همه‌ی سازمان‌ها.
-  async function loadOrgsForQuizSelect() {
+  // selectedId: undefined هنگام ساخت (پیش‌فرض = سازمان خود ادمین)، مقدار مشخص
+  // هنگام ویرایش (سازمان فعلی آزمون؛ null یعنی «عمومی»).
+  async function loadOrgsForQuizSelect(selectedId) {
     const sel = document.getElementById('qz-org-id');
+    const preselect = selectedId !== undefined ? selectedId : (App.currentUser && App.currentUser.org_id);
     try {
       const res = await api.get('/orgs/');
       const orgs = Array.isArray(res) ? res : (res.items || []);
-      const own = App.currentUser && App.currentUser.org_id;
       sel.innerHTML = '<option value="">— عمومی (همه‌ی سازمان‌ها) —</option>' +
-        orgs.map(o => `<option value="${o.id}" ${o.id === own ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
+        orgs.map(o => `<option value="${o.id}" ${o.id === preselect ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
     } catch { /* dropdown فقط گزینه‌ی «عمومی» را نگه می‌دارد */ }
   }
 
@@ -120,8 +122,9 @@ const QuizAdminPage = (() => {
     document.getElementById('qz-onboarding').checked = !!q.is_onboarding;
     document.getElementById('qz-active').checked = !!q.is_active;
     document.getElementById('qz-active-wrap').classList.remove('hidden');
-    // سازمانِ آزمون بعد از ساخت قابل تغییر نیست — انتخاب‌گر پنهان می‌ماند.
-    document.getElementById('qz-org-wrap').classList.add('hidden');
+    const orgWrap = document.getElementById('qz-org-wrap');
+    if (App.isSuperAdmin) { orgWrap.classList.remove('hidden'); loadOrgsForQuizSelect(q.org_id || null); }
+    else orgWrap.classList.add('hidden');
     openModal('modal-quiz');
   }
 
@@ -149,11 +152,16 @@ const QuizAdminPage = (() => {
     };
     if (id) payload.is_active = document.getElementById('qz-active').checked;
 
-    // فقط هنگام ساخت و فقط super_admin: سازمانِ مقصد یا «عمومی».
-    if (!id && App.isSuperAdmin) {
+    // فقط super_admin: سازمانِ مقصد یا «عمومی».
+    if (App.isSuperAdmin) {
       const orgId = document.getElementById('qz-org-id').value;
-      if (orgId) payload.org_id = orgId;
-      else payload.is_public = true;
+      if (!id) {
+        if (orgId) payload.org_id = orgId;
+        else payload.is_public = true;
+      } else {
+        // ویرایش: org_id همیشه فرستاده می‌شود (null = عمومی).
+        payload.org_id = orgId || null;
+      }
     }
 
     const btn = document.getElementById('btn-save-quiz');

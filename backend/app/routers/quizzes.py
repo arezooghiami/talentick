@@ -196,6 +196,17 @@ async def update_quiz(
 ) -> QuizDetailResponse:
     quiz = await _get_quiz_or_404(db, quiz_id)
     enforce_org_scope(current_user, quiz.org_id)
+
+    # تغییر سازمانِ آزمون فقط برای super_admin
+    if "org_id" in body.model_fields_set:
+        if current_user.role != "super_admin":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "فقط super_admin می‌تواند سازمان آزمون را تغییر دهد")
+        if body.org_id:
+            try:
+                uuid.UUID(body.org_id)
+            except ValueError:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "org_id نامعتبر است")
+
     updated = await quiz_service.update_quiz(db, quiz, body)
     return await quiz_service.quiz_to_detail(db, updated)
 

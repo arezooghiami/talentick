@@ -134,6 +134,10 @@ class QuizUpdate(BaseModel):
     max_attempts: Optional[int] = Field(None, ge=1)
     is_active: Optional[bool] = None
     points_override: Optional[int] = Field(None, ge=0, le=1000, description="خالی/null یعنی بازگشت به مقدار سراسری")
+    org_id: Optional[str] = Field(
+        None,
+        description="فقط super_admin — انتقال آزمون به سازمان دیگر. null یعنی آزمون عمومی (بدون سازمان).",
+    )
 
 
 class QuizResponse(BaseModel):

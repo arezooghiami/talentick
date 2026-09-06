@@ -18,7 +18,7 @@ import random
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -210,8 +210,24 @@ async def create_quiz(
 
 async def update_quiz(db: AsyncSession, quiz: Quiz, data: QuizUpdate) -> Quiz:
     payload = data.model_dump(exclude_unset=True)
+
+    # org_id جداگانه هندل می‌شود — علاوه بر خودِ آزمون، org_id سوالات هم باید
+    # همگام شود (routers/quizzes.py برای دسترسی به سوال از question.org_id
+    # استفاده می‌کند). فقط super_admin به اینجا می‌رسد (در router چک می‌شود).
+    reassign_org = "org_id" in payload
+    new_org_id = payload.pop("org_id", None)
+    if reassign_org and new_org_id is not None and not isinstance(new_org_id, uuid.UUID):
+        new_org_id = uuid.UUID(str(new_org_id))
+
     for field, value in payload.items():
         setattr(quiz, field, value)
+
+    if reassign_org and str(new_org_id) != str(quiz.org_id):
+        quiz.org_id = new_org_id
+        await db.execute(
+            update(Question).where(Question.quiz_id == quiz.id).values(org_id=new_org_id)
+        )
+
     await db.commit()
     await db.refresh(quiz)
     return quiz
