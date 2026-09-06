@@ -76,6 +76,112 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('fa-IR');
 }
 
+// ─── تبدیل تاریخ جلالی ⇄ میلادی (الگوریتم jalaali-js) ───────────────
+// برای ورودی‌های تاریخ که با jalaliDatepicker مقدار «۱۴۰۳/۰۶/۱۵» می‌گیرند
+// ولی بک‌اند تاریخ ISO میلادی می‌خواهد.
+const Jalaali = (() => {
+  const breaks = [-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210,
+    1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178];
+  const div = (a, b) => ~~(a / b);
+  const mod = (a, b) => a - ~~(a / b) * b;
+
+  function jalCal(jy, withoutLeap) {
+    const bl = breaks.length, gy = jy + 621;
+    let leapJ = -14, jp = breaks[0], jm, jump, leap, leapG, march, n, i;
+    if (jy < jp || jy >= breaks[bl - 1]) throw new Error('Invalid Jalaali year ' + jy);
+    for (i = 1; i < bl; i += 1) {
+      jm = breaks[i];
+      jump = jm - jp;
+      if (jy < jm) break;
+      leapJ = leapJ + div(jump, 33) * 8 + div(mod(jump, 33), 4);
+      jp = jm;
+    }
+    n = jy - jp;
+    leapJ = leapJ + div(n, 33) * 8 + div(mod(n, 33) + 3, 4);
+    if (mod(jump, 33) === 4 && jump - n === 4) leapJ += 1;
+    leapG = div(gy, 4) - div((div(gy, 100) + 1) * 3, 4) - 150;
+    march = 20 + leapJ - leapG;
+    if (!withoutLeap) {
+      if (jump - n < 6) n = n - jump + div(jump + 4, 33) * 33;
+      leap = mod(mod(n + 1, 33) - 1, 4);
+      if (leap === -1) leap = 4;
+    }
+    return { leap, gy, march };
+  }
+
+  function g2d(gy, gm, gd) {
+    let d = div((gy + div(gm - 8, 6) + 100100) * 1461, 4)
+      + div(153 * mod(gm + 9, 12) + 2, 5) + gd - 34840408;
+    d = d - div(div(gy + 100100 + div(gm - 8, 6), 100) * 3, 4) + 752;
+    return d;
+  }
+
+  function d2g(jdn) {
+    let j = 4 * jdn + 139361631;
+    j = j + div(div(4 * jdn + 183187720, 146097) * 3, 4) * 4 - 3908;
+    const i = div(mod(j, 1461), 4) * 5 + 308;
+    const gd = div(mod(i, 153), 5) + 1;
+    const gm = mod(div(i, 153), 12) + 1;
+    const gy = div(j, 1461) - 100100 + div(8 - gm, 6);
+    return { gy, gm, gd };
+  }
+
+  function toJalaali(gy, gm, gd) {
+    const jdn = g2d(gy, gm, gd);
+    let gy2 = d2g(jdn).gy, jy = gy2 - 621;
+    const r = jalCal(jy, false);
+    const jdn1f = g2d(gy2, 3, r.march);
+    let k = jdn - jdn1f, jm, jd;
+    if (k >= 0) {
+      if (k <= 185) { jm = 1 + div(k, 31); jd = mod(k, 31) + 1; return { jy, jm, jd }; }
+      k -= 186;
+    } else {
+      jy -= 1;
+      k += 179;
+      if (r.leap === 1) k += 1;
+    }
+    jm = 7 + div(k, 30);
+    jd = mod(k, 30) + 1;
+    return { jy, jm, jd };
+  }
+
+  function toGregorian(jy, jm, jd) {
+    const r = jalCal(jy, true);
+    const jdn = g2d(r.gy, 3, r.march) + (jm - 1) * 31 - div(jm, 7) * (jm - 7) + jd - 1;
+    return d2g(jdn);
+  }
+
+  return { toJalaali, toGregorian };
+})();
+
+// ISO/تاریخ میلادی → رشته‌ی ورودی جلالی «۱۴۰۳/۰۶/۱۵» (ارقام لاتین، چون
+// jalaliDatepicker خودش با همین قالب کار می‌کند).
+function isoToJalaliInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const j = Jalaali.toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  const pad = n => String(n).padStart(2, '0');
+  return `${j.jy}/${pad(j.jm)}/${pad(j.jd)}`;
+}
+
+// رشته‌ی جلالی «۱۴۰۳/۰۶/۱۵» یا «1403/6/5» → ISO میلادی.
+// endOfDay=true یعنی ۲۳:۵۹:۵۹ همان روز (برای تاریخ پایان بازه).
+function jalaliInputToISO(value, endOfDay = false) {
+  if (!value) return null;
+  const norm = String(value)
+    .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .trim();
+  const m = norm.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$/);
+  if (!m) return null;
+  let g;
+  try { g = Jalaali.toGregorian(+m[1], +m[2], +m[3]); } catch { return null; }
+  const d = new Date(g.gy, g.gm - 1, g.gd,
+    endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 // ─── Loading button state ─────────────────────────────────────────
 function setLoading(btn, loading, text = 'در حال پردازش...') {
   if (loading) {
@@ -160,6 +266,14 @@ function esc(s) {
 // ─── Persian number formatting ─────────────────────────────────────
 function numFa(n) {
   return Number(n ?? 0).toLocaleString('fa-IR');
+}
+
+// ─── حجم فایل با واحد فارسی ────────────────────────────────────────
+function fmtFileSize(bytes) {
+  if (!bytes) return '';
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${numFa(Math.max(1, Math.round(kb)))} کیلوبایت`;
+  return `${numFa((kb / 1024).toFixed(1))} مگابایت`;
 }
 
 // ─── Generic delete confirmation (آشنا با مودال #modal-confirm-delete) ──

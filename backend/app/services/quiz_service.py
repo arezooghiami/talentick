@@ -76,12 +76,26 @@ def _validate_question_options(q_type: str, options: list) -> None:
     - single_choice / true_false: دقیقاً یک گزینه صحیح
     - true_false: دقیقاً دو گزینه
     - multi_choice: حداقل یک گزینه صحیح
+    - single_image_choice: مثل single_choice ولی هر گزینه باید image_url داشته
+      باشد (متن/کپشن اختیاری است)
     """
     if q_type == "short_text":
         return
     if len(options) < 2:
         raise BadRequestError("سوالات چندگزینه‌ای/درست‌غلط حداقل به ۲ گزینه نیاز دارند")
     correct_count = sum(1 for o in options if o.is_correct)
+
+    if q_type == "single_image_choice":
+        if correct_count != 1:
+            raise BadRequestError("سوال تک‌گزینه‌ای تصویری باید دقیقاً یک گزینه‌ی صحیح داشته باشد")
+        if any(not (getattr(o, "image_url", None) or "").strip() for o in options):
+            raise BadRequestError("برای هر گزینه‌ی سوال تصویری باید یک تصویر آپلود شود")
+        return
+
+    # انواع متنی — متن هر گزینه اجباری است
+    if any(not (o.body or "").strip() for o in options):
+        raise BadRequestError("متن همه‌ی گزینه‌ها اجباری است")
+
     if q_type in ("single_choice", "true_false"):
         if correct_count != 1:
             raise BadRequestError("این نوع سوال باید دقیقاً یک گزینه‌ی صحیح داشته باشد")
@@ -104,7 +118,8 @@ def question_to_admin_response(q: Question) -> QuestionAdminResponse:
         order_index=q.order_index,
         options=[
             QuestionOptionAdminResponse(
-                id=str(o.id), body=o.body, is_correct=o.is_correct, order_index=o.order_index
+                id=str(o.id), body=o.body, image_url=o.image_url,
+                is_correct=o.is_correct, order_index=o.order_index,
             )
             for o in opts
         ],
@@ -130,10 +145,13 @@ async def list_quizzes(
     is_active: bool | None = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
+    scope: str = "all",
 ) -> tuple[list[Quiz], int]:
     q = select(Quiz)
     if org_id is not None:
         q = q.where(Quiz.org_id == org_id)
+    elif scope == "public":
+        q = q.where(Quiz.org_id.is_(None))
     if search:
         q = q.where(Quiz.title.ilike(f"%{search.strip()}%"))
     if is_active is not None:
@@ -256,6 +274,7 @@ async def add_question(db: AsyncSession, quiz: Quiz, data: QuestionCreate) -> Qu
                 id=uuid.uuid4(),
                 question_id=question.id,
                 body=opt.body,
+                image_url=opt.image_url,
                 is_correct=opt.is_correct,
                 order_index=opt.order_index,
             )
@@ -297,6 +316,7 @@ async def update_question(db: AsyncSession, question: Question, data: QuestionUp
                     id=uuid.uuid4(),
                     question_id=question.id,
                     body=opt.body,
+                    image_url=opt.image_url,
                     is_correct=opt.is_correct,
                     order_index=opt.order_index,
                 )
@@ -308,7 +328,10 @@ async def update_question(db: AsyncSession, question: Question, data: QuestionUp
         from app.schemas.quiz import QuestionOptionCreate
 
         current = [
-            QuestionOptionCreate(body=o.body, is_correct=o.is_correct, order_index=o.order_index)
+            QuestionOptionCreate(
+                body=o.body, image_url=o.image_url,
+                is_correct=o.is_correct, order_index=o.order_index,
+            )
             for o in question.options
         ]
         _validate_question_options(final_type, current)
@@ -363,7 +386,9 @@ async def get_quiz_for_taking(db: AsyncSession, quiz: Quiz, user: User) -> QuizT
                 score=q.score,
                 order_index=q.order_index,
                 options=[
-                    QuestionOptionTakeResponse(id=str(o.id), body=o.body, order_index=o.order_index)
+                    QuestionOptionTakeResponse(
+                        id=str(o.id), body=o.body, image_url=o.image_url, order_index=o.order_index,
+                    )
                     for o in opts
                 ],
             )

@@ -193,6 +193,10 @@ async def list_contents(
     status_filter: str | None = Query(None, alias="status"),
     category_id: str | None = Query(None),
     org_id: str | None = Query(None, description="فقط super_admin — خالی = همه سازمان‌ها"),
+    scope: str = Query(
+        "all",
+        description="فقط وقتی org_id خالی است (super_admin): all = همه، public = فقط محتوای عمومی",
+    ),
     sort_by: str = Query("created_at", description="created_at | updated_at | title | status | type"),
     sort_order: str = Query("desc", description="asc | desc"),
 ):
@@ -213,6 +217,7 @@ async def list_contents(
         search=search, type_filter=type, status_filter=status_filter,
         category_id=category_id, sort_by=sort_by, sort_order=sort_order,
         viewer=current_user if current_user.role == "employee" else None,
+        scope=scope,
     )
     responses = [await content_service.content_to_response(db, c) for c in items]
     return ContentListResponse(

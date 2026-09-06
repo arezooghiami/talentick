@@ -121,20 +121,66 @@ const AnnouncementsPage = (() => {
   }
 
   // ─── Create / Edit ──────────────────────────────────────────────
+  const DEFAULT_FILE_HINT = 'فرمت‌های مجاز: JPG, PNG, WEBP, GIF, MP4, WEBM, MOV';
+
   function resetFileFields() {
     document.getElementById('ann-media-url').value = '';
     document.getElementById('ann-file-name').value = '';
     document.getElementById('ann-file-size').value = '';
     document.getElementById('ann-media-type').value = '';
     document.getElementById('ann-file-input').value = '';
-    document.getElementById('ann-file-hint').textContent = 'فرمت‌های مجاز: JPG, PNG, WEBP, GIF, MP4, WEBM, MOV';
+    document.getElementById('ann-file-hint').textContent = DEFAULT_FILE_HINT;
+    setUploadProgress(null);
+    clearFilePreview();
   }
 
-  function toDatetimeLocal(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  // ─── نوار درصد آپلود ────────────────────────────────────────────
+  function setUploadProgress(percent) {
+    const wrap = document.getElementById('ann-file-progress');
+    const fill = document.getElementById('ann-file-progress-fill');
+    const pct = document.getElementById('ann-file-progress-pct');
+    if (percent == null) { wrap.hidden = true; fill.style.width = '0'; return; }
+    wrap.hidden = false;
+    fill.style.width = `${percent}%`;
+    pct.textContent = `${numFa(percent)}٪`;
+  }
+
+  // ─── پیش‌نمایش فایل آپلودشده ────────────────────────────────────
+  let previewObjectUrl = null;
+  function clearFilePreview() {
+    const box = document.getElementById('ann-file-preview');
+    box.hidden = true;
+    box.innerHTML = '';
+    if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
+  }
+
+  // localFile داده شود = تازه آپلودشده (پیش‌نمایش مستقیم بدون نیاز به احراز هویت)؛
+  // در غیر این صورت از mediaUrl داخلی با fetch احراز هویت‌شده استفاده می‌شود.
+  function renderFilePreview({ mediaUrl, fileName, fileSize, mediaType, localFile }) {
+    const box = document.getElementById('ann-file-preview');
+    if (!mediaUrl && !localFile) { clearFilePreview(); return; }
+    if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
+
+    const isVideo = mediaType === 'video' || (localFile && localFile.type.startsWith('video/'));
+    const sizeTxt = fmtFileSize(fileSize);
+    let mediaHtml;
+    if (localFile) {
+      previewObjectUrl = URL.createObjectURL(localFile);
+      mediaHtml = isVideo
+        ? `<video src="${previewObjectUrl}" muted playsinline></video>`
+        : `<img src="${previewObjectUrl}" alt="">`;
+    } else if (isVideo) {
+      mediaHtml = `<div style="width:96px;height:96px;border-radius:8px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🎬</div>`;
+    } else {
+      mediaHtml = `<img data-src="${esc(mediaUrl)}" alt="">`;
+    }
+    box.innerHTML = `${mediaHtml}
+      <div class="upload-preview-meta">
+        <div class="upload-preview-name">${esc(fileName || '—')}</div>
+        ${sizeTxt ? `<div class="upload-preview-size">${sizeTxt}</div>` : ''}
+      </div>`;
+    box.hidden = false;
+    if (!localFile && !isVideo) hydrateAuthedImages(box);
   }
 
   async function openCreate() {
@@ -168,17 +214,22 @@ const AnnouncementsPage = (() => {
     document.getElementById('ann-id').value = a.id;
     document.getElementById('ann-title').value = a.title || '';
     document.getElementById('ann-desc').value = a.description || '';
-    document.getElementById('ann-starts').value = toDatetimeLocal(a.starts_at);
-    document.getElementById('ann-ends').value = toDatetimeLocal(a.ends_at);
+    document.getElementById('ann-starts').value = isoToJalaliInput(a.starts_at);
+    document.getElementById('ann-ends').value = isoToJalaliInput(a.ends_at);
     document.getElementById('ann-is-active').checked = !!a.is_active;
     document.getElementById('ann-media-url').value = a.media_url || '';
     document.getElementById('ann-file-name').value = a.file_name || '';
     document.getElementById('ann-file-size').value = a.file_size || '';
     document.getElementById('ann-media-type').value = a.media_type || '';
     document.getElementById('ann-file-input').value = '';
+    setUploadProgress(null);
     document.getElementById('ann-file-hint').textContent = a.file_name
       ? `فایل فعلی: ${a.file_name}`
-      : 'فرمت‌های مجاز: JPG, PNG, WEBP, GIF, MP4, WEBM, MOV';
+      : DEFAULT_FILE_HINT;
+    renderFilePreview({
+      mediaUrl: a.media_url, fileName: a.file_name,
+      fileSize: a.file_size, mediaType: a.media_type,
+    });
 
     state.targetOrgId = a.org_id;
     if (App.isSuperAdmin) {
@@ -200,16 +251,29 @@ const AnnouncementsPage = (() => {
     if (!state.targetOrgId) { toastError('ابتدا سازمان را انتخاب کنید'); event.target.value = ''; return; }
     const hint = document.getElementById('ann-file-hint');
     hint.textContent = 'در حال آپلود...';
+    clearFilePreview();
+    setUploadProgress(0);
     try {
-      const res = await api.upload(`/announcements/upload?org_id=${state.targetOrgId}`, file);
+      const res = await api.upload(
+        `/announcements/upload?org_id=${state.targetOrgId}`, file,
+        (percent) => setUploadProgress(percent),
+      );
+      setUploadProgress(100);
       document.getElementById('ann-media-url').value = res.url;
       document.getElementById('ann-file-name').value = res.filename || file.name;
       document.getElementById('ann-file-size').value = res.size || file.size;
       const isVideo = (res.content_type || file.type || '').startsWith('video/');
       document.getElementById('ann-media-type').value = isVideo ? 'video' : 'image';
       hint.textContent = `فایل آپلود شد: ${res.filename || file.name}`;
+      renderFilePreview({
+        mediaUrl: res.url, fileName: res.filename || file.name,
+        fileSize: res.size || file.size, mediaType: isVideo ? 'video' : 'image',
+        localFile: file,
+      });
+      setTimeout(() => setUploadProgress(null), 600);
     } catch (e) {
-      hint.textContent = 'فرمت‌های مجاز: JPG, PNG, WEBP, GIF, MP4, WEBM, MOV';
+      setUploadProgress(null);
+      hint.textContent = DEFAULT_FILE_HINT;
       toastError(e.message);
     }
   }
@@ -223,10 +287,6 @@ const AnnouncementsPage = (() => {
       targets.push({ target_type: 'role', target_id: cb.value });
     });
     return targets;
-  }
-
-  function toIsoOrNull(localValue) {
-    return localValue ? new Date(localValue).toISOString() : null;
   }
 
   async function save() {
@@ -246,8 +306,8 @@ const AnnouncementsPage = (() => {
       media_type: document.getElementById('ann-media-type').value,
       file_name: document.getElementById('ann-file-name').value || null,
       file_size: parseInt(document.getElementById('ann-file-size').value, 10) || null,
-      starts_at: toIsoOrNull(document.getElementById('ann-starts').value),
-      ends_at: toIsoOrNull(document.getElementById('ann-ends').value),
+      starts_at: jalaliInputToISO(document.getElementById('ann-starts').value, false),
+      ends_at: jalaliInputToISO(document.getElementById('ann-ends').value, true),
       is_active: document.getElementById('ann-is-active').checked,
       targets: collectTargets(),
     };
@@ -281,6 +341,14 @@ const AnnouncementsPage = (() => {
     const btn = e.target.closest('[data-role="delete-ann"]');
     if (btn) remove(btn.dataset.id, btn.dataset.title);
   });
+
+  // ─── تقویم شمسی برای ورودی‌های بازه‌ی نمایش ─────────────────────
+  if (window.jalaliDatepicker) {
+    window.jalaliDatepicker.startWatch({
+      autoShow: true, autoHide: true,
+      showTodayBtn: true, showEmptyBtn: true, zIndex: 3000,
+    });
+  }
 
   return {
     load, searchDebounced, onOrgChange, onFileSelected,

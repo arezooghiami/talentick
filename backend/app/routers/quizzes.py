@@ -27,14 +27,16 @@ from __future__ import annotations
 import math
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.storage import upload_file
 from app.database import get_db
 from app.dependencies import OrgAdmin
 from app.dependencies import enforce_org_scope
 from app.models.quiz import Quiz
 from app.models.user import User
+from app.schemas.content import UploadResponse
 from app.schemas.quiz import (
     QUESTION_TYPES,
     QuestionAdminResponse,
@@ -47,6 +49,9 @@ from app.schemas.quiz import (
     QuizUpdate,
 )
 from app.services import quiz_service
+
+# فرمت‌های مجاز برای تصویر گزینه‌ی سوال — فقط عکس
+_ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
 
 router = APIRouter(prefix="/api/quizzes", tags=["Quizzes"])
 
@@ -97,6 +102,10 @@ async def list_quizzes(
     search: str | None = Query(None),
     is_active: bool | None = Query(None),
     org_id: str | None = Query(None, description="فقط super_admin — خالی = همه سازمان‌ها"),
+    scope: str = Query(
+        "all",
+        description="فقط وقتی org_id خالی است (super_admin): all = همه، public = فقط آزمون‌های عمومی",
+    ),
     sort_by: str = Query("created_at", description="created_at | updated_at | title"),
     sort_order: str = Query("desc", description="asc | desc"),
 ) -> QuizListResponse:
@@ -107,12 +116,36 @@ async def list_quizzes(
     items, total = await quiz_service.list_quizzes(
         db, target_org_id, page=page, page_size=page_size,
         search=search, is_active=is_active, sort_by=sort_by, sort_order=sort_order,
+        scope=scope,
     )
     responses = [await quiz_service.quiz_to_response(db, q) for q in items]
     return QuizListResponse(
         items=responses, total=total, page=page, page_size=page_size,
         total_pages=max(1, math.ceil(total / page_size)),
     )
+
+
+@router.post(
+    "/upload", response_model=UploadResponse,
+    summary="آپلود تصویر گزینه‌ی سوال (برای نوع single_image_choice)",
+)
+async def upload_question_image(
+    current_user: OrgAdmin,
+    file: UploadFile = File(...),
+    org_id: str | None = Query(None, description="فقط super_admin — آپلود برای سازمان دلخواه (خالی = Public)"),
+):
+    # None مجاز است: آزمون Public (org_id=None) که super_admin می‌سازد.
+    target_org_id = _resolve_org_id(current_user, org_id)
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+    if ext not in _ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"فرمت فایل مجاز نیست — فقط عکس: {', '.join(sorted(_ALLOWED_IMAGE_EXTENSIONS))}",
+        )
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "فایل باید تصویر باشد")
+    result = await upload_file(file, target_org_id, subfolder="quizzes")
+    return UploadResponse(**result)
 
 
 @router.post(

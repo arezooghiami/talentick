@@ -556,6 +556,7 @@ async def list_contents(
     sort_order: str = "desc",
     viewer: User | None = None,
     apply_visibility: bool = False,
+    scope: str = "all",
 ) -> tuple[list[Content], int]:
     """
     لیست محتوا با فیلتر/جستجو/صفحه‌بندی/مرتب‌سازی.
@@ -578,6 +579,8 @@ async def list_contents(
             q = q.where(Content.org_id.is_(None))
     elif org_id is not None:
         q = q.where(Content.org_id == org_id)
+    elif scope == "public":
+        q = q.where(Content.org_id.is_(None))
     if search:
         like = f"%{search.strip()}%"
         q = q.where(or_(Content.title.ilike(like), Content.description.ilike(like)))

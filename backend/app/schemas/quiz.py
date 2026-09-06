@@ -18,21 +18,31 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-QUESTION_TYPES = ("single_choice", "multi_choice", "true_false", "short_text")
+QUESTION_TYPES = (
+    "single_choice",
+    "multi_choice",
+    "true_false",
+    "short_text",
+    "single_image_choice",
+)
 
 
 # ─── Question Option ────────────────────────────────────────────────────────
 
 class QuestionOptionCreate(BaseModel):
-    body: str = Field(..., min_length=1, max_length=2000)
+    # متن گزینه برای single_image_choice اختیاری است (کپشن زیر تصویر) — پس
+    # min_length صفر؛ اجباری‌بودن متن برای بقیه‌ی انواع در سرویس چک می‌شود.
+    body: str = Field("", max_length=2000)
     is_correct: bool = False
     order_index: int = 0
+    image_url: Optional[str] = Field(None, max_length=1000, description="فقط برای single_image_choice")
 
 
 class QuestionOptionAdminResponse(BaseModel):
     """شامل is_correct — فقط برای سازنده/مدیر آزمون."""
     id: str
     body: str
+    image_url: Optional[str] = None
     is_correct: bool
     order_index: int
 
@@ -43,6 +53,7 @@ class QuestionOptionTakeResponse(BaseModel):
     """بدون is_correct — برای کارمندی که در حال پاسخ‌دادن است."""
     id: str
     body: str
+    image_url: Optional[str] = None
     order_index: int
 
     model_config = {"from_attributes": True}
@@ -52,7 +63,7 @@ class QuestionOptionTakeResponse(BaseModel):
 
 class QuestionCreate(BaseModel):
     body: str = Field(..., min_length=1)
-    type: str = Field(..., description="single_choice | multi_choice | true_false | short_text")
+    type: str = Field(..., description="single_choice | multi_choice | true_false | short_text | single_image_choice")
     explanation: Optional[str] = None
     score: int = Field(1, ge=0)
     order_index: int = 0

@@ -134,6 +134,15 @@ const QuizTakePage = (() => {
         state.answers[q.id] = { selected_option_ids: [], text_answer: e.target.value };
         updateDots();
       });
+    } else if (q.type === 'single_image_choice') {
+      const selected = new Set(existing?.selected_option_ids || []);
+      answerWrap.innerHTML = `<div class="quiz-image-grid">` + q.options.map(o => `
+        <div class="quiz-image-option ${selected.has(o.id) ? 'selected' : ''}" onclick="QuizTakePage.selectOption('${q.id}','${o.id}',false)">
+          <span class="opt-mark">${selected.has(o.id) ? '✓' : ''}</span>
+          <div class="quiz-image-option-img"><img data-src="${esc(o.image_url || '')}" alt=""></div>
+          ${o.body ? `<div class="quiz-image-option-caption">${esc(o.body)}</div>` : ''}
+        </div>`).join('') + `</div>`;
+      hydrateAuthedImages(answerWrap);
     } else {
       const isMulti = q.type === 'multi_choice';
       const selected = new Set(existing?.selected_option_ids || []);
@@ -233,7 +242,19 @@ const QuizTakePage = (() => {
     document.getElementById('resultAnswers').innerHTML = result.answers.map((a, i) => {
       const cls = a.is_correct === true ? 'correct' : (a.is_correct === false ? 'wrong' : '');
       let optsHtml = '';
-      if (a.question_type !== 'short_text') {
+      if (a.question_type === 'single_image_choice') {
+        optsHtml = `<div class="quiz-image-grid review">` + (state.questions[i]?.options || []).map(o => {
+          const isCorrectOpt = a.correct_option_ids.includes(o.id);
+          const wasSelected = a.selected_option_ids.includes(o.id);
+          let cls2 = '';
+          if (isCorrectOpt) cls2 = 'correct-opt';
+          else if (wasSelected) cls2 = 'selected-wrong';
+          return `<div class="quiz-image-option ${cls2} ${wasSelected ? 'selected' : ''}">
+            <div class="quiz-image-option-img"><img data-src="${esc(o.image_url || '')}" alt=""></div>
+            ${o.body ? `<div class="quiz-image-option-caption">${esc(o.body)}</div>` : ''}
+          </div>`;
+        }).join('') + `</div>`;
+      } else if (a.question_type !== 'short_text') {
         optsHtml = (state.questions[i]?.options || []).map(o => {
           const isCorrectOpt = a.correct_option_ids.includes(o.id);
           const wasSelected = a.selected_option_ids.includes(o.id);
@@ -252,6 +273,7 @@ const QuizTakePage = (() => {
           ${a.explanation ? `<div class="quiz-answer-explain">💡 ${esc(a.explanation)}</div>` : ''}
         </div>`;
     }).join('');
+    hydrateAuthedImages(document.getElementById('resultAnswers'));
   }
 
   function canRetry() {

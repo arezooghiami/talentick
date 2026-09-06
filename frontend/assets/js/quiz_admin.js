@@ -6,6 +6,7 @@
 
 const QUESTION_TYPE_LABELS = {
   single_choice: 'تک‌گزینه‌ای',
+  single_image_choice: 'تک‌گزینه‌ای تصویری',
   multi_choice: 'چندگزینه‌ای',
   true_false: 'درست / غلط',
   short_text: 'تشریحی (نمره‌دهی دستی)',
@@ -179,7 +180,7 @@ const QuizAdminPage = (() => {
     wrap.innerHTML = state.activeQuestions.map((qs, idx) => `
       <div class="item-row" style="align-items:flex-start;">
         <div class="item-row-order">${numFa(idx + 1)}</div>
-        <div class="item-row-icon">${qs.type === 'short_text' ? '✍️' : '☑️'}</div>
+        <div class="item-row-icon">${qs.type === 'short_text' ? '✍️' : qs.type === 'single_image_choice' ? '🖼️' : '☑️'}</div>
         <div class="item-row-info">
           <div class="item-row-title">${esc(qs.body)}</div>
           <div class="item-row-meta">${QUESTION_TYPE_LABELS[qs.type] || qs.type} • ${numFa(qs.score)} امتیاز${qs.options?.length ? ' • ' + numFa(qs.options.length) + ' گزینه' : ''}</div>
@@ -204,6 +205,16 @@ const QuizAdminPage = (() => {
     openModal('modal-question');
   }
 
+  function isImageType(type) { return type === 'single_image_choice'; }
+
+  // مسیر آپلود تصویر گزینه — org_id آزمون فعال را می‌فرستد (برای آزمون Public
+  // خالی می‌ماند و بک‌اند برای super_admin آن را None در نظر می‌گیرد).
+  function quizUploadPath() {
+    const q = state.items.find(x => x.id === state.activeQuiz);
+    const orgId = q && q.org_id;
+    return '/quizzes/upload' + (orgId ? `?org_id=${encodeURIComponent(orgId)}` : '');
+  }
+
   function openEditQuestion(id) {
     const qs = state.activeQuestions.find(x => x.id === id);
     if (!qs) return;
@@ -214,17 +225,24 @@ const QuizAdminPage = (() => {
     document.getElementById('q-score').value = qs.score ?? 1;
     document.getElementById('q-explanation').value = qs.explanation || '';
     setOptionsMode(qs.type);
-    renderOptionsBuilder((qs.options || []).map(o => ({ body: o.body, is_correct: o.is_correct })));
+    renderOptionsBuilder((qs.options || []).map(o => ({ body: o.body, is_correct: o.is_correct, image_url: o.image_url })));
     openModal('modal-question');
   }
 
   function onQuestionTypeChange() {
     const type = document.getElementById('q-type').value;
+    const list = document.getElementById('q-options-list');
+    const wasImage = list.dataset.imageMode === '1';
     setOptionsMode(type);
     if (type === 'true_false') {
       renderOptionsBuilder([{ body: 'درست', is_correct: true }, { body: 'غلط', is_correct: false }]);
-    } else if (type !== 'short_text' && document.querySelectorAll('#q-options-list .option-row').length < 2) {
-      renderOptionsBuilder([{ body: '', is_correct: false }, { body: '', is_correct: false }]);
+    } else if (type !== 'short_text') {
+      // هنگام جابه‌جایی بین حالت تصویری و متنی، ردیف‌ها را از نو می‌سازیم تا
+      // متن/تصویرِ حالت قبل باقی نماند.
+      const rows = list.querySelectorAll('.option-row').length;
+      if (rows < 2 || wasImage !== isImageType(type)) {
+        renderOptionsBuilder([{ body: '', is_correct: false }, { body: '', is_correct: false }]);
+      }
     }
   }
 
@@ -238,24 +256,75 @@ const QuizAdminPage = (() => {
     }
     wrap.classList.remove('hidden');
     list.dataset.mode = type === 'multi_choice' ? 'checkbox' : 'radio';
+    list.dataset.imageMode = isImageType(type) ? '1' : '';
     addBtn.classList.toggle('hidden', type === 'true_false');
-    document.getElementById('q-options-hint').textContent = type === 'multi_choice'
-      ? 'حداقل یک گزینه را به‌عنوان پاسخ صحیح علامت بزنید (می‌توانید چند گزینه انتخاب کنید)'
-      : 'دقیقاً یک گزینه را به‌عنوان پاسخ صحیح علامت بزنید';
+    document.getElementById('q-options-hint').textContent = isImageType(type)
+      ? 'برای هر گزینه یک تصویر آپلود کنید (متن زیر تصویر اختیاری است) و دقیقاً یک گزینه را به‌عنوان پاسخ صحیح علامت بزنید'
+      : type === 'multi_choice'
+        ? 'حداقل یک گزینه را به‌عنوان پاسخ صحیح علامت بزنید (می‌توانید چند گزینه انتخاب کنید)'
+        : 'دقیقاً یک گزینه را به‌عنوان پاسخ صحیح علامت بزنید';
   }
 
   function renderOptionsBuilder(options) {
     const list = document.getElementById('q-options-list');
-    list.innerHTML = options.map((o) => optionRowHtml(o.body, o.is_correct)).join('');
+    const imageMode = list.dataset.imageMode === '1';
+    list.innerHTML = options.map((o) => optionRowHtml(o, imageMode)).join('');
+    if (imageMode) hydrateAuthedImages(list);
   }
 
-  function optionRowHtml(body, isCorrect) {
+  function optionRowHtml(opt, imageMode) {
+    const body = opt.body || '';
+    const isCorrect = !!opt.is_correct;
+    const imageUrl = opt.image_url || '';
+    if (imageMode) {
+      const thumb = imageUrl
+        ? `<img data-src="${esc(imageUrl)}" alt="" class="q-opt-thumb-img" style="width:100%;height:100%;object-fit:cover;">`
+        : `<span style="color:var(--gray-400);font-size:11px;">بدون تصویر</span>`;
+      return `
+        <div class="option-row" style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;padding:10px;border:1px solid var(--border);border-radius:8px;">
+          <input type="checkbox" class="q-opt-correct" ${isCorrect ? 'checked' : ''} onchange="QuizAdminPage.onOptionCorrectChange(this)" style="width:17px;height:17px;flex-shrink:0;margin-top:32px;" title="پاسخ صحیح">
+          <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
+            <div class="q-opt-thumb" style="width:110px;height:80px;border-radius:6px;overflow:hidden;background:var(--gray-100);display:flex;align-items:center;justify-content:center;">${thumb}</div>
+            <input type="hidden" class="q-opt-image" value="${esc(imageUrl)}">
+            <label class="btn btn-secondary btn-sm" style="align-self:flex-start;cursor:pointer;">
+              ${imageUrl ? 'تغییر تصویر' : 'آپلود تصویر'}
+              <input type="file" accept="image/*" style="display:none;" onchange="QuizAdminPage.uploadOptionImage(this)">
+            </label>
+            <input type="text" class="form-control q-opt-body" value="${esc(body)}" placeholder="متن زیر تصویر (اختیاری)" style="max-width:320px;">
+          </div>
+          <button type="button" class="btn-icon" onclick="QuizAdminPage.removeOption(this)" title="حذف گزینه">✕</button>
+        </div>`;
+    }
     return `
       <div class="option-row" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
         <input type="checkbox" class="q-opt-correct" ${isCorrect ? 'checked' : ''} onchange="QuizAdminPage.onOptionCorrectChange(this)" style="width:17px;height:17px;flex-shrink:0;">
         <input type="text" class="form-control q-opt-body" value="${esc(body)}" placeholder="متن گزینه" style="flex:1;">
         <button type="button" class="btn-icon" onclick="QuizAdminPage.removeOption(this)" title="حذف گزینه">✕</button>
       </div>`;
+  }
+
+  async function uploadOptionImage(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toastError('فقط فایل تصویری مجاز است'); input.value = ''; return; }
+    const row = input.closest('.option-row');
+    const label = input.closest('label');
+    const prevLabel = label ? label.childNodes[0].textContent : '';
+    if (label) label.childNodes[0].textContent = 'در حال آپلود... ';
+    try {
+      const res = await api.upload(quizUploadPath(), file);
+      row.querySelector('.q-opt-image').value = res.url;
+      const thumb = row.querySelector('.q-opt-thumb');
+      thumb.innerHTML = `<img data-src="${esc(res.url)}" alt="" style="width:100%;height:100%;object-fit:cover;">`;
+      await hydrateAuthedImages(thumb);
+      if (label) label.childNodes[0].textContent = 'تغییر تصویر ';
+      toastSuccess('تصویر گزینه آپلود شد');
+    } catch (e) {
+      toastError(e.message || 'خطا در آپلود تصویر');
+      if (label) label.childNodes[0].textContent = prevLabel;
+    } finally {
+      input.value = '';
+    }
   }
 
   function onOptionCorrectChange(checkbox) {
@@ -266,7 +335,8 @@ const QuizAdminPage = (() => {
   }
 
   function addOption() {
-    document.getElementById('q-options-list').insertAdjacentHTML('beforeend', optionRowHtml('', false));
+    const list = document.getElementById('q-options-list');
+    list.insertAdjacentHTML('beforeend', optionRowHtml({ body: '', is_correct: false }, list.dataset.imageMode === '1'));
   }
 
   function removeOption(btn) {
@@ -279,11 +349,15 @@ const QuizAdminPage = (() => {
   }
 
   function collectOptions() {
-    return Array.from(document.querySelectorAll('#q-options-list .option-row')).map((row, idx) => ({
-      body: row.querySelector('.q-opt-body').value.trim(),
-      is_correct: row.querySelector('.q-opt-correct').checked,
-      order_index: idx,
-    }));
+    return Array.from(document.querySelectorAll('#q-options-list .option-row')).map((row, idx) => {
+      const imageEl = row.querySelector('.q-opt-image');
+      return {
+        body: row.querySelector('.q-opt-body').value.trim(),
+        is_correct: row.querySelector('.q-opt-correct').checked,
+        image_url: imageEl ? (imageEl.value || null) : null,
+        order_index: idx,
+      };
+    });
   }
 
   async function saveQuestion() {
@@ -297,13 +371,19 @@ const QuizAdminPage = (() => {
     let options = [];
     if (type !== 'short_text') {
       options = collectOptions();
-      if (options.some(o => !o.body)) { toastError('متن همه‌ی گزینه‌ها را وارد کنید'); return; }
+      if (options.length < 2) { toastError('حداقل ۲ گزینه لازم است'); return; }
       const correctCount = options.filter(o => o.is_correct).length;
-      if ((type === 'single_choice' || type === 'true_false') && correctCount !== 1) {
-        toastError('دقیقاً یک گزینه‌ی صحیح انتخاب کنید'); return;
-      }
-      if (type === 'multi_choice' && correctCount < 1) {
-        toastError('حداقل یک گزینه‌ی صحیح انتخاب کنید'); return;
+      if (isImageType(type)) {
+        if (options.some(o => !o.image_url)) { toastError('برای همه‌ی گزینه‌ها تصویر آپلود کنید'); return; }
+        if (correctCount !== 1) { toastError('دقیقاً یک گزینه‌ی صحیح انتخاب کنید'); return; }
+      } else {
+        if (options.some(o => !o.body)) { toastError('متن همه‌ی گزینه‌ها را وارد کنید'); return; }
+        if ((type === 'single_choice' || type === 'true_false') && correctCount !== 1) {
+          toastError('دقیقاً یک گزینه‌ی صحیح انتخاب کنید'); return;
+        }
+        if (type === 'multi_choice' && correctCount < 1) {
+          toastError('حداقل یک گزینه‌ی صحیح انتخاب کنید'); return;
+        }
       }
     }
 
@@ -378,7 +458,7 @@ const QuizAdminPage = (() => {
     load, searchDebounced, openCreate, openEdit, save, remove,
     openQuestionsModal, loadQuestions,
     openCreateQuestion, openEditQuestion, onQuestionTypeChange,
-    onOptionCorrectChange, addOption, removeOption, saveQuestion, removeQuestion,
+    onOptionCorrectChange, addOption, removeOption, uploadOptionImage, saveQuestion, removeQuestion,
     openAttemptsModal, loadAttempts,
   };
 })();

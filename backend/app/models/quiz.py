@@ -23,7 +23,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UUIDMixin
 
 # انواع سوال
-QUESTION_TYPES = ("single_choice", "multi_choice", "true_false", "short_text")
+#   single_image_choice: مثل single_choice (یک گزینه‌ی درست) ولی هر گزینه یک
+#   تصویر است (با متن/کپشن اختیاری زیر آن).
+QUESTION_TYPES = (
+    "single_choice",
+    "multi_choice",
+    "true_false",
+    "short_text",
+    "single_image_choice",
+)
 
 
 class Quiz(UUIDMixin, TimestampMixin, Base):
@@ -134,7 +142,7 @@ class Question(UUIDMixin, TimestampMixin, Base):
     )
     type: Mapped[str] = mapped_column(
         String(50), nullable=False,
-        comment="single_choice | multi_choice | true_false | short_text"
+        comment="single_choice | multi_choice | true_false | short_text | single_image_choice"
     )
 
     # توضیح پاسخ صحیح (نشان داده می‌شود بعد از پاسخ)
@@ -182,7 +190,14 @@ class QuestionOption(UUIDMixin, Base):
         nullable=False,
         index=True,
     )
-    body: Mapped[str] = mapped_column(Text, nullable=False, comment="متن گزینه")
+    body: Mapped[str] = mapped_column(
+        Text, nullable=False, default="",
+        comment="متن گزینه — برای single_image_choice می‌تواند خالی باشد (کپشن اختیاری تصویر)",
+    )
+    image_url: Mapped[str | None] = mapped_column(
+        Text, nullable=True,
+        comment="آدرس داخلی تصویر گزینه (/api/files/...) — فقط برای سوال single_image_choice",
+    )
     is_correct: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )

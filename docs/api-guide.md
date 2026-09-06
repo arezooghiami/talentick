@@ -405,7 +405,7 @@ Query: `page, page_size, search, type (course|article|podcast|book), status (dra
 ```json
 {
   "body": "پایتخت ایران کجاست؟",
-  "type": "single_choice",   // single_choice|multi_choice|true_false|short_text
+  "type": "single_choice",   // single_choice|multi_choice|true_false|short_text|single_image_choice
   "explanation": "...",
   "score": 1,
   "order_index": 0,
@@ -415,11 +415,14 @@ Query: `page, page_size, search, type (course|article|podcast|book), status (dra
   ]
 }
 ```
+`QuestionOptionCreate` علاوه بر `body`، فیلد اختیاری `image_url` هم دارد — فقط برای `single_image_choice`. مقدارش باید همان `url` برگشتی از `POST /api/quizzes/upload` (multipart، فیلد `file`، عکس؛ `org_id` اختیاری برای super_admin) باشد.
+
 **قوانین اعتبارسنجی سوال (وگرنه `400`):**
 - `short_text`: نباید option داشته باشه (نمره‌دهی خودکار نداره — همیشه ۰ می‌گیره، تصحیح دستی هنوز پیاده نشده).
 - `single_choice` و `true_false`: باید دقیقاً **۱** گزینه‌ی درست داشته باشن.
 - `true_false`: باید دقیقاً **۲** گزینه داشته باشه.
 - `multi_choice`: حداقل **۱** گزینه‌ی درست، و همه‌ی انواع چندگزینه‌ای حداقل ۲ گزینه.
+- `single_image_choice`: منطقش مثل `single_choice` (دقیقاً **۱** گزینه‌ی درست)، ولی هر گزینه باید `image_url` داشته باشه؛ `body` (کپشن زیر تصویر) اختیاریه.
 
 نکته: `PATCH` سوال، اگه `options` بفرستید کل گزینه‌های قبلی جایگزین می‌شن.
 

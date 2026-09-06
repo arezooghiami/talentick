@@ -329,10 +329,14 @@ const OnboardingPage = (() => {
 
   // ─── تب ۲: مراحل ────────────────────────────────────────────────
   async function loadContentsAndQuizzesForSelect(orgId) {
+    // برنامه‌ی Public (بدون سازمان) → فقط محتوا/آزمون‌های عمومی (org_id IS NULL).
+    // بدون این شاخه، ارسال «org_id=null» به بک‌اند خطای ۴۰۰ می‌دهد و هر دو
+    // دراپ‌داون خالی می‌مانند.
+    const qs = orgId ? `org_id=${orgId}&` : 'scope=public&';
     try {
       const [contentsRes, quizzesRes] = await Promise.all([
-        api.get(`/contents/?org_id=${orgId}&status=published&page_size=100`),
-        api.get(`/quizzes/?org_id=${orgId}&page_size=100`),
+        api.get(`/contents/?${qs}status=published&page_size=100`),
+        api.get(`/quizzes/?${qs}page_size=100`),
       ]);
       state.contentsForSelect = contentsRes.items || [];
       state.quizzesForSelect = quizzesRes.items || [];

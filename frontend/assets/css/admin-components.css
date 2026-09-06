@@ -242,3 +242,20 @@ textarea.form-control { resize: vertical; line-height: 1.7; }
 /* ─── Empty state ─────────────────────────────────────────────────── */
 .empty-state { text-align: center; padding: 56px 20px; color: var(--gray-400); }
 .empty-state-icon { font-size: 38px; margin-bottom: 12px; opacity: .7; }
+
+/* ─── Upload progress + preview (مودال آپلود فایل) ─────────────────── */
+.upload-progress[hidden], .upload-preview[hidden] { display: none; }
+.upload-progress { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.upload-progress-track { flex: 1; height: 8px; background: var(--gray-100); border-radius: 20px; overflow: hidden; }
+.upload-progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); border-radius: 20px; transition: width .2s ease; }
+.upload-progress-pct { font-size: 12px; font-weight: 600; color: var(--gray-500); min-width: 40px; text-align: left; }
+.upload-preview { margin-top: 10px; display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--gray-50); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.upload-preview img, .upload-preview video { width: 96px; height: 96px; object-fit: cover; border-radius: var(--radius-sm); background: var(--gray-100); flex-shrink: 0; }
+.upload-preview-meta { min-width: 0; }
+.upload-preview-name { font-size: 13px; font-weight: 600; color: var(--gray-800); word-break: break-all; }
+.upload-preview-size { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+
+/* ─── jalaliDatepicker — هماهنگی با تم پنل ─────────────────────────── */
+jdp-container { z-index: 3000 !important; font-family: 'Vazirmatn', sans-serif; }
+jdp-container .jdp-day-name.selected, jdp-container .jdp-day.selected { background-color: var(--primary) !important; }
+jdp-container .jdp-btn-empty, jdp-container .jdp-btn-today { background: var(--primary); }
