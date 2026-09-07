@@ -63,6 +63,13 @@ _EMPLOYEE_ONBOARDING_EXEMPT_PREFIXES = (
 def _is_employee_onboarding_exempt(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in _EMPLOYEE_ONBOARDING_EXEMPT_PREFIXES)
 
+# علاوه بر پیشوندهای بالا، یک استثنای «منبع‌محور» هم هست که با prefix ساده
+# قابل بیان نیست: کاربرِ مسدود باید بتواند دقیقاً همان محتوا/آزمون‌هایی را
+# که مراحل مسیر آنبوردینگ اجباریِ ناتمامش هستند مصرف کند
+# (/api/me/contents/{id}[...] و /api/me/quizzes/{id}[...]) — وگرنه بن‌بست:
+# نمی‌تواند مراحل محتوای آنبوردینگ را ببیند تا از گیت خارج شود. این بررسی
+# در onboarding_service.gate_allows_onboarding_resource_path است.
+
 # ─── Role Hierarchy ───────────────────────────────────────────────────────────
 # هر نقش شامل تمام نقش‌های پایین‌تر از خودشه
 ROLE_HIERARCHY: dict[str, int] = {
@@ -135,7 +142,9 @@ async def get_current_user(
 
     if not _is_employee_onboarding_exempt(request.url.path):
         is_blocked = await onboarding_service.get_employee_onboarding_gate_status(db, user.id)
-        if is_blocked:
+        if is_blocked and not await onboarding_service.gate_allows_onboarding_resource_path(
+            db, user.id, request.url.path, request.query_params
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={

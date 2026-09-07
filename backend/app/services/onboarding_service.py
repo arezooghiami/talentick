@@ -12,6 +12,7 @@ CRUD برنامه‌ی آشنایی (OnboardingProgram + ProgramStep) + ثبت�
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -469,6 +470,94 @@ async def get_employee_onboarding_gate_status(db: AsyncSession, user_id: uuid.UU
         )
     )
     return result.scalar_one() > 0
+
+
+async def _pending_mandatory_onboarding_step_exists(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    content_id: uuid.UUID | None = None,
+    quiz_id: uuid.UUID | None = None,
+) -> bool:
+    """
+    آیا محتوا/آزمون داده‌شده مرحله‌ای از یک مسیر «آنبوردینگ کارمند»ِ
+    اجباریِ ناتمامِ همین کاربر است؟ — دقیقاً همان شرط
+    get_employee_onboarding_gate_status، فقط محدود به یک منبع مشخص.
+    """
+    if content_id is None and quiz_id is None:
+        return False
+    resource_clause = (
+        ProgramStep.content_id == content_id if content_id is not None else ProgramStep.quiz_id == quiz_id
+    )
+    result = await db.execute(
+        select(func.count())
+        .select_from(ProgramStep)
+        .join(UserProgramEnrollment, UserProgramEnrollment.program_id == ProgramStep.program_id)
+        .join(OnboardingProgram, OnboardingProgram.id == ProgramStep.program_id)
+        .where(
+            resource_clause,
+            UserProgramEnrollment.user_id == user_id,
+            OnboardingProgram.purpose == "employee_onboarding",
+            UserProgramEnrollment.is_mandatory.is_(True),
+            UserProgramEnrollment.completed_at.is_(None),
+            UserProgramEnrollment.cancelled_at.is_(None),
+        )
+    )
+    return result.scalar_one() > 0
+
+
+async def user_can_access_onboarding_content(db: AsyncSession, user_id: uuid.UUID, content_id) -> bool:
+    """
+    آیا این کاربر باید بتواند این محتوا را ببیند چون مرحله‌ای از آنبوردینگ
+    اجباریِ ناتمامش است — صرف‌نظر از هدف‌گذاری واحد/سمت محتوا و صرف‌نظر از
+    گیت آنبوردینگ (وگرنه بن‌بست: نمی‌تواند مراحل محتوای آنبوردینگ را ببیند
+    تا از گیت خارج شود).
+    """
+    try:
+        cid = content_id if isinstance(content_id, uuid.UUID) else uuid.UUID(str(content_id))
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return await _pending_mandatory_onboarding_step_exists(db, user_id, content_id=cid)
+
+
+async def user_can_access_onboarding_quiz(db: AsyncSession, user_id: uuid.UUID, quiz_id) -> bool:
+    """معادل user_can_access_onboarding_content برای مرحله‌ی نوع «آزمون»."""
+    try:
+        qid = quiz_id if isinstance(quiz_id, uuid.UUID) else uuid.UUID(str(quiz_id))
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return await _pending_mandatory_onboarding_step_exists(db, user_id, quiz_id=qid)
+
+
+_GATE_CONTENT_PATH_RE = re.compile(r"^/api/me/contents/([0-9a-fA-F-]{36})(?:/.*)?$")
+_GATE_QUIZ_PATH_RE = re.compile(r"^/api/me/quizzes/([0-9a-fA-F-]{36})(?:/.*)?$")
+
+
+async def gate_allows_onboarding_resource_path(
+    db: AsyncSession, user_id: uuid.UUID, path: str, query_params=None
+) -> bool:
+    """
+    استثنای منبع‌محورِ گیت آنبوردینگ: یک کاربرِ مسدود باید بتواند دقیقاً
+    همان محتوا/آزمون‌هایی را که مراحل مسیر آنبوردینگ اجباریِ ناتمامش هستند
+    مصرف کند (مشاهده، شروع، ثبت پیشرفت، شرکت در آزمون) — وگرنه هرگز نمی‌تواند
+    آنبوردینگ را تمام کند. سایر مسیرها همچنان مسدود می‌مانند.
+    """
+    m = _GATE_CONTENT_PATH_RE.match(path)
+    if m:
+        return await user_can_access_onboarding_content(db, user_id, m.group(1))
+
+    m = _GATE_QUIZ_PATH_RE.match(path)
+    if m:
+        if await user_can_access_onboarding_quiz(db, user_id, m.group(1)):
+            return True
+        # آزمونی که به‌صورت آیتم quiz_ref داخل یک محتوای آنبوردینگ باز شده —
+        # خودِ آزمون مرحله نیست ولی محتوای والدش هست.
+        parent_content_id = query_params.get("content_id") if query_params else None
+        if parent_content_id:
+            return await user_can_access_onboarding_content(db, user_id, parent_content_id)
+        return False
+
+    return False
 
 
 async def unenroll_user_from_employee_onboarding(db: AsyncSession, user: User) -> None:

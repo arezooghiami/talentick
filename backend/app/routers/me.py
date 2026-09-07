@@ -195,7 +195,7 @@ async def get_my_content(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     if content.status != "published":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
-    if not await content_service.is_visible_to_user(db, content, current_user):
+    if not await content_service.is_visible_to_user(db, content, current_user) and not await onboarding_service.user_can_access_onboarding_content(db, current_user.id, content.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
 
     detail = await content_service.content_to_detail(db, content)
@@ -234,7 +234,7 @@ async def start_my_content(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     if content.status != "published":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
-    if not await content_service.is_visible_to_user(db, content, current_user):
+    if not await content_service.is_visible_to_user(db, content, current_user) and not await onboarding_service.user_can_access_onboarding_content(db, current_user.id, content.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     progress = await progress_service.start_content(db, current_user, content)
     return progress_service.content_progress_to_response(progress)
@@ -256,7 +256,7 @@ async def update_item_progress(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
     if content.status != "published":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
-    if not await content_service.is_visible_to_user(db, content, current_user):
+    if not await content_service.is_visible_to_user(db, content, current_user) and not await onboarding_service.user_can_access_onboarding_content(db, current_user.id, content.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "محتوا یافت نشد")
 
     item = await content_service.get_item(db, item_id)
