@@ -10,7 +10,6 @@ const StructurePage = (() => {
     orgId: null, orgName: '', depts: [], positions: [],
     structTab: 'tree',        // 'tree' | 'table' — نمای پیش‌فرض واحدها
     collapsed: new Set(),      // id واحدهایی که در نمای درختی جمع شده‌اند
-    orgUsers: null,            // کش کاربران سازمان — برای انتخاب «مدیر واحد»
     dragId: null,              // واحد در حال کشیده‌شدن
   };
 
@@ -18,7 +17,6 @@ const StructurePage = (() => {
   function openFor(orgId, orgName) {
     state.orgId = orgId;
     state.orgName = orgName;
-    state.orgUsers = null;        // کش کاربران سازمان قبلی را دور بریز
     state.collapsed.clear();
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-structure').classList.add('active');
@@ -36,7 +34,6 @@ const StructurePage = (() => {
   function loadOwn() {
     state.orgId = App.currentUser.org_id;
     state.orgName = '';
-    state.orgUsers = null;
     setText('structTitle', 'ساختار سازمانی');
     setText('structSubtitle', 'مدیریت واحدها و پست‌های سازمان شما');
     document.getElementById('structBackBtn').classList.add('hidden');
@@ -295,25 +292,128 @@ const StructurePage = (() => {
         .map(d => `<option value="${d.id}" ${d.id === selectedId ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
   }
 
-  async function loadOrgUsers() {
-    if (state.orgUsers) return state.orgUsers;
-    try {
-      const res = await api.get(`/users/?org_id=${state.orgId}&per_page=100`);
-      state.orgUsers = res.items || [];
-    } catch (_) { state.orgUsers = []; }
-    return state.orgUsers;
+  // ─── انتخاب «مدیر واحد» — دراپ‌داون قابل‌سرچ (جستجوی سمت سرور) ────
+  // تعداد کاربران سازمان می‌تواند زیاد باشد؛ به‌جای بارگذاری همه، هنگام
+  // تایپ یک درخواست debounce‌شده به /users/?search=... زده می‌شود.
+  const mgr = {
+    box: null, input: null, hidden: null, menu: null,
+    debounce: null, open: false, results: [], activeIdx: -1, bound: false,
+  };
+
+  function managerChoices() {
+    return [{ id: '', full_name: '— بدون مدیر —', department: null }, ...mgr.results];
   }
 
-  function populateManagerSelect(selectedId) {
-    const sel = document.getElementById('d-manager');
-    if (!sel) return;
-    const users = state.orgUsers || [];
-    sel.innerHTML = '<option value="">— بدون مدیر —</option>' +
-      users.map(u => `<option value="${u.id}" ${u.id === selectedId ? 'selected' : ''}>${esc(u.full_name)}${u.department ? ' — ' + esc(u.department) : ''}</option>`).join('');
-    if (selectedId && !users.some(u => u.id === selectedId)) {
-      // مدیر فعلی در ۱۰۰ کاربر اول نبود — یک گزینه‌ی دستی اضافه کن تا گم نشود
-      sel.insertAdjacentHTML('beforeend', `<option value="${selectedId}" selected>مدیر فعلی</option>`);
+  function initManagerSelect() {
+    if (mgr.bound) return;
+    mgr.box = document.getElementById('d-manager-box');
+    mgr.input = document.getElementById('d-manager-search');
+    mgr.hidden = document.getElementById('d-manager');
+    mgr.menu = document.getElementById('d-manager-menu');
+    if (!mgr.box || !mgr.input || !mgr.hidden || !mgr.menu) return;
+
+    mgr.input.addEventListener('input', () => {
+      mgr.hidden.value = '';           // تایپ آزاد = انتخاب قبلی باطل شد
+      openManagerMenu();
+      mgr.menu.innerHTML = `<div class="search-select-hint">در حال جستجو…</div>`;
+      clearTimeout(mgr.debounce);
+      mgr.debounce = setTimeout(() => runManagerSearch(mgr.input.value.trim()), 300);
+    });
+    mgr.input.addEventListener('focus', () => {
+      openManagerMenu();
+      runManagerSearch(mgr.input.value.trim());
+    });
+    mgr.input.addEventListener('keydown', onManagerKeydown);
+    mgr.menu.addEventListener('mousedown', (e) => {
+      const opt = e.target.closest('[data-uid]');
+      if (!opt) return;
+      e.preventDefault();                // نگذار input بلور شود
+      pickManager(opt.dataset.uid, opt.dataset.name);
+    });
+    document.addEventListener('click', (e) => {
+      if (mgr.open && !mgr.box.contains(e.target)) closeManagerMenu();
+    });
+    mgr.bound = true;
+  }
+
+  function openManagerMenu() {
+    if (mgr.open) return;
+    mgr.open = true;
+    mgr.menu.classList.remove('hidden');
+  }
+  function closeManagerMenu() {
+    mgr.open = false;
+    mgr.activeIdx = -1;
+    mgr.menu.classList.add('hidden');
+  }
+
+  async function runManagerSearch(term) {
+    const p = new URLSearchParams({ org_id: state.orgId, per_page: '20' });
+    if (term) p.set('search', term);
+    try {
+      const res = await api.get(`/users/?${p}`);
+      mgr.results = res.items || [];
+    } catch (_) {
+      mgr.results = [];
     }
+    mgr.activeIdx = -1;
+    renderManagerMenu();
+  }
+
+  function renderManagerMenu() {
+    if (!mgr.open) return;
+    const choices = managerChoices();
+    const cur = mgr.hidden.value;
+    let html = choices.map((c, i) => `
+      <div class="search-select-option${i === mgr.activeIdx ? ' is-active' : ''}${c.id && c.id === cur ? ' is-selected' : ''}"
+           data-uid="${esc(c.id)}" data-name="${c.id ? esc(c.full_name) : ''}">
+        <span class="search-select-name">${esc(c.full_name)}</span>
+        ${c.department ? `<span class="search-select-sub">${esc(c.department)}</span>` : ''}
+      </div>`).join('');
+    if (choices.length === 1) html += `<div class="search-select-hint">کاربری یافت نشد</div>`;
+    mgr.menu.innerHTML = html;
+    const act = mgr.menu.querySelector('.search-select-option.is-active');
+    if (act) act.scrollIntoView({ block: 'nearest' });
+  }
+
+  function onManagerKeydown(e) {
+    const choices = managerChoices();
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      openManagerMenu();
+      mgr.activeIdx = Math.min(mgr.activeIdx + 1, choices.length - 1);
+      renderManagerMenu();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      mgr.activeIdx = Math.max(mgr.activeIdx - 1, 0);
+      renderManagerMenu();
+    } else if (e.key === 'Enter') {
+      if (mgr.open && mgr.activeIdx >= 0) {
+        e.preventDefault();
+        const c = choices[mgr.activeIdx];
+        pickManager(c.id, c.id ? c.full_name : '');
+      }
+    } else if (e.key === 'Escape') {
+      if (mgr.open) { e.preventDefault(); closeManagerMenu(); }
+    }
+  }
+
+  function pickManager(uid, name) {
+    mgr.hidden.value = uid || '';
+    mgr.input.value = uid ? (name || '') : '';
+    closeManagerMenu();
+  }
+
+  /** مقدار اولیه‌ی انتخاب مدیر را تنظیم می‌کند (بدون درخواست شبکه). */
+  function setManagerSelection(id, name) {
+    initManagerSelect();
+    if (!mgr.hidden) return;
+    mgr.hidden.value = id || '';
+    mgr.input.value = id ? (name || '') : '';
+    mgr.results = [];
+    mgr.activeIdx = -1;
+    clearTimeout(mgr.debounce);
+    closeManagerMenu();
   }
 
   async function openCreateDept(parentId) {
@@ -324,11 +424,9 @@ const StructurePage = (() => {
     document.getElementById('d-desc').value = '';
     document.getElementById('d-order').value = String(deptChildren(parentId || null).length);
     populateParentDeptSelect(parentId || '', '');
-    populateManagerSelect('');
+    setManagerSelection('', '');
     openModal('modal-dept');
     document.getElementById('d-name').focus();
-    await loadOrgUsers();
-    populateManagerSelect('');
   }
 
   async function openEditDept(id) {
@@ -340,10 +438,8 @@ const StructurePage = (() => {
     document.getElementById('d-desc').value = d.description || '';
     document.getElementById('d-order').value = d.order_index ?? 0;
     populateParentDeptSelect(d.parent_id, d.id);
-    populateManagerSelect(d.manager_id || '');
+    setManagerSelection(d.manager_id || '', d.manager_name || '');
     openModal('modal-dept');
-    await loadOrgUsers();
-    populateManagerSelect(d.manager_id || '');
   }
 
   async function saveDept() {

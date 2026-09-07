@@ -18,7 +18,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
   <!-- ─── سیستم طراحی واحد (مبنا: ظاهر super-admin.html سابق) ─── -->
   <link rel="stylesheet" href="../assets/css/admin.css?v=20260719a" />
-  <link rel="stylesheet" href="../assets/css/admin-components.css?v=20260907b" />
+  <link rel="stylesheet" href="../assets/css/admin-components.css?v=20260907c" />
   <link rel="stylesheet" href="../assets/vendor/jalalidatepicker.min.css?v=0.6.0" />
 </head>
 <body>
@@ -980,7 +980,13 @@
       <div class="form-group"><label class="form-label">نام واحد <span class="required">*</span></label><input id="d-name" class="form-control" placeholder="واحد فناوری"></div>
       <div class="form-grid-2">
         <div class="form-group"><label class="form-label">واحد مادر</label><select id="d-parent" class="form-control"><option value="">— بدون واحد مادر (سطح اول) —</option></select></div>
-        <div class="form-group"><label class="form-label">مدیر واحد</label><select id="d-manager" class="form-control"><option value="">— بدون مدیر —</option></select></div>
+        <div class="form-group"><label class="form-label">مدیر واحد</label>
+          <div class="search-select" id="d-manager-box">
+            <input type="hidden" id="d-manager">
+            <input type="text" id="d-manager-search" class="form-control" placeholder="جستجوی نام مدیر…" autocomplete="off">
+            <div class="search-select-menu hidden" id="d-manager-menu"></div>
+          </div>
+        </div>
       </div>
       <div class="form-group"><label class="form-label">توضیحات</label><textarea id="d-desc" class="form-control" rows="2"></textarea></div>
       <div class="form-group"><label class="form-label">ترتیب نمایش</label><input id="d-order" class="form-control" type="number" min="0" value="0"><span class="form-hint">در نمای درختی با کشیدن واحد هم قابل تنظیم است.</span></div>
@@ -2232,7 +2238,7 @@
 <script src="../assets/js/dashboard.js?v=20260715"></script>
 <script src="../assets/js/users.js?v=20260816"></script>
 <script src="../assets/js/orgs.js?v=20260715"></script>
-<script src="../assets/js/org_structure.js?v=20260907b"></script>
+<script src="../assets/js/org_structure.js?v=20260907c"></script>
 <script src="../assets/js/org_profile.js?v=20260715"></script>
 <script src="../assets/js/document_admin.js?v=20260715"></script>
 <script src="../assets/js/announcements_admin.js?v=20260906b"></script>
