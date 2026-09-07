@@ -29,11 +29,13 @@ from app.dependencies import enforce_org_scope as _enforce_org_scope
 from app.models.user import User
 from app.schemas.department import (
     DepartmentCreate,
+    DepartmentReorderRequest,
     DepartmentResponse,
     DepartmentTreeNode,
     DepartmentUpdate,
 )
 from app.services import department_service
+from app.services.department_service import ReorderError
 
 router = APIRouter(prefix="/api/departments", tags=["Departments"])
 
@@ -101,6 +103,23 @@ async def create_department(
 
     dept = await department_service.create_department(db, org_id, body)
     return await department_service._to_response(db, dept)
+
+
+@router.patch(
+    "/reorder", status_code=status.HTTP_204_NO_CONTENT, summary="بازچینش درخت واحدها",
+    description="والد و ترتیب نمایش چند واحد را یکجا به‌روزرسانی می‌کند — خروجی کشیدن‌ورهاکردن در نمای درختی. کل تغییر atomic است. **دسترسی:** manager به بالا (سازمان خودشان).",
+    responses={400: {"description": "id/والد نامعتبر است یا جابه‌جایی حلقه می‌سازد"}},
+)
+async def reorder_departments(
+    body: DepartmentReorderRequest,
+    current_user: Manager,
+    db: AsyncSession = Depends(get_db),
+):
+    target_org_id = _resolve_org_id(current_user, body.org_id)
+    try:
+        await department_service.reorder_departments(db, target_org_id, body.items)
+    except ReorderError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
 
 
 @router.get(

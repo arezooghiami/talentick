@@ -17,10 +17,15 @@ from app.models.organization import Department
 from app.models.user import User
 from app.schemas.department import (
     DepartmentCreate,
+    DepartmentReorderItem,
     DepartmentResponse,
     DepartmentTreeNode,
     DepartmentUpdate,
 )
+
+
+class ReorderError(ValueError):
+    """خطای اعتبارسنجی هنگام بازچینش درخت — پیام برای نمایش به کاربر مناسب است."""
 
 
 async def _user_counts(db: AsyncSession, org_id: uuid.UUID) -> dict[str, int]:
@@ -112,6 +117,54 @@ async def delete_department(db: AsyncSession, dept: Department) -> None:
     طبق FK با ondelete=SET NULL آزاد می‌شوند (حذف نمی‌شوند).
     """
     await db.delete(dept)
+    await db.commit()
+
+
+async def reorder_departments(
+    db: AsyncSession, org_id: uuid.UUID, items: list[DepartmentReorderItem]
+) -> None:
+    """
+    والد (parent_id) و ترتیب نمایش (order_index) چند واحد را یکجا به‌روزرسانی می‌کند.
+
+    خروجی مستقیم کشیدن‌ورهاکردن در نمای درختی است. قبل از اعمال:
+    - همه‌ی id ها و parent_id ها باید متعلق به همین سازمان باشند.
+    - نتیجه‌ی نهایی نباید حلقه (چرخه) بسازد — واحد نمی‌تواند زیرمجموعه‌ی
+      خودش یا یکی از زیرمجموعه‌هایش شود.
+    کل تغییر در یک transaction اعمال می‌شود (all-or-nothing).
+    """
+    result = await db.execute(select(Department).where(Department.org_id == org_id))
+    by_id = {str(d.id): d for d in result.scalars().all()}
+
+    # نقشه‌ی والدِ پیشنهادی برای همه‌ی واحدها (شروع از وضعیت فعلی)
+    proposed_parent: dict[str, str | None] = {
+        did: (str(d.parent_id) if d.parent_id else None) for did, d in by_id.items()
+    }
+
+    for it in items:
+        if it.id not in by_id:
+            raise ReorderError("واحدی در این سازمان یافت نشد")
+        if it.parent_id is not None:
+            if it.parent_id not in by_id:
+                raise ReorderError("واحد مادر معتبر نیست")
+            if it.parent_id == it.id:
+                raise ReorderError("یک واحد نمی‌تواند مادر خودش باشد")
+        proposed_parent[it.id] = it.parent_id
+
+    # تشخیص چرخه — از هر گره به سمت ریشه بالا می‌رویم
+    for start in by_id:
+        seen: set[str] = set()
+        cur: str | None = start
+        while cur is not None:
+            if cur in seen:
+                raise ReorderError("این جابه‌جایی یک حلقه در ساختار سازمانی می‌سازد")
+            seen.add(cur)
+            cur = proposed_parent.get(cur)
+
+    for it in items:
+        dept = by_id[it.id]
+        dept.parent_id = uuid.UUID(it.parent_id) if it.parent_id else None
+        dept.order_index = it.order_index
+
     await db.commit()
 
 

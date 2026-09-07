@@ -58,3 +58,16 @@ class DepartmentTreeNode(BaseModel):
 
 
 DepartmentTreeNode.model_rebuild()
+
+
+class DepartmentReorderItem(BaseModel):
+    """یک واحد با والد و ترتیب جدیدش — خروجی کشیدن‌ورهاکردن در نمای درختی."""
+    id: str
+    parent_id: str | None = None
+    order_index: int = 0
+
+
+class DepartmentReorderRequest(BaseModel):
+    items: list[DepartmentReorderItem] = Field(..., min_length=1)
+    # فقط super_admin مجاز است org_id غیر از سازمان خودش بدهد — در router enforce می‌شود
+    org_id: str | None = None

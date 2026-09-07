@@ -5,6 +5,9 @@
 const OrganizationPage = (() => {
   const state = {
     chartLoaded: false,
+    chartZoom: 1,
+    myDeptId: null,
+    chartCollapsed: new Set(),
     docCategories: [],
     docCategoryId: '',
     docSearch: '',
@@ -70,27 +73,72 @@ const OrganizationPage = (() => {
     const wrap = document.getElementById('orgChartWrap');
     wrap.innerHTML = `<div class="org-chart-loading">در حال بارگذاری...</div>`;
     try {
+      if (state.myDeptId === null) {
+        try { state.myDeptId = (await api.get('/users/me'))?.dept_id || ''; }
+        catch (_) { state.myDeptId = ''; }
+      }
       const tree = await api.get('/me/org-chart');
       state.chartLoaded = true;
-      wrap.innerHTML = tree && tree.length
-        ? `<div class="org-chart-tree">${renderChartNodes(tree)}</div>`
-        : `<div class="org-empty-hint">هنوز واحد سازمانی ثبت نشده است.</div>`;
+      if (!tree || !tree.length) {
+        wrap.innerHTML = `<div class="org-empty-hint">هنوز واحد سازمانی ثبت نشده است.</div>`;
+        return;
+      }
+      wrap.innerHTML = `
+        <div class="org-chart-toolbar">
+          <span class="org-chart-legend"><span class="org-chart-legend-dot"></span> واحد شما</span>
+          <div class="org-chart-zoom">
+            <button type="button" aria-label="کوچک‌نمایی" onclick="OrganizationPage.zoomChart(-1)">−</button>
+            <button type="button" onclick="OrganizationPage.zoomChart(0)">۱۰۰٪</button>
+            <button type="button" aria-label="بزرگ‌نمایی" onclick="OrganizationPage.zoomChart(1)">+</button>
+          </div>
+        </div>
+        <div class="org-chart-viewport">
+          <div class="org-chart-canvas" id="orgChartCanvas">
+            <ul class="org-chart-tree">${renderChartNodes(tree, true)}</ul>
+          </div>
+        </div>`;
+      applyChartZoom();
     } catch (e) {
       wrap.innerHTML = `<div class="org-empty-hint" style="color:var(--danger);">خطا در بارگذاری: ${esc(e.message)}</div>`;
     }
   }
 
-  function renderChartNodes(nodes) {
-    return `<ul class="org-chart-level">` + nodes.map(n => `
-      <li class="org-chart-node">
-        <div class="org-chart-box${n.is_active ? '' : ' inactive'}">
-          <div class="org-chart-box-name">${esc(n.name)}</div>
-          ${n.manager_name ? `<div class="org-chart-box-manager">👤 ${esc(n.manager_name)}</div>` : ''}
-          <div class="org-chart-box-count">${numFa(n.user_count)} نفر</div>
+  function renderChartNodes(nodes, top = false) {
+    return nodes.map(n => {
+      const kids = n.children && n.children.length ? n.children : null;
+      const isCol = state.chartCollapsed.has(n.id);
+      const mine = state.myDeptId && n.id === state.myDeptId;
+      const initials = n.manager_name ? esc(n.manager_name.trim().charAt(0)) : '';
+      return `
+      <li class="org-chart-node${isCol ? ' collapsed' : ''}">
+        <div class="org-chart-card${n.is_active ? '' : ' inactive'}${mine ? ' is-mine' : ''}"
+             ${kids ? `role="button" tabindex="0" data-chart-toggle="${n.id}" title="${isCol ? 'نمایش زیرواحدها' : 'جمع کردن'}"` : ''}>
+          ${mine ? `<span class="org-chart-card-tag">واحد شما</span>` : ''}
+          <div class="org-chart-card-name">${esc(n.name)}</div>
+          <div class="org-chart-card-manager">
+            ${n.manager_name
+              ? `<span class="org-chart-avatar">${initials}</span><span>${esc(n.manager_name)}</span>`
+              : `<span class="org-chart-manager-empty">بدون مدیر واحد</span>`}
+          </div>
+          <div class="org-chart-card-foot">
+            <span class="org-chart-count">${numFa(n.user_count)} نفر</span>
+            ${kids ? `<span class="org-chart-branch">${isCol ? '+' : '–'} ${numFa(kids.length)} زیرواحد</span>` : ''}
+          </div>
         </div>
-        ${n.children && n.children.length ? renderChartNodes(n.children) : ''}
-      </li>
-    `).join('') + `</ul>`;
+        ${kids && !isCol ? `<ul>${renderChartNodes(kids)}</ul>` : ''}
+      </li>`;
+    }).join('');
+  }
+
+  function zoomChart(dir) {
+    state.chartZoom = dir === 0 ? 1
+      : Math.min(1.4, Math.max(0.5, +(state.chartZoom + dir * 0.15).toFixed(2)));
+    applyChartZoom();
+  }
+
+  function applyChartZoom() {
+    const c = document.getElementById('orgChartCanvas');
+    if (c) c.style.transform = `scale(${state.chartZoom})`;
   }
 
   // ─── کتابخانه اسناد ─────────────────────────────────────────────
@@ -163,5 +211,20 @@ const OrganizationPage = (() => {
     }
   }
 
-  return { load, switchTab, setDocCategory, docSearchDebounced };
+  // جمع/باز کردن شاخه‌های چارت با کلیک روی کارت
+  document.getElementById('orgChartWrap')?.addEventListener('click', (e) => {
+    const card = e.target.closest('[data-chart-toggle]');
+    if (!card) return;
+    const id = card.dataset.chartToggle;
+    state.chartCollapsed.has(id) ? state.chartCollapsed.delete(id) : state.chartCollapsed.add(id);
+    loadChart();
+  });
+  document.getElementById('orgChartWrap')?.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-chart-toggle]')) {
+      e.preventDefault();
+      e.target.closest('[data-chart-toggle]').click();
+    }
+  });
+
+  return { load, switchTab, setDocCategory, docSearchDebounced, zoomChart };
 })();

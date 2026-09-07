@@ -37,7 +37,7 @@ from app.core.phone import normalize_phone_search
 from app.database import get_db
 from app.dependencies import CurrentUser, Manager, OrgAdmin, require_active
 from app.dependencies import enforce_org_scope as _enforce_org_scope
-from app.models.organization import Organization
+from app.models.organization import Department, Organization, Position
 from app.models.user import User
 from app.schemas.user import (
     PaginatedUsers,
@@ -69,14 +69,26 @@ async def _to_detail(db: AsyncSession, user: User) -> UserDetail:
     if user.manager_id:
         manager = await user_service.get_user(db, str(user.manager_id))
         manager_name = manager.full_name if manager else None
+
+    # نام واحد/پست را صریح می‌گیریم — دسترسی به user.department/user.position
+    # وقتی رابطه lazy است در session async خطای MissingGreenlet می‌دهد.
+    dept_name = None
+    if user.dept_id:
+        dept = await db.get(Department, user.dept_id)
+        dept_name = dept.name if dept else None
+    position_name = None
+    if user.position_id:
+        pos = await db.get(Position, user.position_id)
+        position_name = pos.name if pos else None
+
     return UserDetail(
         id=str(user.id),
         full_name=user.full_name,
         email=user.email,
         role=user.role,
-        department=user.department.name if user.department else None,
+        department=dept_name,
         dept_id=str(user.dept_id) if user.dept_id else None,
-        position=user.position.name if user.position else None,
+        position=position_name,
         position_id=str(user.position_id) if user.position_id else None,
         manager_id=str(user.manager_id) if user.manager_id else None,
         manager_name=manager_name,
