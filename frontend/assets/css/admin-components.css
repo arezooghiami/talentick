@@ -366,11 +366,20 @@ button.org-tree-chip { cursor: pointer; font-family: 'Vazirmatn', sans-serif; tr
   .org-tree-meta { width: 100%; margin-inline-start: 29px; }
 }
 
-/* ═══ افرادِ هر واحد ذیل آن — چیدمان بر اساس سطح پست («نمایش افراد») ═══ */
-/* کلید فعال: پُر و برجسته تا حالت روشن‌بودن آشکار باشد. */
+/* ═══ افرادِ هر واحد ذیل آن — چیدمان بر اساس سطح پست ═══════════════════ */
+/* کلید سراسری فعال (حداقل یک واحد باز): پُر و برجسته. */
 #structMembersToggle.active {
   background: var(--primary) !important; color: #fff !important; border-color: var(--primary) !important;
 }
+
+/* چیپِ «N نفر» روی ردیفِ واحد = کلیدِ باز/بسته‌کردنِ افرادِ همان واحد */
+.org-tree-chip.is-people { cursor: pointer; }
+.org-tree-chip.is-people:hover { border-color: var(--primary-100); color: var(--primary-darker); }
+.org-tree-chip.is-people.is-open {
+  color: var(--primary-darker); background: var(--primary-light); border-color: transparent;
+}
+.org-tree-chip.is-people.is-loading { opacity: .6; pointer-events: none; }
+.org-tree-chip-caret { font-size: 8px; opacity: .8; }
 
 /* گروهِ اعضا زیر ردیفِ واحد — همان زبانِ بصریِ خطوط اتصالِ درختِ واحدها،
    اما با کنتراست کمتر تا از سلسله‌مراتبِ خودِ واحدها متمایز بماند. */

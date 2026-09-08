@@ -11,8 +11,9 @@ const StructurePage = (() => {
     structTab: 'tree',        // 'tree' | 'table' — نمای پیش‌فرض واحدها
     collapsed: new Set(),      // id واحدهایی که در نمای درختی جمع شده‌اند
     dragId: null,              // واحد در حال کشیده‌شدن
-    showMembers: false,        // نمایش افرادِ هر واحد ذیل آن در نمای درختی
-    membersByDept: {},         // deptId → آرایه‌ی تودرتوی افراد (بر اساس مدیر مستقیم)
+    membersByDept: {},         // deptId → آرایه‌ی تودرتوی افراد (بر اساس سطح پست)
+    membersLoaded: false,      // آیا داده‌ی افراد یک‌بار از سرور گرفته شده؟
+    membersExpanded: new Set(), // id واحدهایی که فهرست افرادشان باز است
   };
 
   /** super_admin از این مسیر وارد می‌شود (نه از Router.navigate معمولی). */
@@ -55,7 +56,8 @@ const StructurePage = (() => {
       // شناسه‌های جمع‌شده‌ای که دیگر وجود ندارند را پاک کن
       const ids = new Set(state.depts.map(d => d.id));
       state.collapsed.forEach(id => { if (!ids.has(id)) state.collapsed.delete(id); });
-      if (state.showMembers) await loadMembers();
+      state.membersExpanded.forEach(id => { if (!ids.has(id)) state.membersExpanded.delete(id); });
+      if (state.membersLoaded) await loadMembers();
       populateDeptFilter();
       renderDeptTable();
       renderDeptTree();
@@ -67,31 +69,64 @@ const StructurePage = (() => {
     }
   }
 
-  // ─── نمایش افرادِ هر واحد (نمای درختی) ─────────────────────────
+  // ─── نمایش افرادِ هر واحد — باز/بسته‌شدنِ مستقلِ هر واحد ────────
   async function loadMembers() {
+    const tree = await api.get(`/departments/tree?org_id=${state.orgId}&include_members=true`);
+    const map = {};
+    (function walk(nodes) {
+      (nodes || []).forEach(n => { map[n.id] = n.members || []; walk(n.children); });
+    })(tree);
+    state.membersByDept = map;
+    state.membersLoaded = true;
+  }
+
+  /** داده‌ی افراد را در صورت نیاز یک‌بار می‌گیرد. true اگر آماده باشد. */
+  async function ensureMembersLoaded() {
+    if (state.membersLoaded) return true;
     try {
-      const tree = await api.get(`/departments/tree?org_id=${state.orgId}&include_members=true`);
-      const map = {};
-      (function walk(nodes) {
-        (nodes || []).forEach(n => { map[n.id] = n.members || []; walk(n.children); });
-      })(tree);
-      state.membersByDept = map;
+      await loadMembers();
+      return true;
     } catch (e) {
-      state.membersByDept = {};
       toastError(e.message || 'خطا در بارگذاری افراد');
+      return false;
     }
   }
 
-  async function toggleMembers() {
-    state.showMembers = !state.showMembers;
-    const btn = document.getElementById('structMembersToggle');
-    if (btn) btn.classList.toggle('active', state.showMembers);
-    if (state.showMembers && !Object.keys(state.membersByDept).length) {
-      const tree = document.getElementById('deptsTree');
-      if (tree) tree.innerHTML = `<div class="org-tree-loading">در حال بارگذاری افراد...</div>`;
-      await loadMembers();
+  /** باز/بسته‌کردنِ فهرست افرادِ یک واحدِ مشخص. */
+  async function togglePeople(deptId) {
+    if (state.membersExpanded.has(deptId)) {
+      state.membersExpanded.delete(deptId);
+      renderDeptTree();
+      return;
     }
+    if (!state.membersLoaded) {
+      const row = document.querySelector(`.org-tree-row[data-id="${deptId}"] [data-people="${deptId}"]`);
+      if (row) row.classList.add('is-loading');
+      const ok = await ensureMembersLoaded();
+      if (!ok) { renderDeptTree(); return; }
+    }
+    state.membersExpanded.add(deptId);
     renderDeptTree();
+  }
+
+  /** دکمه‌ی سراسری: اگر همه باز باشند همه را ببند، وگرنه همه را باز کن. */
+  async function toggleAllPeople() {
+    const ok = await ensureMembersLoaded();
+    if (!ok) return;
+    const withPeople = state.depts.filter(d => (state.membersByDept[d.id] || []).length).map(d => d.id);
+    const allOpen = withPeople.length > 0 && withPeople.every(id => state.membersExpanded.has(id));
+    state.membersExpanded = new Set(allOpen ? [] : withPeople);
+    syncAllPeopleBtn();
+    renderDeptTree();
+  }
+
+  function syncAllPeopleBtn() {
+    const btn = document.getElementById('structMembersToggle');
+    if (!btn) return;
+    const withPeople = state.depts.filter(d => (state.membersByDept[d.id] || []).length).map(d => d.id);
+    const allOpen = withPeople.length > 0 && withPeople.every(id => state.membersExpanded.has(id));
+    btn.classList.toggle('active', state.membersExpanded.size > 0);
+    btn.textContent = allOpen ? '👥 بستن همه‌ی افراد' : '👥 نمایش همه‌ی افراد';
   }
 
   // ─── نمای واحدها: جدولی / درختی ─────────────────────────────────
@@ -173,14 +208,17 @@ const StructurePage = (() => {
     }
     wrap.innerHTML = `<div class="org-tree" id="orgTreeRoot">${renderTreeLevel(null, 0)}</div>`;
     bindTreeDnd(wrap);
-    if (state.showMembers) hydrateAuthedImages(wrap);
+    if (state.membersExpanded.size) hydrateAuthedImages(wrap);
+    syncAllPeopleBtn();
   }
 
-  // ─── رندر بازگشتی افرادِ یک واحد (تودرتو بر اساس مدیر مستقیم) ────
+  // ─── رندر بازگشتی افرادِ یک واحد (تودرتو بر اساس سطح پست) ────────
   function renderMembersBlock(deptId) {
-    if (!state.showMembers) return '';
+    if (!state.membersExpanded.has(deptId)) return '';
     const members = state.membersByDept[deptId] || [];
-    if (!members.length) return '';
+    if (!members.length) {
+      return `<div class="org-tree-members"><div class="org-members-cap">عضوِ فعالی در این واحد نیست</div></div>`;
+    }
     return `<div class="org-tree-members">
       <div class="org-members-cap">اعضای واحد — چیدمان بر اساس سطح پست</div>
       ${renderMemberNodes(members)}
@@ -229,6 +267,14 @@ const StructurePage = (() => {
         ? `<span class="org-tree-chip"><span aria-hidden="true">👤</span>${esc(d.manager_name)}</span>`
         : `<button class="org-tree-chip is-assign" data-edit="${d.id}"><span aria-hidden="true">＋</span>تعیین مدیر</button>`;
       const inactive = d.is_active ? '' : `<span class="badge badge-inactive">غیرفعال</span>`;
+      const peopleOpen = state.membersExpanded.has(d.id);
+      const peopleChip = d.user_count > 0
+        ? `<button class="org-tree-chip is-people${peopleOpen ? ' is-open' : ''}" data-people="${d.id}"
+                   aria-expanded="${peopleOpen}" title="${peopleOpen ? 'بستن فهرست افراد' : 'نمایش افرادِ این واحد'}">
+             <span aria-hidden="true">👥</span>${numFa(d.user_count)} نفر
+             <span class="org-tree-chip-caret" aria-hidden="true">${peopleOpen ? '▾' : '▸'}</span>
+           </button>`
+        : `<span class="org-tree-chip"><span aria-hidden="true">👥</span>${numFa(d.user_count)} نفر</span>`;
       return `
         <div class="org-tree-node" data-node="${d.id}">
           <div class="org-tree-row${depth === 0 ? ' is-root' : ''}${d.is_active ? '' : ' is-inactive'}"
@@ -239,7 +285,7 @@ const StructurePage = (() => {
             <span class="org-tree-name">${esc(d.name)}</span>
             <span class="org-tree-meta">
               ${manager}
-              <span class="org-tree-chip"><span aria-hidden="true">👥</span>${numFa(d.user_count)} نفر</span>
+              ${peopleChip}
               ${inactive}
             </span>
             <span class="org-tree-actions">
@@ -731,12 +777,14 @@ const StructurePage = (() => {
 
   // ─── نمای درختی — کلیک روی chevron / دکمه‌های عملیات ─────────────
   document.getElementById('deptsTree')?.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-toggle],[data-add],[data-edit],[data-del]');
+    const t = e.target.closest('[data-toggle],[data-people],[data-add],[data-edit],[data-del]');
     if (!t) return;
     if (t.dataset.toggle) {
       const id = t.dataset.toggle;
       state.collapsed.has(id) ? state.collapsed.delete(id) : state.collapsed.add(id);
       renderDeptTree();
+    } else if (t.dataset.people) {
+      togglePeople(t.dataset.people);
     } else if (t.dataset.add) {
       openCreateDept(t.dataset.add);
     } else if (t.dataset.edit) {
@@ -748,7 +796,7 @@ const StructurePage = (() => {
 
   return {
     openFor, loadOwn,
-    setStructTab, toggleAllTree, toggleMembers,
+    setStructTab, toggleAllTree, toggleAllPeople,
     openCreateDept, openEditDept, saveDept, removeDept,
     openCreatePosition, openEditPosition, savePosition, removePosition,
     loadPositions,
