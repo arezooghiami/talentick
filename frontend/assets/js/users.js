@@ -266,7 +266,7 @@ const UsersPage = (() => {
     }
 
     if (u.org_id) {
-      await populateDeptPositionSelects(orgId, u.dept_id, u.position_id);
+      await populateDeptPositionSelects(orgId, u.dept_id, u.position_id, u.manager_id, u.id);
 
       // وضعیت فعلی Employee Onboarding این کاربر — غیرحیاتی (اگر خطا داد، فرم بدون پیش‌فرض باز می‌شود)
       try {
@@ -300,6 +300,7 @@ const UsersPage = (() => {
       document.getElementById('un-role').value = 'employee';
       document.getElementById('un-dept').value = '';
       document.getElementById('un-position').value = '';
+      document.getElementById('un-manager').value = '';
       document.getElementById('un-is-new-employee').checked = false;
       document.getElementById('un-eo-program-wrap').classList.add('hidden');
     } else {
@@ -338,18 +339,21 @@ const UsersPage = (() => {
     };
   }
 
-  async function populateDeptPositionSelects(orgId, selectedDeptId, selectedPosId) {
+  async function populateDeptPositionSelects(orgId, selectedDeptId, selectedPosId, selectedManagerId, excludeUserId) {
     const deptSel = document.getElementById('un-dept');
     const posSel = document.getElementById('un-position');
+    const mgrSel = document.getElementById('un-manager');
     if (!orgId) {
       deptSel.innerHTML = '<option value="">— ابتدا سازمان را انتخاب کنید —</option>';
       posSel.innerHTML = '<option value="">— ابتدا سازمان را انتخاب کنید —</option>';
+      if (mgrSel) mgrSel.innerHTML = '<option value="">— ابتدا سازمان را انتخاب کنید —</option>';
       return;
     }
     try {
-      const [depts, positions] = await Promise.all([
+      const [depts, positions, users] = await Promise.all([
         api.get(`/departments/?org_id=${orgId}`),
         api.get(`/positions/?org_id=${orgId}`),
+        api.get(`/users/?org_id=${orgId}&per_page=100`).catch(() => ({ items: [] })),
       ]);
       state.depts = depts || [];
       state.positions = positions || [];
@@ -357,9 +361,17 @@ const UsersPage = (() => {
         state.depts.map(d => `<option value="${d.id}" ${d.id === selectedDeptId ? 'selected' : ''}>${esc(d.name)}</option>`).join('');
       posSel.innerHTML = '<option value="">— بدون پست —</option>' +
         state.positions.map(p => `<option value="${p.id}" ${p.id === selectedPosId ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+      if (mgrSel) {
+        const people = (users.items || [])
+          .filter(u => u.id !== excludeUserId)
+          .sort((a, b) => a.full_name.localeCompare(b.full_name, 'fa'));
+        mgrSel.innerHTML = '<option value="">— بدون مدیر مستقیم —</option>' +
+          people.map(u => `<option value="${u.id}" ${u.id === selectedManagerId ? 'selected' : ''}>${esc(u.full_name)}${u.department ? ' — ' + esc(u.department) : ''}</option>`).join('');
+      }
     } catch (e) {
       deptSel.innerHTML = '<option value="">خطا در بارگذاری واحدها</option>';
       posSel.innerHTML = '<option value="">خطا در بارگذاری پست‌ها</option>';
+      if (mgrSel) mgrSel.innerHTML = '<option value="">خطا در بارگذاری کاربران</option>';
     }
   }
 
@@ -373,6 +385,7 @@ const UsersPage = (() => {
     const isGeneralUser = App.isSuperAdmin && document.getElementById('un-general-user').checked;
     const dept_id = isGeneralUser ? null : (document.getElementById('un-dept').value || null);
     const position_id = isGeneralUser ? null : (document.getElementById('un-position').value || null);
+    const manager_id = isGeneralUser ? '' : (document.getElementById('un-manager').value || '');
     const org_id = isGeneralUser ? null : (App.isSuperAdmin ? document.getElementById('un-org').value : App.currentUser.org_id);
     const isNewEmployee = !isGeneralUser && document.getElementById('un-is-new-employee').checked;
     const employee_onboarding_program_id = isNewEmployee ? (document.getElementById('un-eo-program').value || null) : null;
@@ -389,7 +402,7 @@ const UsersPage = (() => {
       if (id) {
         const patchBody = {
           full_name, email: email || null, role, phone: phone || null, dept_id, position_id,
-          employee_onboarding_program_id,
+          manager_id, employee_onboarding_program_id,
         };
         // فقط super_admin اجازه‌ی تغییر سازمان کاربر را دارد — برای بقیه‌ی
         // نقش‌ها این کلید اصلاً ارسال نمی‌شود تا سرور 403 ندهد.
@@ -399,7 +412,7 @@ const UsersPage = (() => {
       } else {
         await api.post('/users/', {
           full_name, email: email || null, role, org_id, phone, password, dept_id, position_id,
-          employee_onboarding_program_id,
+          manager_id: manager_id || null, employee_onboarding_program_id,
         });
         toastSuccess('کاربر با موفقیت ایجاد شد');
       }

@@ -180,19 +180,19 @@ async def _members_by_dept(
     db: AsyncSession, org_id: uuid.UUID, dept_manager_id: dict[str, uuid.UUID | None]
 ) -> dict[str, list[DepartmentMemberNode]]:
     """
-    برای هر واحد، افرادِ آن را به‌صورت تودرتو بر اساس «سطح پستِ سازمانی»
-    برمی‌گرداند (سطح بالاتر = رتبه بالاتر؛ ۸ = مدیرعامل). فقط کاربران
+    برای هر واحد، افرادِ آن را به‌صورت تودرتو برمی‌گرداند. فقط کاربران
     فعالِ دارای `dept_id`.
 
-    منطق چیدمان داخل هر واحد:
-      • افرادِ بالاترین سطحِ موجود، ریشه‌های واحد هستند.
-      • هر فردِ دیگر زیر «نزدیک‌ترین سطحِ بالاتر» در همان واحد می‌نشیند.
-      • رفعِ ابهام وقتی چند نفر در آن سطحِ بالاتر هستند:
-          ۱) اگر یکی از آن‌ها «مدیر واحد» است → زیرِ او.
-          ۲) وگرنه اگر `manager_id` فرد به یکی از آن‌ها اشاره می‌کند → زیرِ همان.
-          ۳) وگرنه → زیرِ اولین نفرِ آن سطح (به ترتیب نام).
-      • «مدیر واحد» همیشه یک ریشه است (زیرِ کسی نمی‌رود)؛ اگر سطحِ او از
-        همه بالاتر نباشد، افرادِ هم‌سطح یا بالاترش هم کنارش ریشه می‌شوند.
+    منطقِ چیدمان (هیبریدی) برای هر فرد داخل واحدش:
+      ۱) اگر «مدیر مستقیم» (`users.manager_id`) او ست باشد و آن شخص هم در
+         همان واحد باشد → دقیقاً زیرِ او (معتبرترین منبع).
+      ۲) وگرنه بر اساس «سطح پستِ سازمانی» (سطح بالاتر = رتبه بالاتر):
+         زیرِ «نزدیک‌ترین سطحِ بالاتر» در همان واحد. رفعِ ابهام وقتی چند
+         نفر در آن سطح هستند: (الف) مدیر واحد، (ب) مدیر مستقیمِ فرد،
+         (ج) اولین نفر به ترتیب نام.
+      ۳) «مدیر واحد» و افرادِ بالاترین سطحِ موجود → ریشه‌ی واحد.
+    حلقه‌ها (مثلاً دو نفر که مدیرِ همدیگرند) تشخیص داده و بازِ می‌شوند تا
+    کسی از چارت حذف نشود.
     """
     rows = await db.execute(
         select(User).where(
@@ -222,6 +222,7 @@ async def _members_by_dept(
     result: dict[str, list[DepartmentMemberNode]] = {}
     for dept_id, dept_users in by_dept.items():
         mgr_id = dept_manager_id.get(dept_id)
+        member_ids = {u.id for u in dept_users}
         levels_desc = sorted({_level(u) for u in dept_users}, reverse=True)
 
         node_map: dict[uuid.UUID, DepartmentMemberNode] = {
@@ -241,30 +242,54 @@ async def _members_by_dept(
             for u in dept_users
         }
 
-        roots: list[DepartmentMemberNode] = []
+        # ── گامِ ۱: تعیینِ والدِ هر فرد (به‌صورت id) ─────────────────
+        parent_of: dict[uuid.UUID, uuid.UUID | None] = {}
         for u in dept_users:
-            lvl = _level(u)
-            higher_levels = [x for x in levels_desc if x > lvl]
-
-            # مدیر واحد، و هرکس در بالاترین سطحِ موجود → ریشه‌ی واحد
-            if u.id == mgr_id or not higher_levels:
-                roots.append(node_map[u.id])
+            if u.id == mgr_id:
+                parent_of[u.id] = None
                 continue
 
-            parent_level = min(higher_levels)  # نزدیک‌ترین سطحِ بالاتر
+            # (۱) مدیر مستقیمِ صریح — اگر در همان واحد باشد
+            mid = u.manager_id
+            if mid is not None and mid in member_ids and mid != u.id:
+                parent_of[u.id] = mid
+                continue
+
+            # (۲) fallback بر اساس سطح
+            higher_levels = [x for x in levels_desc if x > _level(u)]
+            if not higher_levels:
+                parent_of[u.id] = None
+                continue
+            parent_level = min(higher_levels)
             candidates = [
                 c for c in dept_users if _level(c) == parent_level and c.id != u.id
             ]
-            # قانون ۱ — مدیر واحد در میان کاندیداها
-            parent = next((c for c in candidates if c.id == mgr_id), None)
-            # قانون ۲ — مدیر مستقیمِ فرد در میان کاندیداها
-            if parent is None and u.manager_id is not None:
-                parent = next((c for c in candidates if c.id == u.manager_id), None)
-            # قانون ۳ — اولین نفر به ترتیب نام
-            if parent is None:
-                parent = sorted(candidates, key=lambda c: c.full_name)[0]
+            pick = next((c for c in candidates if c.id == mgr_id), None)
+            if pick is None and mid is not None:
+                pick = next((c for c in candidates if c.id == mid), None)
+            if pick is None:
+                pick = min(candidates, key=lambda c: c.full_name)
+            parent_of[u.id] = pick.id
 
-            node_map[parent.id].children.append(node_map[u.id])
+        # ── گامِ ۲: بازکردنِ حلقه‌ها ────────────────────────────────
+        for u in dept_users:
+            seen: set[uuid.UUID] = set()
+            cur: uuid.UUID | None = u.id
+            while cur is not None:
+                if cur in seen:
+                    parent_of[cur] = None  # این گره روی یک حلقه است — آزادش کن
+                    break
+                seen.add(cur)
+                cur = parent_of.get(cur)
+
+        # ── گامِ ۳: ساختِ درخت ────────────────────────────────────
+        roots: list[DepartmentMemberNode] = []
+        for u in dept_users:
+            p = parent_of[u.id]
+            if p is None:
+                roots.append(node_map[u.id])
+            else:
+                node_map[p].children.append(node_map[u.id])
 
         _sort_member_nodes(roots)
         result[dept_id] = roots
@@ -278,8 +303,9 @@ async def build_tree(
     """
     درخت چارت سازمانی را از لیست مسطح می‌سازد.
 
-    با `include_members=True` افرادِ هر واحد هم به‌صورت تودرتو (بر اساس
-    سطح پستِ سازمانی) در فیلد `members` هر گره قرار می‌گیرند — مخصوص پنل ادمین.
+    با `include_members=True` افرادِ هر واحد هم به‌صورت تودرتو (مدیر
+    مستقیم، و در نبودِ آن سطح پست) در فیلد `members` هر گره قرار می‌گیرند
+    — مخصوص پنل ادمین.
     """
     result = await db.execute(
         select(Department)

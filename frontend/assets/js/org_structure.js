@@ -220,7 +220,7 @@ const StructurePage = (() => {
       return `<div class="org-tree-members"><div class="org-members-cap">عضوِ فعالی در این واحد نیست</div></div>`;
     }
     return `<div class="org-tree-members">
-      <div class="org-members-cap">اعضای واحد — چیدمان بر اساس سطح پست</div>
+      <div class="org-members-cap">اعضای واحد — بر اساس مدیر مستقیم (و در نبودِ آن، سطح پست)</div>
       ${renderMemberNodes(members)}
     </div>`;
   }
