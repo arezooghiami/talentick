@@ -71,15 +71,22 @@ async def list_departments(
 
 @router.get(
     "/tree", response_model=list[DepartmentTreeNode], summary="چارت سازمانی درختی",
-    description="ساختار درختی کامل دپارتمان‌ها (parent → children) برای رندر چارت سازمانی در فرانت — هر گره شامل تعداد کاربران و نام مدیر واحد. **دسترسی:** manager به بالا.",
+    description=(
+        "ساختار درختی کامل دپارتمان‌ها (parent → children) برای رندر چارت سازمانی در فرانت — "
+        "هر گره شامل تعداد کاربران و نام مدیر واحد. با `include_members=true` افرادِ هر واحد هم "
+        "به‌صورت تودرتو (بر اساس سطح پستِ سازمانی) در فیلد `members` برمی‌گردند. **دسترسی:** manager به بالا."
+    ),
 )
 async def get_department_tree(
     current_user: Manager,
     db: AsyncSession = Depends(get_db),
     org_id: str | None = Query(None, description="فقط super_admin — مدیریت سازمان دلخواه"),
+    include_members: bool = Query(
+        False, description="افرادِ هر واحد را هم به‌صورت تودرتو (بر اساس سطح پست) در فیلد members برگردان (نمای ادمین)"
+    ),
 ):
     target_org_id = _resolve_org_id(current_user, org_id)
-    return await department_service.build_tree(db, target_org_id)
+    return await department_service.build_tree(db, target_org_id, include_members=include_members)
 
 
 @router.post(

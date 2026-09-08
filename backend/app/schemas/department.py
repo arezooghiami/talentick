@@ -47,6 +47,27 @@ class DepartmentResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class DepartmentMemberNode(BaseModel):
+    """
+    یک فرد داخل یک واحد سازمانی — برای نمایش تودرتوی افراد ذیل هر واحد
+    در نمای درختیِ پنل ادمین (فقط وقتی `include_members=true` باشد).
+
+    تودرتویی بر اساس «مدیر مستقیم» (`users.manager_id`) ساخته می‌شود و
+    افرادِ هم‌رده بر اساس `position_level` نزولی و سپس نام مرتب می‌شوند.
+    """
+    id: str
+    full_name: str
+    avatar_url: str | None = None
+    position_name: str | None = None
+    position_level: int = 0
+    is_manager: bool = False  # مدیرِ همین واحد
+    is_active: bool = True
+    children: list["DepartmentMemberNode"] = []
+
+
+DepartmentMemberNode.model_rebuild()
+
+
 class DepartmentTreeNode(BaseModel):
     """یک گره در چارت سازمانی — برای نمایش درختی در فرانت."""
     id: str
@@ -55,6 +76,7 @@ class DepartmentTreeNode(BaseModel):
     user_count: int = 0
     is_active: bool
     children: list["DepartmentTreeNode"] = []
+    members: list[DepartmentMemberNode] = []
 
 
 DepartmentTreeNode.model_rebuild()

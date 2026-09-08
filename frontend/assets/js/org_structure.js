@@ -11,6 +11,8 @@ const StructurePage = (() => {
     structTab: 'tree',        // 'tree' | 'table' — نمای پیش‌فرض واحدها
     collapsed: new Set(),      // id واحدهایی که در نمای درختی جمع شده‌اند
     dragId: null,              // واحد در حال کشیده‌شدن
+    showMembers: false,        // نمایش افرادِ هر واحد ذیل آن در نمای درختی
+    membersByDept: {},         // deptId → آرایه‌ی تودرتوی افراد (بر اساس مدیر مستقیم)
   };
 
   /** super_admin از این مسیر وارد می‌شود (نه از Router.navigate معمولی). */
@@ -53,6 +55,7 @@ const StructurePage = (() => {
       // شناسه‌های جمع‌شده‌ای که دیگر وجود ندارند را پاک کن
       const ids = new Set(state.depts.map(d => d.id));
       state.collapsed.forEach(id => { if (!ids.has(id)) state.collapsed.delete(id); });
+      if (state.showMembers) await loadMembers();
       populateDeptFilter();
       renderDeptTable();
       renderDeptTree();
@@ -62,6 +65,33 @@ const StructurePage = (() => {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--danger);">${err}</td></tr>`;
       if (tree) tree.innerHTML = `<div class="org-tree-empty" style="color:var(--danger);">${err}</div>`;
     }
+  }
+
+  // ─── نمایش افرادِ هر واحد (نمای درختی) ─────────────────────────
+  async function loadMembers() {
+    try {
+      const tree = await api.get(`/departments/tree?org_id=${state.orgId}&include_members=true`);
+      const map = {};
+      (function walk(nodes) {
+        (nodes || []).forEach(n => { map[n.id] = n.members || []; walk(n.children); });
+      })(tree);
+      state.membersByDept = map;
+    } catch (e) {
+      state.membersByDept = {};
+      toastError(e.message || 'خطا در بارگذاری افراد');
+    }
+  }
+
+  async function toggleMembers() {
+    state.showMembers = !state.showMembers;
+    const btn = document.getElementById('structMembersToggle');
+    if (btn) btn.classList.toggle('active', state.showMembers);
+    if (state.showMembers && !Object.keys(state.membersByDept).length) {
+      const tree = document.getElementById('deptsTree');
+      if (tree) tree.innerHTML = `<div class="org-tree-loading">در حال بارگذاری افراد...</div>`;
+      await loadMembers();
+    }
+    renderDeptTree();
   }
 
   // ─── نمای واحدها: جدولی / درختی ─────────────────────────────────
@@ -143,6 +173,45 @@ const StructurePage = (() => {
     }
     wrap.innerHTML = `<div class="org-tree" id="orgTreeRoot">${renderTreeLevel(null, 0)}</div>`;
     bindTreeDnd(wrap);
+    if (state.showMembers) hydrateAuthedImages(wrap);
+  }
+
+  // ─── رندر بازگشتی افرادِ یک واحد (تودرتو بر اساس مدیر مستقیم) ────
+  function renderMembersBlock(deptId) {
+    if (!state.showMembers) return '';
+    const members = state.membersByDept[deptId] || [];
+    if (!members.length) return '';
+    return `<div class="org-tree-members">
+      <div class="org-members-cap">اعضای واحد — چیدمان بر اساس سطح پست</div>
+      ${renderMemberNodes(members)}
+    </div>`;
+  }
+
+  function renderMemberNodes(nodes) {
+    return nodes.map(m => {
+      const hasKids = m.children && m.children.length;
+      const avatar = m.avatar_url
+        ? `<img class="org-member-av" data-src="${esc(m.avatar_url)}" alt="">`
+        : `<span class="org-member-av">${esc(initials(m.full_name || ''))}</span>`;
+      const role = m.position_name
+        ? `<span class="org-member-role">${esc(m.position_name)}</span>`
+        : `<span class="org-member-role is-empty">بدون پست سازمانی</span>`;
+      return `
+        <div class="org-member-node">
+          <div class="org-member-row${m.is_manager ? ' is-manager' : ''}${m.is_active ? '' : ' is-inactive'}">
+            ${avatar}
+            <span class="org-member-id">
+              <span class="org-member-name">${esc(m.full_name)}</span>
+              ${role}
+            </span>
+            <span class="org-member-meta">
+              ${m.is_manager ? `<span class="org-member-lead">مدیر واحد</span>` : ''}
+              ${m.position_level ? `<span class="org-member-lvl">سطح <b>${numFa(m.position_level)}</b></span>` : ''}
+            </span>
+          </div>
+          ${hasKids ? `<div class="org-member-children">${renderMemberNodes(m.children)}</div>` : ''}
+        </div>`;
+    }).join('');
   }
 
   function renderTreeLevel(parentId, depth) {
@@ -179,6 +248,7 @@ const StructurePage = (() => {
               <button class="btn-action" style="background:#FEF2F2;color:#DC2626;" data-del="${d.id}" data-name="${esc(d.name)}" title="حذف واحد">حذف</button>
             </span>
           </div>
+          ${renderMembersBlock(d.id)}
           ${hasKids && !isCol ? `<div class="org-tree-children">${renderTreeLevel(d.id, depth + 1)}</div>` : ''}
         </div>`;
     }).join('');
@@ -678,7 +748,7 @@ const StructurePage = (() => {
 
   return {
     openFor, loadOwn,
-    setStructTab, toggleAllTree,
+    setStructTab, toggleAllTree, toggleMembers,
     openCreateDept, openEditDept, saveDept, removeDept,
     openCreatePosition, openEditPosition, savePosition, removePosition,
     loadPositions,

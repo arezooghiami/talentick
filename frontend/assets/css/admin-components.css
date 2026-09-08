@@ -365,3 +365,98 @@ button.org-tree-chip { cursor: pointer; font-family: 'Vazirmatn', sans-serif; tr
   .org-tree-actions { opacity: 1; }
   .org-tree-meta { width: 100%; margin-inline-start: 29px; }
 }
+
+/* ═══ افرادِ هر واحد ذیل آن — چیدمان بر اساس سطح پست («نمایش افراد») ═══ */
+/* کلید فعال: پُر و برجسته تا حالت روشن‌بودن آشکار باشد. */
+#structMembersToggle.active {
+  background: var(--primary) !important; color: #fff !important; border-color: var(--primary) !important;
+}
+
+/* گروهِ اعضا زیر ردیفِ واحد — همان زبانِ بصریِ خطوط اتصالِ درختِ واحدها،
+   اما با کنتراست کمتر تا از سلسله‌مراتبِ خودِ واحدها متمایز بماند. */
+.org-tree-members {
+  position: relative;
+  margin-inline-start: 27px;
+  padding-inline-start: 22px;
+  margin-top: 3px; padding-top: 4px;
+}
+.org-members-cap {
+  font-size: 10px; font-weight: 700; letter-spacing: .02em;
+  color: var(--gray-400); text-transform: none;
+  margin: 0 2px 4px;
+}
+.org-tree-members::before {
+  content: ''; position: absolute; inset-inline-start: 0; top: -6px; bottom: 0;
+  width: 0; border-inline-start: 2px solid var(--gray-200);
+}
+.org-member-children {
+  position: relative;
+  margin-inline-start: 22px;
+  padding-inline-start: 22px;
+}
+.org-member-children::before {
+  content: ''; position: absolute; inset-inline-start: 0; top: -6px; bottom: 0;
+  width: 0; border-inline-start: 2px solid var(--gray-200);
+}
+.org-member-node { position: relative; }
+.org-member-node::before {
+  content: ''; position: absolute; inset-inline-start: -22px; top: 20px;
+  width: 22px; height: 0; border-top: 2px solid var(--gray-200);
+}
+/* آخرین فرد: خطِ عمودی فقط تا آرنجِ همان ردیف ادامه یابد */
+.org-tree-members > .org-member-node:last-child::after,
+.org-member-children > .org-member-node:last-child::after {
+  content: ''; position: absolute; inset-inline-start: -22px; top: 21px; bottom: 0;
+  width: 3px; background: var(--card-bg);
+}
+
+.org-member-row {
+  display: flex; align-items: center; gap: 9px; position: relative;
+  padding: 6px 11px; margin: 4px 0;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+  transition: border-color .12s, background .12s;
+}
+.org-member-row:hover { border-color: var(--primary-100); background: var(--gray-50); }
+.org-member-row.is-manager { border-color: var(--primary-200); background: var(--primary-50); }
+.org-member-row.is-inactive { opacity: .5; }
+
+.org-member-av {
+  width: 27px; height: 27px; border-radius: 50%; flex-shrink: 0;
+  object-fit: cover;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; letter-spacing: -.3px;
+  background: var(--primary-light); color: var(--primary-darker); text-transform: uppercase;
+}
+img.org-member-av { background: var(--gray-100); }
+.org-member-row.is-manager .org-member-av {
+  box-shadow: 0 0 0 2px var(--card-bg), 0 0 0 3.5px var(--primary);
+}
+
+.org-member-id { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.org-member-name { font-size: 12.5px; font-weight: 700; color: var(--gray-800); white-space: nowrap; }
+.org-member-role {
+  font-size: 10.5px; color: var(--gray-500);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
+}
+.org-member-role.is-empty { color: var(--gray-400); }
+
+.org-member-meta { display: flex; align-items: center; gap: 6px; margin-inline-start: auto; flex-shrink: 0; }
+.org-member-lead {
+  font-size: 9.5px; font-weight: 800; color: var(--primary-darker);
+  background: var(--primary-light); border-radius: 20px; padding: 2px 8px; white-space: nowrap;
+}
+.org-member-lvl {
+  font-size: 10px; font-weight: 700; color: var(--gray-500);
+  background: var(--gray-50); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 2px 7px; white-space: nowrap;
+}
+.org-member-lvl b { font-weight: 800; color: var(--gray-700); }
+
+@media (max-width: 640px) {
+  .org-tree-members { margin-inline-start: 12px; padding-inline-start: 16px; }
+  .org-member-children { margin-inline-start: 14px; padding-inline-start: 16px; }
+  .org-member-node::before { inset-inline-start: -16px; width: 16px; }
+  .org-tree-members > .org-member-node:last-child::after,
+  .org-member-children > .org-member-node:last-child::after { inset-inline-start: -16px; }
+  .org-member-role { max-width: 140px; }
+}
