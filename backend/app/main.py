@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -53,11 +54,46 @@ app = FastAPI(
     title="Talentick API",
     description="پلتفرم یادگیری و آنبوردینگ سازمانی",
     version="0.1.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    # docs_url/redoc_url روی None — به‌جای CDN (jsdelivr) از assetهای
+    # لوکالِ زیر سرو می‌شوند تا Swagger/ReDoc بدون اینترنت هم بالا بیاید.
+    # نگاه کنید به روت‌های سفارشی /api/docs و /api/redoc پایین‌تر.
+    docs_url=None,
+    redoc_url=None,
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+# ─── Self-hosted API Docs assets ──────────────────────────────────────────────
+# فایل‌های swagger-ui-*.js/.css در backend/app/static/swagger/ نگهداری می‌شوند
+# (از cdnjs دانلود و کامیت شده‌اند). cwd هنگام اجرا backend/ (dev) یا /app
+# (کانتینر) است، پس مسیر نسبی app/static در هر دو حالت درست است.
+_SWAGGER_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%234a90d9'/%3E%3C/svg%3E"
+app.mount("/api/static", StaticFiles(directory="app/static"), name="api-static")
+
+
+@app.get("/api/docs", include_in_schema=False)
+async def swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} — Swagger UI",
+        swagger_js_url="/api/static/swagger/swagger-ui-bundle.js",
+        swagger_css_url="/api/static/swagger/swagger-ui.css",
+        swagger_favicon_url=_SWAGGER_FAVICON,
+    )
+
+
+@app.get("/api/redoc", include_in_schema=False)
+async def redoc_html():
+    # ReDoc از همان swagger-ui-bundle استفاده نمی‌کند؛ فایل standalone آن روی
+    # cdnjs موجود نبود، پس فعلاً ReDoc هم روی همان Swagger UI برمی‌گردد.
+    # اگر بعداً redoc.standalone.js اضافه شد، اینجا به get_redoc_html سوییچ شود.
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} — API Docs",
+        swagger_js_url="/api/static/swagger/swagger-ui-bundle.js",
+        swagger_css_url="/api/static/swagger/swagger-ui.css",
+        swagger_favicon_url=_SWAGGER_FAVICON,
+    )
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 # ⚠️ نکته امنیتی مهم: origin=["*"] به‌همراه allow_credentials=True طبق
