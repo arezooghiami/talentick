@@ -12,6 +12,7 @@ Talentick — FastAPI Application Entry Point
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -65,10 +66,12 @@ app = FastAPI(
 
 # ─── Self-hosted API Docs assets ──────────────────────────────────────────────
 # فایل‌های swagger-ui-*.js/.css در backend/app/static/swagger/ نگهداری می‌شوند
-# (از cdnjs دانلود و کامیت شده‌اند). cwd هنگام اجرا backend/ (dev) یا /app
-# (کانتینر) است، پس مسیر نسبی app/static در هر دو حالت درست است.
+# (از cdnjs دانلود و کامیت شده‌اند). مسیر نسبت به همین فایل حساب می‌شود تا به
+# cwd وابسته نباشد. check_dir=False هم عمداً — اگر assetها روی سرور موجود
+# نباشند فقط /api/docs خراب می‌شود، نه کل API (وگرنه import کرش می‌کرد → 502).
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 _SWAGGER_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%234a90d9'/%3E%3C/svg%3E"
-app.mount("/api/static", StaticFiles(directory="app/static"), name="api-static")
+app.mount("/api/static", StaticFiles(directory=_STATIC_DIR, check_dir=False), name="api-static")
 
 
 @app.get("/api/docs", include_in_schema=False)
