@@ -430,16 +430,13 @@ async def update_user(db: AsyncSession, user: User, data: UserUpdateRequest, act
 
 async def delete_user(db: AsyncSession, user: User) -> None:
     """
-    غیرفعال‌سازی کاربر (Soft Delete) — هیچ رکوردی از دیتابیس پاک نمی‌شود.
+    حذف واقعی کاربر از دیتابیس (Hard Delete).
 
-    دلیل: کاربر ممکن است سابقه‌ی مرتبط (quiz_attempts، content progress،
-    onboarding enrollments و ...) داشته باشد که با حذف فیزیکی از بین
-    می‌رفت. به‌جای آن is_active=False می‌شود و کاربر می‌تواند بعداً از
-    طریق toggle-active دوباره فعال شود.
-
-    توجه: اگر کاربر از قبل غیرفعال بوده، این عملیات idempotent است.
+    رکوردهای مرتبط بر اساس ondelete تعریف‌شده در مدل‌ها مدیریت می‌شوند
+    (برخی CASCADE حذف می‌شوند، برخی SET NULL می‌گیرند) — این رفتار در
+    سطح دیتابیس اعمال می‌شود، نه در این تابع.
     """
-    user.is_active = False
+    await db.delete(user)
     await db.commit()
 
 

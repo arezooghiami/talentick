@@ -5,7 +5,7 @@ Talentick — Auth Endpoint Tests
 - ورود موفق و ساخت access token معتبر
 - ورود با پسورد اشتباه → 401
 - ورود با ایمیل ناموجود → 401
-- ورود کاربر غیرفعال (Soft-Deleted) → 401
+- ورود کاربر غیرفعال (is_active=False) → 401
 - GET /api/auth/me با/بدون توکن معتبر
 """
 from httpx import AsyncClient
@@ -43,7 +43,7 @@ async def test_login_unknown_email(client: AsyncClient):
 
 
 async def test_login_inactive_user_rejected(client: AsyncClient, employee_user: User, db_session):
-    """کاربر Soft-Delete شده (is_active=False) نباید بتواند لاگین کند."""
+    """کاربر غیرفعال‌شده (is_active=False) نباید بتواند لاگین کند."""
     employee_user.is_active = False
     db_session.add(employee_user)
     await db_session.commit()

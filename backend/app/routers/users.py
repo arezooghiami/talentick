@@ -11,11 +11,10 @@ CRUD کامل کاربران با رعایت سلسله‌مراتب نقش و O
 - GET  /api/users/{id}                → جزئیات یک کاربر — manager به بالا + org isolation
 - POST /api/users/                    → ساخت کاربر جدید — فقط org_admin به بالا
 - PATCH /api/users/{id}               → ویرایش کاربر — manager به بالا + org isolation
-- DELETE /api/users/{id}              → غیرفعال‌سازی کاربر (Soft Delete —
-                                         is_active=False، هیچ رکوردی پاک نمی‌شود)
+- DELETE /api/users/{id}              → حذف واقعی کاربر (Hard Delete —
+                                         رکورد کاملاً از دیتابیس پاک می‌شود)
                                          — manager به بالا + org isolation
-- PATCH /api/users/{id}/toggle-active → فعال/غیرفعال — manager به بالا + org isolation
-                                         (برای بازگرداندن کاربر soft-delete‌شده هم استفاده می‌شود)
+- PATCH /api/users/{id}/toggle-active → فعال/غیرفعال کردن کاربر — manager به بالا + org isolation
 
 قانون طلایی Org Isolation:
 هر کاربری که super_admin نیست، فقط می‌تواند کاربران سازمان خودش را
@@ -183,7 +182,7 @@ async def list_org_users(
     dept_id: str | None = Query(None, description="فیلتر بر اساس واحد"),
     position_id: str | None = Query(None, description="فیلتر بر اساس پست"),
     is_active: bool | None = Query(
-        None, description="پیش‌فرض فقط کاربران فعال. برای دیدن غیرفعال‌ها (soft-deleted) صراحتاً false بدهید."
+        None, description="پیش‌فرض فقط کاربران فعال. برای دیدن غیرفعال‌شده‌ها صراحتاً false بدهید."
     ),
 ) -> PaginatedUsers:
     scoped_org_id = org_id if current_user.role == "super_admin" else str(current_user.org_id)
@@ -412,12 +411,12 @@ async def update_user(
 @router.delete(
     "/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="غیرفعال‌سازی کاربر (Soft Delete)",
+    summary="حذف واقعی کاربر (Hard Delete)",
     description="""
-    کاربر را غیرفعال می‌کند (is_active=False) — هیچ رکوردی از دیتابیس پاک
-    نمی‌شود. کاربر غیرفعال‌شده به‌طور پیش‌فرض از لیست‌ها و جستجوها مخفی
-    می‌شود، اما سابقه‌ی او (محتوا، آزمون، onboarding) دست‌نخورده باقی می‌ماند
-    و از طریق `PATCH /{id}/toggle-active` قابل بازگردانی است.
+    کاربر را به‌طور کامل و غیرقابل‌بازگشت از دیتابیس پاک می‌کند.
+
+    برای غیرفعال‌سازی موقت (بدون از دست دادن سابقه‌ی کاربر) از
+    `PATCH /{id}/toggle-active` استفاده کنید.
     """,
 )
 async def delete_user(
